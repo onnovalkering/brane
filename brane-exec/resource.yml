@@ -1,0 +1,68 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: manage-jobs
+  namespace: brane
+rules:
+- apiGroups: ["batch", "extensions"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: brane-exec-sa
+  namespace: brane
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: allow-manage-jobs
+  namespace: brane
+subjects:
+- kind: ServiceAccount
+  name: brane-exec-sa
+  namespace: brane
+roleRef:
+  kind: Role
+  name: manage-jobs
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: brane-exec
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: brane-exec
+  template:
+    metadata:
+      labels:
+        app: brane-exec
+    spec:
+      serviceAccountName: brane-exec-sa
+      containers:
+        - name: brane-exec
+          image: onnovalkering/brane-exec
+          env:
+            - name: "DEBUG"
+              value: "true"
+            - name: "K8S_IN_CLUSTER"
+              value: "true"
+            - name: "K8S_NAMESPACE"
+              value: "brane"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: brane-exec
+spec:
+  type: NodePort
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 31980
+  selector:
+    app: brane-exec
