@@ -1,0 +1,12 @@
+[package]
+name = "brane"
+version = "0.1.0"
+authors = ["Onno Valkering"]
+edition = "2018"
+
+[dependencies]
+env_logger = "0.7"
+failure = "0.1"
+human-panic = "1.0"
+log = "0.4"
+structopt = "0.3"
