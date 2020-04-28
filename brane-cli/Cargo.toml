@@ -5,9 +5,17 @@ authors = ["Onno Valkering"]
 edition = "2018"
 
 [dependencies]
+appdirs = "0.2"
+chrono = "0.4"
+console = "0.11"
 env_logger = "0.7"
 failure = "0.1"
 human-panic = "1.0"
+indicatif = "0.14"
 log = "0.4"
+prettytable-rs = "0.8"
 semver = "0.9"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.8"
 structopt = "0.3"
+specifications = { git = "https://github.com/brane-ri/specifications" }

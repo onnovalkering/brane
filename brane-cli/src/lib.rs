@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate failure;
+#[macro_use]
+extern crate prettytable;
 
 pub mod build_api;
 pub mod build_cwl;
