@@ -3,6 +3,7 @@ extern crate human_panic;
 
 use log::LevelFilter;
 use std::path::PathBuf;
+use std::process;
 use structopt::StructOpt;
 
 type FResult<T> = Result<T, failure::Error>;
@@ -97,6 +98,12 @@ fn main() -> FResult<()> {
             authors: env!("CARGO_PKG_AUTHORS").replace(":", ", ").into(),
             homepage: env!("CARGO_PKG_HOMEPAGE").into(),
         });
+    }
+
+    let deps_check = brane::check_dependencies();
+    if deps_check.is_err() {
+        println!("Dependency not found: Docker (version >= 19.0.0).");
+        process::exit(1);
     }
 
     Ok(())
