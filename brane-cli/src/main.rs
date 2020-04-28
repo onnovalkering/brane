@@ -1,12 +1,11 @@
 #[macro_use]
 extern crate human_panic;
 
+use brane::{build_api, build_cwl, build_ecu, packages, registry};
 use log::LevelFilter;
 use std::path::PathBuf;
 use std::process;
 use structopt::StructOpt;
-
-type FResult<T> = Result<T, failure::Error>;
 
 #[derive(StructOpt)]
 #[structopt(name = "brane", about = "The Brane command-line interface.")]
@@ -14,7 +13,7 @@ struct CLI {
     #[structopt(short, long, help = "Enable debug mode")]
     debug: bool,
     #[structopt(subcommand)]
-    command: SubCommand,
+    sub_command: SubCommand,
 }
 
 #[derive(StructOpt)]
@@ -25,21 +24,17 @@ enum SubCommand {
         context: PathBuf,
         #[structopt(name = "FILE", help = "Path to the file to build, relative to the context")]
         file: PathBuf,
-        #[structopt(short, long, help = "Kind of package: container, cwl, open-api, script")]
-        kind: String
+        #[structopt(short, long, help = "Kind of package: api, cwl, ecu")]
+        kind: String,
     },
 
     #[structopt(name = "list", about = "List packages")]
-    List {
-
-    },
+    List {},
 
     #[structopt(name = "login", about = "Log in to a registry")]
     Login {
         #[structopt(name = "HOST", help = "Hostname of the registry")]
         host: String,
-        #[structopt(short, long, help = "Password of the account")]
-        password: Option<String>,
         #[structopt(short, long, help = "Username of the account")]
         username: String,
     },
@@ -53,25 +48,25 @@ enum SubCommand {
     #[structopt(name = "pull", about = "Pull a package from a registry")]
     Pull {
         #[structopt(name = "NAME", help = "Name of the package")]
-        name: String
+        name: String,
     },
 
     #[structopt(name = "push", about = "Push a package to a registry")]
     Push {
         #[structopt(name = "NAME", help = "Name of the package")]
-        name: String
+        name: String,
     },
 
     #[structopt(name = "remove", about = "Remove one or more local packages")]
     Remove {
         #[structopt(name = "NAME", help = "Name of the package")]
-        name: String
+        name: String,
     },
 
     #[structopt(name = "test", about = "Test a package locally")]
     Test {
         #[structopt(name = "NAME", help = "Name of the package")]
-        name: String
+        name: String,
     },
 
     #[structopt(name = "search", about = "Search a registry for packages")]
@@ -81,7 +76,7 @@ enum SubCommand {
     },
 }
 
-fn main() -> FResult<()> {
+fn main() {
     let options = CLI::from_args();
 
     let mut logger = env_logger::builder();
@@ -106,5 +101,39 @@ fn main() -> FResult<()> {
         process::exit(1);
     }
 
-    Ok(())
+    use SubCommand::*;
+    match options.sub_command {
+        Build { context, file, kind } => match kind.as_str() {
+            "api" => build_api::handle(context, file).unwrap(),
+            "cwl" => build_cwl::handle(context, file).unwrap(),
+            "ecu" => build_ecu::handle(context, file).unwrap(),
+            _ => unreachable!(),
+        },
+        List {} => {
+            packages::list().unwrap();
+        }
+        Login { host, username } => {
+            registry::login(host, username).unwrap();
+        }
+        Logout { host } => {
+            registry::logout(host).unwrap();
+        }
+        Pull { name } => {
+            registry::pull(name).unwrap();
+        }
+        Push { name } => {
+            registry::push(name).unwrap();
+        }
+        Remove { name } => {
+            packages::remove(name).unwrap();
+        }
+        Test { name } => {
+            packages::test(name).unwrap();
+        }
+        Search { terms } => {
+            registry::search(terms).unwrap();
+        }
+    }
+
+    process::exit(0);
 }

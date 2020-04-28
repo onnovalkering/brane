@@ -1,6 +1,12 @@
 #[macro_use]
 extern crate failure;
 
+pub mod build_api;
+pub mod build_cwl;
+pub mod build_ecu;
+pub mod packages;
+pub mod registry;
+
 use semver::Version;
 use std::process::Command;
 
