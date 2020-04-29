@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "brane-cli",
+    "brane-exec",
+]
