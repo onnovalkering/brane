@@ -61,6 +61,10 @@ enum SubCommand {
     Remove {
         #[structopt(name = "NAME", help = "Name of the package")]
         name: String,
+        #[structopt(short, long, help = "Version of the package")]
+        version: Option<String>,
+        #[structopt(short, long, help = "Don't ask for confirmation")]
+        force: bool,
     },
 
     #[structopt(name = "test", about = "Test a package locally")]
@@ -124,8 +128,8 @@ fn main() {
         Push { name } => {
             registry::push(name).unwrap();
         }
-        Remove { name } => {
-            packages::remove(name).unwrap();
+        Remove { name, version, force } => {
+            packages::remove(name, version, force).unwrap();
         }
         Test { name } => {
             packages::test(name).unwrap();

@@ -1,5 +1,6 @@
 use chrono::Utc;
 use console::{pad_str, Alignment};
+use dialoguer::Confirm;
 use indicatif::HumanDuration;
 use prettytable::format::FormatBuilder;
 use prettytable::Table;
@@ -25,11 +26,16 @@ pub fn get_packages_dir() -> PathBuf {
 ///
 pub fn get_package_dir(
     name: &str,
-    version: &str,
+    version: Option<&str>,
 ) -> FResult<PathBuf> {
     let packages_dir = get_packages_dir();
     let package_dir = packages_dir.join(&name);
 
+    if version.is_none() {
+        return Ok(package_dir);
+    }
+
+    let version = version.unwrap();
     let version = if version == "latest" {
         ensure!(package_dir.exists(), "Package does not exist.");
 
@@ -57,23 +63,21 @@ pub fn get_package_dir(
 ///
 pub fn list() -> FResult<()> {
     let packages_dir = get_packages_dir();
-
-    // Prepare display table.
-    let format = FormatBuilder::new()
-        .column_separator('\0')
-        .borders('\0')
-        .padding(1, 1)
-        .build();
-
-    let mut table = Table::new();
-    table.set_format(format);
-    table.add_row(row!["ID", "NAME", "VERSION", "CREATED"]);
-
-    // Return early, if packages directory does not exist.
     if !packages_dir.exists() {
         println!("No packages found.");
         return Ok(());
     }
+
+    // Prepare display table.
+    let format = FormatBuilder::new()
+    .column_separator('\0')
+    .borders('\0')
+    .padding(1, 1)
+    .build();
+
+    let mut table = Table::new();
+    table.set_format(format);
+    table.add_row(row!["ID", "NAME", "VERSION", "CREATED"]);
 
     // Add a row to the table for each version of each group.
     let packages = fs::read_dir(packages_dir)?;
@@ -116,8 +120,47 @@ pub fn list() -> FResult<()> {
 ///
 ///
 ///
-pub fn remove(_name: String) -> FResult<()> {
-    println!("Remove package.");
+pub fn remove(
+    name: String,
+    version: Option<String>,
+    force: bool,
+) -> FResult<()> {
+    // Remove without confirmation if explicity stated package version.
+    if let Some(version) = version {
+        let package_dir = get_package_dir(&name, Some(&version))?;
+        if let Err(_) = fs::remove_dir_all(&package_dir) {
+            println!("No package with name '{}' and version '{}' exists!", name, version);
+        }
+
+        return Ok(());
+    }
+
+    let package_dir = get_package_dir(&name, None)?;
+    if !package_dir.exists() {
+        println!("No package with name '{}' exists!", name);
+        return Ok(());
+    }
+
+    // Also remove without confirmation if --force is provided.
+    if force {
+        fs::remove_dir_all(&package_dir)?;
+        return Ok(());
+    }
+
+    // Look for packages.
+    let versions = fs::read_dir(&package_dir)?
+        .map(|v| v.unwrap().file_name())
+        .map(|v| String::from(v.to_string_lossy()));
+
+    println!("Do you want to remove the following version(s)?");
+    for version in versions {
+        println!("- {}", version);
+    }
+    println!();
+
+    if Confirm::new().interact()? {
+        fs::remove_dir_all(&package_dir)?;
+    }
 
     Ok(())
 }

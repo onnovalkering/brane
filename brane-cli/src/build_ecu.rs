@@ -21,7 +21,7 @@ pub fn handle(
     file: PathBuf,
 ) -> FResult<()> {
     let container_info = ContainerInfo::from_path(context.join(file))?;
-    let package_dir = packages::get_package_dir(&container_info.name, &container_info.version)?;
+    let package_dir = packages::get_package_dir(&container_info.name, Some(&container_info.version))?;
 
     // Prepare package directory
     let dockerfile = generate_dockerfile(&container_info)?;
