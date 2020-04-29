@@ -1,0 +1,91 @@
+name: arithmetic-task
+version: 1.0.0
+
+kind: compute
+
+entrypoint:
+  kind: task
+  exec: run.sh
+
+dependencies:
+  - bash
+
+files:
+  - run.sh
+
+actions:
+  add:
+    command:
+      args:
+        - add
+
+    notation:
+      infix:
+        - "+"
+
+    input:
+      - name: a
+        type: integer
+      - name: b
+        type: integer
+
+    output:
+      - name: c
+        type: integer
+
+  substract:
+    command:
+      args:
+        - substract
+
+    notation:
+      infix:
+        - "-"
+
+    input:
+      - name: a
+        type: integer
+      - name: b
+        type: integer
+
+    output:
+      - name: c
+        type: integer
+
+  multiply:
+    command:
+      args:
+        - multiply
+
+    notation:
+      infix:
+        - "*"
+
+    input:
+      - name: a
+        type: integer
+      - name: b
+        type: integer
+
+    output:
+      - name: c
+        type: integer
+
+  divide:
+    command:
+      args:
+        - divide
+
+    notation:
+      infix:
+        - "/"
+
+    input:
+      - name: a
+        type: integer
+      - name: b
+        type: integer
+
+    output:
+      - name: c
+        type: integer
