@@ -3,12 +3,54 @@ use console::{pad_str, Alignment};
 use indicatif::HumanDuration;
 use prettytable::format::FormatBuilder;
 use prettytable::Table;
+use semver::Version;
 use specifications::groupmeta::GroupMeta as PackageInfo;
 use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
 
 type FResult<T> = Result<T, failure::Error>;
+
+///
+///
+///
+pub fn get_packages_dir() -> PathBuf {
+    appdirs::user_data_dir(Some("brane"), None, false)
+        .expect("Couldn't determine Brane data directory.")
+        .join("packages")
+}
+
+///
+///
+///
+pub fn get_package_dir(
+    name: &str,
+    version: &str,
+) -> FResult<PathBuf> {
+    let packages_dir = get_packages_dir();
+    let package_dir = packages_dir.join(&name);
+
+    let version = if version == "latest" {
+        ensure!(package_dir.exists(), "Package does not exist.");
+
+        let versions = fs::read_dir(&package_dir)?;
+        let mut versions: Vec<Version> = versions
+            .map(|v| v.unwrap().file_name())
+            .map(|v| Version::parse(&v.into_string().unwrap()).unwrap())
+            .collect();
+
+        versions.sort();
+        versions.reverse();
+
+        versions[0].to_string()
+    } else {
+        Version::parse(&version)
+            .expect("Not a valid semantic version.")
+            .to_string()
+    };
+
+    Ok(package_dir.join(version))
+}
 
 ///
 ///
@@ -29,7 +71,7 @@ pub fn list() -> FResult<()> {
 
     // Return early, if packages directory does not exist.
     if !packages_dir.exists() {
-        table.print_tty(true);
+        println!("No packages found.");
         return Ok(());
     }
 
@@ -87,13 +129,4 @@ pub fn test(_name: String) -> FResult<()> {
     println!("Test package.");
 
     Ok(())
-}
-
-///
-///
-///
-fn get_packages_dir() -> PathBuf {
-    appdirs::user_data_dir(Some("brane"), None, false)
-        .expect("Couldn't determine Brane data directory.")
-        .join("packages")
 }
