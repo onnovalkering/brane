@@ -6,7 +6,6 @@ $namespaces:
 s:name: 'echo'
 s:description: 'Simple echo command-line tool.'
 s:version: '1.0.0'
-s:license: 'MIT'
 
 cwlVersion: v1.0
 class: CommandLineTool
