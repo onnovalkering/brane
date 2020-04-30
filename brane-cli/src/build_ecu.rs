@@ -1,6 +1,6 @@
 use crate::packages;
-use specifications::actiongroup::ActionGroup as ContainerInfo;
-use specifications::groupmeta::{Function, GroupMeta as PackageInfo};
+use specifications::container::ContainerInfo;
+use specifications::package::{Function, PackageInfo};
 use std::fmt::Write as FmtWrite;
 use std::fs;
 use std::fs::File;
@@ -51,15 +51,13 @@ fn generate_package_info(container_info: &ContainerInfo) -> FResult<PackageInfo>
     }
 
     // Create and write a package.yml file.
-    let image_id = None;
-    let package_info = PackageInfo::new_action(
+    let package_info = PackageInfo::new(
         container_info.name.clone(),
         container_info.version.clone(),
         container_info.description.clone(),
-        container_info.contributors.clone(),
+        String::from("cwl"),
+        Some(functions),
         None,
-        functions,
-        image_id,
     );
 
     Ok(package_info)

@@ -1,5 +1,4 @@
 use crate::packages;
-use chrono::Utc;
 use cwl::v11_clt::{CommandInputParameter, CommandInputParameterType, CommandLineToolInput, CommandLineToolInputType};
 use cwl::v11_clt::{
     CommandLineToolOutput, CommandLineToolOutputType, CommandOutputParameter, CommandOutputParameterType,
@@ -7,11 +6,10 @@ use cwl::v11_clt::{
 use cwl::v11_cm::CwlType;
 use cwl::{v11::CwlDocument, v11_clt::CommandLineTool};
 use specifications::common::{Argument, Type};
-use specifications::groupmeta::{Function, GroupMeta as PackageInfo};
+use specifications::package::{Function, PackageInfo};
 use std::io::Write;
 use std::path::PathBuf;
 use std::{fs, fs::File};
-use uuid::Uuid;
 
 type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
@@ -53,19 +51,14 @@ fn create_package_info(cwl_document: CwlDocument) -> FResult<PackageInfo> {
         }
     };
 
-    let package_info = PackageInfo {
-        created: Utc::now(),
-        contributors: None,
-        description,
-        functions,
-        id: Uuid::new_v4(),
-        image_id: None,
-        kind: String::from("cwl"),
-        license: None,
+    let package_info = PackageInfo::new(
         name,
-        types: Some(types),
         version,
-    };
+        description,
+        String::from("cwl"),
+        Some(functions),
+        Some(types)
+    );
 
     Ok(package_info)
 }

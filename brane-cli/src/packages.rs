@@ -5,7 +5,7 @@ use indicatif::HumanDuration;
 use prettytable::format::FormatBuilder;
 use prettytable::Table;
 use semver::Version;
-use specifications::groupmeta::GroupMeta as PackageInfo;
+use specifications::package::PackageInfo;
 use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;

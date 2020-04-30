@@ -20,5 +20,4 @@ semver = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8"
 structopt = "0.3"
-specifications = { git = "https://github.com/brane-ri/specifications" }
-uuid = { version = "0.8", features = ["serde", "v4"] }
+specifications = { path = "../specifications" }
