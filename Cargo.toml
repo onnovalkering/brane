@@ -3,4 +3,5 @@
 members = [
     "brane-cli",
     "brane-exec",
+    "specifications",
 ]
