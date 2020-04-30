@@ -107,7 +107,7 @@ fn main() {
 
     use SubCommand::*;
     match options.sub_command {
-        Build { context, file, kind } => match kind.as_str() {
+        Build { context, file, kind } => match kind.to_lowercase().as_str() {
             "api" => build_api::handle(context, file).unwrap(),
             "cwl" => build_cwl::handle(context, file).unwrap(),
             "ecu" => build_ecu::handle(context, file).unwrap(),

@@ -9,16 +9,19 @@ s:version: "1.0.0"
 
 cwlVersion: v1.0
 class: Workflow
+label: echo-wf
 
 inputs:
-  message: string
+  message:
+    type: string
 
 steps:
   echo-step:
     run: echo.cwl
     in:
       message: message
-    out: [message]
+    out:
+      - message
 
 outputs:
   message:

@@ -70,10 +70,10 @@ pub fn list() -> FResult<()> {
 
     // Prepare display table.
     let format = FormatBuilder::new()
-    .column_separator('\0')
-    .borders('\0')
-    .padding(1, 1)
-    .build();
+        .column_separator('\0')
+        .borders('\0')
+        .padding(1, 1)
+        .build();
 
     let mut table = Table::new();
     table.set_format(format);
