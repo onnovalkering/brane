@@ -111,7 +111,7 @@ fn main() {
             "api" => build_api::handle(context, file).unwrap(),
             "cwl" => build_cwl::handle(context, file).unwrap(),
             "ecu" => build_ecu::handle(context, file).unwrap(),
-            _ => unreachable!(),
+            _ => println!("Unsupported package kind: {}", kind),
         },
         List {} => {
             packages::list().unwrap();
