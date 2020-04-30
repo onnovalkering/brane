@@ -11,7 +11,7 @@ type FResult<T> = Result<T, failure::Error>;
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ActionGroup {
+pub struct ContainerInfo {
     pub actions: Map<Action>,
     pub base: Option<String>,
     pub contributors: Option<Vec<String>>,
@@ -29,14 +29,14 @@ pub struct ActionGroup {
 }
 
 #[allow(unused)]
-impl ActionGroup {
-    pub fn from_path(path: PathBuf) -> FResult<ActionGroup> {
+impl ContainerInfo {
+    pub fn from_path(path: PathBuf) -> FResult<ContainerInfo> {
         let contents = fs::read_to_string(path)?;
 
-        ActionGroup::from_string(contents)
+        ContainerInfo::from_string(contents)
     }
 
-    pub fn from_string(contents: String) -> FResult<ActionGroup> {
+    pub fn from_string(contents: String) -> FResult<ContainerInfo> {
         let result = serde_yaml::from_str(&contents)?;
 
         Ok(result)

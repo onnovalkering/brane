@@ -13,77 +13,49 @@ type FResult<T> = Result<T, failure::Error>;
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct GroupMeta {
+pub struct PackageInfo {
     pub created: DateTime<Utc>,
-    pub contributors: Option<Vec<String>>,
     pub description: Option<String>,
-    pub functions: Map<Function>,
+    pub functions: Option<Map<Function>>,
     pub id: Uuid,
-    pub image_id: Option<String>,
     pub kind: String,
-    pub license: Option<String>,
     pub name: String,
     pub types: Option<Map<Type>>,
     pub version: String,
 }
 
 #[allow(unused)]
-impl GroupMeta {
-    pub fn new_action(
+impl PackageInfo {
+    pub fn new(
         name: String,
         version: String,
         description: Option<String>,
-        contributors: Option<Vec<String>>,
-        license: Option<String>,
-        functions: Map<Function>,
-        image_id: Option<String>,
-    ) -> GroupMeta {
-        GroupMeta {
-            created: Utc::now(),
-            contributors,
-            description,
-            functions,
-            id: Uuid::new_v4(),
-            image_id,
-            kind: "action".to_string(),
-            license,
-            name,
-            types: None,
-            version,
-        }
-    }
-
-    pub fn new_activity(
-        name: String,
-        version: String,
-        description: Option<String>,
-        contributors: Option<Vec<String>>,
-        license: Option<String>,
-        functions: Map<Function>,
+        kind: String,
+        functions: Option<Map<Function>>,
         types: Option<Map<Type>>,
-    ) -> GroupMeta {
-        GroupMeta {
-            created: Utc::now(),
-            contributors,
+    ) -> PackageInfo {
+        let id = Uuid::new_v4();
+        let created = Utc::now();
+
+        PackageInfo {
+            created,
             description,
             functions,
-            id: Uuid::new_v4(),
-            image_id: None,
-            kind: "activity".to_string(),
-            license,
+            id,
+            kind,
             name,
             types,
             version,
         }
     }
 
-    pub fn from_path(path: PathBuf) -> FResult<GroupMeta> {
+    pub fn from_path(path: PathBuf) -> FResult<PackageInfo> {
         let contents = fs::read_to_string(path)?;
 
-        GroupMeta::from_string(contents)
+        PackageInfo::from_string(contents)
     }
 
-    pub fn from_string(contents: String) -> FResult<GroupMeta> {
+    pub fn from_string(contents: String) -> FResult<PackageInfo> {
         let result = serde_yaml::from_str(&contents)?;
 
         Ok(result)
