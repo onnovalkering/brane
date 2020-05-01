@@ -8,6 +8,7 @@ use semver::Version;
 use specifications::package::PackageInfo;
 use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
 use std::time::Duration;
 
 type FResult<T> = Result<T, failure::Error>;
@@ -168,8 +169,52 @@ pub fn remove(
 ///
 ///
 ///
-pub fn test(_name: String) -> FResult<()> {
-    println!("Test package.");
+pub fn test(
+    name: String,
+    version: Option<String>,
+) -> FResult<()> {
+    let version_or_latest = version.unwrap_or(String::from("latest"));
+    let package_dir = get_package_dir(&name, Some(&version_or_latest))?;
+    ensure!(package_dir.exists(), "No package found.");
+
+    let package_info = PackageInfo::from_path(package_dir.join("package.yml"))?;
+    ensure!(package_info.kind == String::from("ecu"), "Only testing of ECU packages is supported.");
+
+    let image_tag = format!("{}:{}", package_info.name, package_info.version);
+    let image_file = package_dir.join("image.tar");
+    ensure!(image_file.exists(), "No image found.");
+
+    // Load image
+    let output = Command::new("docker")
+        .arg("load")
+        .arg("-i")
+        .arg(image_file)
+        .output()
+        .expect("Couldn't run 'docker' command.");
+
+    ensure!(output.status.success(), "Failed to load image.");
+
+    // Run image
+    Command::new("docker")
+        .arg("run")
+        .arg("--rm")
+        .arg("-it")
+        .arg(&image_tag)
+        .arg("test")
+        .status()
+        .expect("Couldn't run 'docker' command.");
+
+    // Unload image
+    let output = Command::new("docker")
+        .arg("image")
+        .arg("rm")
+        .arg(&image_tag)
+        .output()
+        .expect("Couldn't run 'docker' command.");
+
+    if !output.status.success() {
+        warn!("Failed to unload '{}', image remains loaded in Docker.", image_tag);
+    }
 
     Ok(())
 }

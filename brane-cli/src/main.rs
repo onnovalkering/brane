@@ -71,6 +71,8 @@ enum SubCommand {
     Test {
         #[structopt(name = "NAME", help = "Name of the package")]
         name: String,
+        #[structopt(short, long, help = "Version of the package")]
+        version: Option<String>,
     },
 
     #[structopt(name = "search", about = "Search a registry for packages")]
@@ -131,8 +133,8 @@ fn main() {
         Remove { name, version, force } => {
             packages::remove(name, version, force).unwrap();
         }
-        Test { name } => {
-            packages::test(name).unwrap();
+        Test { name, version } => {
+            packages::test(name, version).unwrap();
         }
         Search { terms } => {
             registry::search(terms).unwrap();
