@@ -178,7 +178,10 @@ pub fn test(
     ensure!(package_dir.exists(), "No package found.");
 
     let package_info = PackageInfo::from_path(package_dir.join("package.yml"))?;
-    ensure!(package_info.kind == String::from("ecu"), "Only testing of ECU packages is supported.");
+    ensure!(
+        package_info.kind == String::from("ecu"),
+        "Only testing of ECU packages is supported."
+    );
 
     let image_tag = format!("{}:{}", package_info.name, package_info.version);
     let image_file = package_dir.join("image.tar");

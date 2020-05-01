@@ -298,12 +298,8 @@ fn prepare_directory(
     fs::copy(cwl_file, package_dir.join("document.cwl"))?;
     if let CwlDocument::Workflow(wf) = cwl_document {
         let runs: Vec<String> = match &wf.steps {
-            WorkflowSteps::StepArray(steps) => {
-                steps.iter().map(|s| s.run.clone()).collect()
-            },
-            WorkflowSteps::StepMap(steps) => {
-                steps.iter().map(|(_,v)| v.run.clone()).collect()
-            },
+            WorkflowSteps::StepArray(steps) => steps.iter().map(|s| s.run.clone()).collect(),
+            WorkflowSteps::StepMap(steps) => steps.iter().map(|(_, v)| v.run.clone()).collect(),
         };
 
         for run in runs {
