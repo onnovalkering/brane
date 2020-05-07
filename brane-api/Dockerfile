@@ -19,7 +19,12 @@ RUN rm ./target/release/deps/brane_api*
 RUN cargo build --release
 
 # Define final image
-FROM rust
+FROM ubuntu:20.04
+
+RUN apt-get update && apt-get install -y \
+    libsqlite3-dev \
+    sqlite3 \
+ && rm -rf /var/lib/apt/lists/*
 
 # Copy the release binary from the build stage
 COPY --from=build /brane-api/target/release/brane-api .
