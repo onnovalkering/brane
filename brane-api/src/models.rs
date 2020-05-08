@@ -1,37 +1,49 @@
 use crate::schema::packages;
+use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
-use std::path::PathBuf;
 use specifications::package::PackageInfo;
-use chrono::NaiveDateTime;
+use std::path::PathBuf;
 
 #[derive(Serialize, Queryable)]
 pub struct Package {
     pub id: i32,
-    pub uuid: String,
+    // Metadata
+    pub created: NaiveDateTime,
     pub kind: String,
     pub name: String,
+    pub uploaded: NaiveDateTime,
+    pub uuid: String,
     pub version: String,
-    pub created: NaiveDateTime,
+    // Content
     pub description: Option<String>,
     pub functions_json: Option<String>,
     pub types_json: Option<String>,
+    // File
+    pub checksum: i64,
+    pub filename: String,
 }
 
 #[derive(Insertable)]
 #[table_name = "packages"]
 pub struct NewPackage {
-    pub uuid: String,
+    // Metadata
+    pub created: NaiveDateTime,
     pub kind: String,
     pub name: String,
+    pub uploaded: NaiveDateTime,
+    pub uuid: String,
     pub version: String,
-    pub created: NaiveDateTime,
+    // Content
     pub description: Option<String>,
     pub functions_json: Option<String>,
     pub types_json: Option<String>,
+    // File
+    pub checksum: i64,
+    pub filename: String,
 }
 
 impl NewPackage {
-    pub fn from_info(info: PackageInfo) -> Self {
+    pub fn from_info(info: PackageInfo, checksum: u32, filename: String) -> Self {
         let functions_json = if let Some(functions) = info.functions {
             let functions = serde_json::to_string(&functions).unwrap();
             Some(functions)
@@ -47,14 +59,17 @@ impl NewPackage {
         };
 
         NewPackage {
-            uuid: info.id.to_string(),
-            kind: info.kind,
-            name: info.name,
-            version: info.version,
+            checksum: checksum as i64,
             created: info.created.naive_utc(),
             description: info.description,
+            filename,
             functions_json,
+            kind: info.kind,
+            name: info.name,
             types_json,
+            uploaded: Utc::now().naive_utc(),
+            uuid: info.id.to_string(),
+            version: info.version,
         }
     }
 }

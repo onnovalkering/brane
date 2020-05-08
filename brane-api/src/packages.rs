@@ -3,16 +3,16 @@ use crate::schema::{self, packages::dsl as db};
 use actix_multipart::Multipart;
 use actix_web::Scope;
 use actix_web::{web, HttpRequest, HttpResponse};
+use crc32fast::Hasher;
 use diesel::prelude::*;
 use diesel::{r2d2, r2d2::ConnectionManager};
-use futures::{StreamExt, TryStreamExt};
-use rand::{thread_rng, Rng};
-use rand::distributions::Alphanumeric;
-use std::io::Write;
-use crc32fast::Hasher;
-use std::fs::File;
 use flate2::read::GzDecoder;
+use futures::{StreamExt, TryStreamExt};
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use specifications::package::PackageInfo;
+use std::fs::{self, File};
+use std::io::Write;
 use tar::Archive;
 
 type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
@@ -63,7 +63,7 @@ async fn upload_package(
     web::Query(query): Query,
     mut payload: Multipart,
 ) -> HttpResponse {
-    let _packages_dir = &config.get_ref().packges_dir;
+    let packages_dir = &config.get_ref().packges_dir;
     let temporary_dir = &config.get_ref().temporary_dir;
 
     // Generate identifier unique to this upload
@@ -79,7 +79,7 @@ async fn upload_package(
     // Write uploaded file to temporary dir
     let mut crc32_hasher = Hasher::new();
     let temp_filename = format!("{}.tar.gz", upload_id);
-    let temp_filepath = &temporary_dir.join(temp_filename);
+    let temp_filepath = &temporary_dir.join(temp_filename.clone());
     while let Ok(Some(mut field)) = payload.try_next().await {
         let filepath = temp_filepath.clone();
 
@@ -91,10 +91,11 @@ async fn upload_package(
 
             f = web::block(move || f.write_all(&data).map(|_| f)).await.unwrap();
         }
-    };
+    }
 
     // Check if file has been uploaded correctly
-    if checksum != crc32_hasher.finalize() {
+    let upload_checksum = crc32_hasher.finalize();
+    if checksum != upload_checksum {
         return HttpResponse::BadRequest().body("Checksums don't match.");
     }
 
@@ -108,11 +109,15 @@ async fn upload_package(
         return HttpResponse::BadRequest().body("Package doesn't contain a (valid) package.yml file.");
     }
 
+    // Store package information in database and tarball in packages dir
+    fs::copy(temp_filepath, packages_dir.join(&temp_filename)).unwrap();
+
     let conn = pool.get().expect("Couldn't get connection from db pool.");
-    let new_package = NewPackage::from_info(package_info.unwrap());
+    let new_package = NewPackage::from_info(package_info.unwrap(), upload_checksum, temp_filename);
     let result = diesel::insert_into(schema::packages::table)
         .values(&new_package)
         .execute(&conn);
+
 
     if let Ok(_) = result {
         HttpResponse::Ok().body("")

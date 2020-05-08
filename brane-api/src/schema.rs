@@ -1,13 +1,16 @@
 table! {
     packages (id) {
         id -> Integer,
-        uuid -> Text,
+        created -> Timestamp,
         kind -> Text,
         name -> Text,
+        uploaded -> Timestamp,
+        uuid -> Text,
         version -> Text,
-        created -> Timestamp,
         description -> Nullable<Text>,
         functions_json -> Nullable<Text>,
         types_json -> Nullable<Text>,
+        checksum -> BigInt,
+        filename -> Text,
     }
 }
