@@ -1,0 +1,31 @@
+title: "Brane"
+description: "Programmable construction of applications, networks, and infrastructures."
+baseurl: "/brane"
+url: "https://onnovalkering.github.io"
+
+remote_theme: pmarsceill/just-the-docs
+
+# Enable or disable the site search
+search_enabled: false
+
+# Set the search token separator for hyphenated-word search:
+search_tokenizer_separator: /[\s/]+/
+
+# Enable or disable heading anchors
+heading_anchors: true
+
+# Aux links for the upper right navigation
+aux_links:
+  "Brane on GitHub":
+    - "https://github.com/onnovalkering/brane"
+
+plugins:
+  - jekyll-seo-tag
+
+compress_html:
+  clippings: all
+  comments: all
+  endings: all
+  startings: []
+  blanklines: false
+  profile: false
