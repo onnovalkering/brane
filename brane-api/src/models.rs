@@ -4,7 +4,7 @@ use serde::Serialize;
 use specifications::package::PackageInfo;
 use std::path::PathBuf;
 
-#[derive(Serialize, Queryable)]
+#[derive(Serialize, Queryable, Identifiable)]
 pub struct Package {
     pub id: i32,
     // Metadata
@@ -43,7 +43,11 @@ pub struct NewPackage {
 }
 
 impl NewPackage {
-    pub fn from_info(info: PackageInfo, checksum: u32, filename: String) -> Self {
+    pub fn from_info(
+        info: PackageInfo,
+        checksum: u32,
+        filename: String,
+    ) -> Self {
         let functions_json = if let Some(functions) = info.functions {
             let functions = serde_json::to_string(&functions).unwrap();
             Some(functions)
@@ -76,6 +80,6 @@ impl NewPackage {
 
 #[derive(Clone)]
 pub struct Config {
-    pub packges_dir: PathBuf,
+    pub packages_dir: PathBuf,
     pub temporary_dir: PathBuf,
 }

@@ -62,15 +62,15 @@ async fn main() -> std::io::Result<()> {
 
     // Configure the HTTP server
     let config = models::Config {
-        packges_dir: PathBuf::from(packages_dir),
+        packages_dir: PathBuf::from(packages_dir),
         temporary_dir: PathBuf::from(temporary_dir),
     };
     let server = HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())
             .wrap(middleware::NormalizePath)
-            .data(config.clone())
             .data(pool.clone())
+            .data(config.clone())
             .service(packages::scope())
     });
 

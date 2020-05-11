@@ -18,3 +18,5 @@ CREATE TABLE `packages` (
   ,`checksum` BIGINT NOT NULL
   ,`filename` VARCHAR NOT NULL
 );
+
+CREATE UNIQUE INDEX `package_version` ON packages(`name`, `version`);
