@@ -3,6 +3,7 @@
 members = [
     "brane-api",
     "brane-cli",
+    "brane-dsl",
     "brane-exec",
     "specifications",
 ]

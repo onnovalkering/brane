@@ -1,0 +1,26 @@
+import "alloc" // loads 'allocate_temp_directory'
+import "cp" // loads 'copy-to'
+import "lofar" // loads 'stage', 'calibrate-with'
+
+// The ID of the observation
+observation := ?? as Integer
+
+// Temporary directory to use.
+directory := allocate_temp_directory
+
+// Prepare the observation's file
+files := stage observation
+files := copy files to directory
+
+// Override some of the default parameters.
+parameters := {
+  avg_timeresolution: "4",
+  avg_freqresolution: "48.82kHz",
+  error_tolerance: "False",
+  reference_station: "CS001HBA0"
+}
+
+// Perform calibration of the files
+files := calibrate files with parameters
+
+return files // Stop, and mark 'file' as output
