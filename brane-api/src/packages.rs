@@ -1,5 +1,6 @@
 use crate::models::{Config, NewPackage, Package};
 use crate::schema::{self, packages::dsl as db};
+use actix_files::NamedFile;
 use actix_multipart::Multipart;
 use actix_web::Scope;
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -151,7 +152,8 @@ async fn upload_package(
         diesel::insert_into(schema::packages::table)
             .values(&new_package)
             .execute(&conn)
-    }).await;
+    })
+    .await;
 
     if let Ok(_) = result {
         HttpResponse::Ok().body("")
@@ -235,8 +237,8 @@ async fn get_package_version(
         .load::<Package>(&conn);
 
     if let Ok(packages) = packages {
-        if packages.len() > 0 {
-            HttpResponse::Ok().json(packages)
+        if packages.len() == 1 {
+            HttpResponse::Ok().json(packages.first())
         } else {
             HttpResponse::NotFound().body("")
         }
@@ -272,7 +274,7 @@ async fn delete_package_version(
 
     let package = package.unwrap();
     if let Err(_) = fs::remove_file(packages_dir.join(&package.filename)) {
-        return HttpResponse::InternalServerError().body("Failed to delete package archive (tar.gz).");
+        return HttpResponse::InternalServerError().body("Failed to delete package archive.");
     }
 
     if let Ok(_) = diesel::delete(&package).execute(&conn) {
@@ -286,12 +288,32 @@ async fn delete_package_version(
 ///
 ///
 async fn download_package_archive(
-    _req: HttpRequest,
-    _pool: web::Data<DbPool>,
+    req: HttpRequest,
+    pool: web::Data<DbPool>,
+    config: web::Data<Config>,
     path: web::Path<(String, String)>,
 ) -> HttpResponse {
+    let conn = pool.get().expect("Couldn't get connection from db pool.");
+    let packages_dir = &config.get_ref().packages_dir;
     let name = &path.0;
     let version = &path.1;
 
-    HttpResponse::NotImplemented().body(format!("Get {}:{}", name, version))
+    let package = db::packages
+        .filter(db::name.eq(name))
+        .filter(db::version.eq(version))
+        .first::<Package>(&conn)
+        .optional()
+        .unwrap();
+
+    if let None = package {
+        return HttpResponse::NotFound().body("");
+    }
+
+    let package = package.unwrap();
+    let package_file = packages_dir.join(package.filename);
+    if !package_file.exists() {
+        return HttpResponse::InternalServerError().body("Package exists, but archive is missing.");
+    }
+
+    NamedFile::open(package_file).unwrap().into_response(&req).unwrap()
 }
