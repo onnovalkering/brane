@@ -49,12 +49,16 @@ enum SubCommand {
     Pull {
         #[structopt(name = "NAME", help = "Name of the package")]
         name: String,
+        #[structopt(name = "VERSION", help = "Version of the package")]
+        version: Option<String>,
     },
 
     #[structopt(name = "push", about = "Push a package to a registry")]
     Push {
         #[structopt(name = "NAME", help = "Name of the package")]
         name: String,
+        #[structopt(name = "VERSION", help = "Version of the package")]
+        version: String,
     },
 
     #[structopt(name = "remove", about = "Remove one or more local packages")]
@@ -77,12 +81,13 @@ enum SubCommand {
 
     #[structopt(name = "search", about = "Search a registry for packages")]
     Search {
-        #[structopt(name = "TERMS", help = "Terms to use as search criteria")]
-        terms: Vec<String>,
+        #[structopt(name = "TERM", help = "Term to use as search criteria")]
+        term: String,
     },
 }
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let options = CLI::from_args();
 
     let mut logger = env_logger::builder();
@@ -124,11 +129,11 @@ fn main() {
         Logout { host } => {
             registry::logout(host).unwrap();
         }
-        Pull { name } => {
-            registry::pull(name).unwrap();
+        Pull { name, version } => {
+            registry::pull(name, version).unwrap();
         }
-        Push { name } => {
-            registry::push(name).unwrap();
+        Push { name, version } => {
+            registry::push(name, version).await?;
         }
         Remove { name, version, force } => {
             packages::remove(name, version, force).unwrap();
@@ -136,8 +141,8 @@ fn main() {
         Test { name, version } => {
             packages::test(name, version).unwrap();
         }
-        Search { terms } => {
-            registry::search(terms).unwrap();
+        Search { term } => {
+            registry::search(term).await?;
         }
     }
 

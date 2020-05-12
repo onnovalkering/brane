@@ -10,6 +10,7 @@ pub mod build_cwl;
 pub mod build_ecu;
 pub mod packages;
 pub mod registry;
+pub mod utils;
 
 use semver::Version;
 use std::process::Command;
