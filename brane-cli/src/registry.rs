@@ -1,11 +1,14 @@
 use crate::packages;
 use crate::utils;
+use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use reqwest::{self, multipart::Form, multipart::Part, Body, Client, Method};
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::fs::File;
+use std::fs::{self, File};
+use std::io::prelude::*;
+use tar::Archive;
 use tokio::fs::File as TokioFile;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
@@ -50,11 +53,44 @@ pub fn logout(_host: String) -> FResult<()> {
 ///
 ///
 ///
-pub fn pull(
-    _name: String,
-    _version: Option<String>,
+pub async fn pull(
+    name: String,
+    version: Option<String>,
 ) -> FResult<()> {
-    println!("Pull.");
+    let version = version.expect("please provide version");
+
+    let url = format!("http://127.0.0.1:8080/packages/{}/{}", name, version);
+    let package: Result<Package, _> = reqwest::get(&url).await?.json().await;
+    if package.is_err() {
+        println!("Cannot find version '{}' of package '{}'", version, name);
+        return Ok(());
+    }
+
+    let url = format!("http://127.0.0.1:8080/packages/{}/{}/archive", name, version);
+    let mut package_archive = reqwest::get(&url).await?;
+    let package = package.unwrap();
+
+    // Write package archive to temporary file
+    let temp_filepath = env::temp_dir().join(package.filename);
+    let mut temp_file = File::create(&temp_filepath)?;
+    while let Some(chunk) = package_archive.chunk().await? {
+        temp_file.write(&chunk)?;
+    }
+
+    // Verify checksum
+    let checksum = utils::calculate_crc32(&temp_filepath)?;
+    if checksum != package.checksum as u32 {
+        println!("Download failed, checksums don't match!");
+        return Ok(());
+    }
+
+    // Unpack temporary file to target location
+    let archive_file = File::open(temp_filepath)?;
+    let package_dir = packages::get_package_dir(&name, Some(&version))?;
+    fs::create_dir_all(&package_dir)?;
+
+    let mut archive = Archive::new(GzDecoder::new(archive_file));
+    archive.unpack(&package_dir)?;
 
     Ok(())
 }

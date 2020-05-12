@@ -130,7 +130,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             registry::logout(host).unwrap();
         }
         Pull { name, version } => {
-            registry::pull(name, version).unwrap();
+            registry::pull(name, version).await?;
         }
         Push { name, version } => {
             registry::push(name, version).await?;
