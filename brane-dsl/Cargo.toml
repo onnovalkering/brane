@@ -1,26 +1,22 @@
 [package]
-name = "bakery"
+name = "brane-dsl"
 version = "0.1.0"
 authors = ["Onno Valkering"]
 edition = "2018"
 
 [dependencies]
 appdirs = "0.2"
-curl = "0.4"
-dialoguer = "0.4"
-env_logger = "0.7"
 failure = "0.1"
-human-panic = "1.0"
 itertools = "0.8"
-linefeed = "0.6"
 log = "0.4"
 pest = "2.0"
 pest_derive = "2.0"
 rand = "0.7.2"
 regex = "1"
+semver = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-serde_yaml = "0.8"
 specifications = { path = "../specifications" }
-structopt = "0.3"
-url = "2.1"
+
+[dev-dependencies]
+env_logger = "0.7"

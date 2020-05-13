@@ -1,6 +1,6 @@
-use crate::ast::{AstNode, AstTerm};
 use pest::iterators::Pair;
 use pest::Parser;
+use semver::Version;
 use specifications::common::{Literal, Value};
 
 #[derive(Parser)]
@@ -8,6 +8,68 @@ use specifications::common::{Literal, Value};
 pub struct BakeryParser;
 
 type FResult<T> = Result<T, failure::Error>;
+
+#[derive(Debug)]
+pub enum AstNode {
+    Assignment {
+        name: String,
+        terms: Vec<AstTerm>,
+    },
+    Call {
+        terms: Vec<AstTerm>,
+    },
+    Condition {
+        predicate: Box<AstNode>,
+        if_exec: Box<AstNode>,
+        el_exec: Option<Box<AstNode>>,
+    },
+    Import {
+        module: String,
+        version: Option<Version>,
+    },
+    Parameter {
+        name: String,
+        complex: String,
+    },
+    Repeat {
+        predicate: Box<AstNode>,
+        exec: Box<AstNode>,
+    },
+    Terminate {
+        terms: Option<Vec<AstTerm>>,
+    },
+}
+
+impl AstNode {
+    ///
+    ///
+    ///
+    pub fn is_import(&self) -> bool {
+        match self {
+            AstNode::Import { module: _, version: _ } => true,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum AstTerm {
+    Name(String),
+    Symbol(String),
+    Value(Value),
+}
+
+impl AstTerm {
+    ///
+    ///
+    ///
+    pub fn is_value(&self) -> bool {
+        match self {
+            AstTerm::Value(_) => true,
+            _ => false,
+        }
+    }
+}
 
 ///
 ///
@@ -124,7 +186,7 @@ fn parse_import_rule(rule: Pair<Rule>) -> FResult<AstNode> {
     let module = parse_string_rule(import.next().unwrap())?;
 
     let version = if let Some(version) = import.next() {
-        Some(parse_string_rule(version)?)
+        Some(Version::parse(&parse_string_rule(version)?)?)
     } else {
         None
     };

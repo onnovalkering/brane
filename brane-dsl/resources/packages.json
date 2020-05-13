@@ -1,0 +1,248 @@
+[
+    {
+        "created": "2020-05-11T11:17:44.459935Z",
+        "functions": {
+            "add": {
+                "arguments": [
+                    {
+                        "name": "a",
+                        "type": "integer"
+                    },
+                    {
+                        "name": "b",
+                        "type": "integer"
+                    }
+                ],
+                "notation": {
+                    "infix": [
+                        "+"
+                    ]
+                },
+                "returnType": "integer"
+            },
+            "divide": {
+                "arguments": [
+                    {
+                        "name": "a",
+                        "type": "integer"
+                    },
+                    {
+                        "name": "b",
+                        "type": "integer"
+                    }
+                ],
+                "notation": {
+                    "infix": [
+                        "/"
+                    ]
+                },
+                "returnType": "integer"
+            },
+            "multiply": {
+                "arguments": [
+                    {
+                        "name": "a",
+                        "type": "integer"
+                    },
+                    {
+                        "name": "b",
+                        "type": "integer"
+                    }
+                ],
+                "notation": {
+                    "infix": [
+                        "*"
+                    ]
+                },
+                "returnType": "integer"
+            },
+            "substract": {
+                "arguments": [
+                    {
+                        "name": "a",
+                        "type": "integer"
+                    },
+                    {
+                        "name": "b",
+                        "type": "integer"
+                    }
+                ],
+                "notation": {
+                    "infix": [
+                        "-"
+                    ]
+                },
+                "returnType": "integer"
+            }
+        },
+        "id": "6f28932f-3c2c-4186-b4d5-135d6671a096",
+        "kind": "cwl",
+        "name": "arithmetic-task",
+        "types": {},
+        "version": "3.0.0"
+    },
+    {
+        "created": "2020-05-11T11:17:44.459935Z",
+        "functions": {
+            "add": {
+                "arguments": [
+                    {
+                        "name": "a",
+                        "type": "integer"
+                    },
+                    {
+                        "name": "b",
+                        "type": "integer"
+                    }
+                ],
+                "notation": {
+                    "infix": [
+                        "+"
+                    ]
+                },
+                "returnType": "integer"
+            },
+            "divide": {
+                "arguments": [
+                    {
+                        "name": "a",
+                        "type": "integer"
+                    },
+                    {
+                        "name": "b",
+                        "type": "integer"
+                    }
+                ],
+                "notation": {
+                    "infix": [
+                        "/"
+                    ]
+                },
+                "returnType": "integer"
+            },
+            "multiply": {
+                "arguments": [
+                    {
+                        "name": "a",
+                        "type": "integer"
+                    },
+                    {
+                        "name": "b",
+                        "type": "integer"
+                    }
+                ],
+                "notation": {
+                    "infix": [
+                        "*"
+                    ]
+                },
+                "returnType": "integer"
+            },
+            "substract": {
+                "arguments": [
+                    {
+                        "name": "a",
+                        "type": "integer"
+                    },
+                    {
+                        "name": "b",
+                        "type": "integer"
+                    }
+                ],
+                "notation": {
+                    "infix": [
+                        "-"
+                    ]
+                },
+                "returnType": "integer"
+            }
+        },
+        "id": "6f28932f-3c2c-4186-b4d5-135d6671a096",
+        "kind": "cwl",
+        "name": "arithmetic-task",
+        "types": {},
+        "version": "1.0.0"
+    },
+    {
+        "created": "2020-05-11T11:17:44.459935Z",
+        "functions": {
+            "add": {
+                "arguments": [
+                    {
+                        "name": "a",
+                        "type": "integer"
+                    },
+                    {
+                        "name": "b",
+                        "type": "integer"
+                    }
+                ],
+                "notation": {
+                    "infix": [
+                        "+"
+                    ]
+                },
+                "returnType": "integer"
+            },
+            "divide": {
+                "arguments": [
+                    {
+                        "name": "a",
+                        "type": "integer"
+                    },
+                    {
+                        "name": "b",
+                        "type": "integer"
+                    }
+                ],
+                "notation": {
+                    "infix": [
+                        "/"
+                    ]
+                },
+                "returnType": "integer"
+            },
+            "multiply": {
+                "arguments": [
+                    {
+                        "name": "a",
+                        "type": "integer"
+                    },
+                    {
+                        "name": "b",
+                        "type": "integer"
+                    }
+                ],
+                "notation": {
+                    "infix": [
+                        "*"
+                    ]
+                },
+                "returnType": "integer"
+            },
+            "substract": {
+                "arguments": [
+                    {
+                        "name": "a",
+                        "type": "integer"
+                    },
+                    {
+                        "name": "b",
+                        "type": "integer"
+                    }
+                ],
+                "notation": {
+                    "infix": [
+                        "-"
+                    ]
+                },
+                "returnType": "integer"
+            }
+        },
+        "id": "6f28932f-3c2c-4186-b4d5-135d6671a096",
+        "kind": "cwl",
+        "name": "arithmetic-task",
+        "types": {},
+        "version": "1.1.0"
+    }
+]
