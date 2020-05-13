@@ -4,6 +4,7 @@ use actix_files::NamedFile;
 use actix_multipart::Multipart;
 use actix_web::Scope;
 use actix_web::{web, HttpRequest, HttpResponse};
+use chrono::{DateTime, Utc};
 use crc32fast::Hasher;
 use diesel::prelude::*;
 use diesel::{r2d2, r2d2::ConnectionManager};
@@ -16,6 +17,7 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 use tar::Archive;
+use uuid::Uuid;
 
 type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 type FResult<T> = Result<T, failure::Error>;
@@ -40,6 +42,29 @@ pub fn scope() -> Scope {
         .route("/{name}/{version}/archive", web::get().to(download_package_archive))
 }
 
+impl Package {
+    fn as_info(&self) -> PackageInfo {
+        let functions_json = self.functions_json.clone();
+        let types_json = self.types_json.clone();
+
+        let id = Uuid::parse_str(&self.uuid).unwrap();
+        let created = DateTime::<Utc>::from_utc(self.created, Utc);
+        let functions = serde_json::from_str(&functions_json.unwrap_or(String::from("{}"))).unwrap();
+        let types = serde_json::from_str(&types_json.unwrap_or(String::from("{}"))).unwrap();
+
+        PackageInfo {
+            id: id,
+            created,
+            description: self.description.clone(),
+            functions: Some(functions),
+            kind: self.kind.clone(),
+            name: self.name.clone(),
+            types: Some(types),
+            version: self.version.clone(),
+        }
+    }
+}
+
 ///
 ///
 ///
@@ -56,7 +81,8 @@ async fn get_packages(
         .load::<Package>(&conn);
 
     if let Ok(packages) = packages {
-        HttpResponse::Ok().json(packages)
+        let package_infos: Vec<PackageInfo> = packages.iter().map(|p| p.as_info()).collect();
+        HttpResponse::Ok().json(package_infos)
     } else {
         HttpResponse::InternalServerError().body("")
     }
@@ -210,7 +236,8 @@ async fn get_package(
 
     if let Ok(packages) = packages {
         if packages.len() > 0 {
-            HttpResponse::Ok().json(packages)
+            let package_infos: Vec<PackageInfo> = packages.iter().map(|p| p.as_info()).collect();
+            HttpResponse::Ok().json(package_infos)
         } else {
             HttpResponse::NotFound().body("")
         }
@@ -238,7 +265,8 @@ async fn get_package_version(
 
     if let Ok(packages) = packages {
         if packages.len() == 1 {
-            HttpResponse::Ok().json(packages.first())
+            let package_info: PackageInfo = packages.first().unwrap().as_info();
+            HttpResponse::Ok().json(package_info)
         } else {
             HttpResponse::NotFound().body("")
         }
