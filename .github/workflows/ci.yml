@@ -1,0 +1,62 @@
+name: CI
+
+on: [push]
+
+jobs:
+  unit-tests:
+    name: Unit Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-10.15, ubuntu-18.04]
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          if [ `uname` = 'Linux' ]; then
+            sudo apt-get install -y libssl-dev libsqlite3-dev
+          fi
+
+          if [ `uname` = 'Darwin' ]; then
+            brew install openssl sqlite
+            export OPENSSL_ROOT_DIR='/usr/local/opt/openssl'
+          fi
+
+      - name: Build project
+        run: cargo build -v
+
+      - name: Run unit tests
+        run: cargo test -v --lib
+
+  integration-tests:
+    name: Integration Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-10.15, ubuntu-18.04]
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          if [ `uname` = 'Linux' ]; then
+            sudo apt-get install -y libssl-dev libsqlite3-dev
+          fi
+
+          if [ `uname` = 'Darwin' ]; then
+            brew install openssl sqlite
+            export OPENSSL_ROOT_DIR='/usr/local/opt/openssl'
+          fi
+
+      - name: Build project
+        run: cargo test -v --no-run
+
+      - name: Run integration tests
+        run: cargo test -v --test samples
