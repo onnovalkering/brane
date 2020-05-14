@@ -1,10 +1,12 @@
 use crate::packages;
 use crate::utils;
+use brane_dsl::indexes::PackageIndex;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use reqwest::{self, multipart::Form, multipart::Part, Body, Client, Method};
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JValue;
 use std::env;
 use std::fs::{self, File};
 use std::io::prelude::*;
@@ -149,4 +151,14 @@ pub async fn search(term: String) -> FResult<()> {
     }
 
     Ok(())
+}
+
+///
+///
+///
+pub async fn get_package_index() -> FResult<PackageIndex> {
+    let url = "http://127.0.0.1:8080/packages";
+    let packages: JValue = reqwest::get(url).await?.json().await?;
+
+    PackageIndex::from_value(packages)
 }
