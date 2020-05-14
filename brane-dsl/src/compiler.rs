@@ -50,6 +50,20 @@ impl Compiler {
         })
     }
 
+    ///
+    ///
+    ///
+    pub fn quick_compile(
+        package_index: PackageIndex,
+        input: &String,
+    ) -> FResult<Vec<Instruction>> {
+        let mut compiler = Compiler::new(CompilerOptions::none(), package_index)?;
+        compiler.compile(input)
+    }
+
+    ///
+    ///
+    ///
     pub fn compile(
         &mut self,
         input: &String,
