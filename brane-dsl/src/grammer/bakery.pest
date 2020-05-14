@@ -1,5 +1,7 @@
-WHITESPACE  = _{ " " | "\t" }
-COMMENT     = _{ "//" ~ (!"\n" ~ ANY)* }
+WHITESPACE      = _{ " " | "\t" }
+COMMENT         = _{ COMMENT_BLOCK | COMMENT_LINE }
+COMMENT_BLOCK   = @{ "---" ~ (!"---" ~ ANY)* ~ "---" }
+COMMENT_LINE    = @{ "//" ~ (!("\r" | "\n") ~ ANY)* }
 
 program = _{ SOI ~ "\n"* ~ (statement ~ "\n"+) * ~ statement? ~ EOI }
 reserved = { "??" | "as" | "else" | "false" | "if" | "import" | "true" | "while" | "return" }
