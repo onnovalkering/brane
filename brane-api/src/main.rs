@@ -14,6 +14,7 @@ use std::fs;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+mod invocations;
 mod models;
 mod packages;
 mod schema;
@@ -71,6 +72,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::NormalizePath)
             .data(pool.clone())
             .data(config.clone())
+            .service(invocations::scope())
             .service(packages::scope())
     });
 

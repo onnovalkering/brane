@@ -1,8 +1,63 @@
-use crate::schema::packages;
+use crate::schema::{invocations, packages};
 use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
+use specifications::instructions::Instruction;
+use specifications::common::Argument;
 use specifications::package::PackageInfo;
 use std::path::PathBuf;
+use uuid::Uuid;
+
+type FResult<T> = Result<T, failure::Error>;
+type Map<T> = std::collections::HashMap<String, T>;
+
+#[derive(Serialize, Queryable, Identifiable)]
+pub struct Invocation {
+    pub id: i32,
+    // Metadata
+    pub created: NaiveDateTime,
+    pub name: Option<String>,
+    pub uuid: String,
+    // Content
+    pub status: String,
+    pub arguments_json: String,
+    pub instructions_json: String,
+}
+
+#[derive(Insertable)]
+#[table_name = "invocations"]
+pub struct NewInvocation {
+    // Metadata
+    pub created: NaiveDateTime,
+    pub name: Option<String>,
+    pub uuid: String,
+    // Content
+    pub status: String,
+    pub arguments_json: String,
+    pub instructions_json: String,
+}
+
+impl NewInvocation {
+    pub fn new(
+        name: Option<String>,
+        arguments: &Map<Argument>,
+        instructions: &Vec<Instruction>,
+    ) -> FResult<Self> {
+        let created = Utc::now().naive_utc();
+        let uuid = Uuid::new_v4().to_string();
+        let status = String::from("created");
+        let arguments_json = serde_json::to_string(arguments)?;
+        let instructions_json = serde_json::to_string(instructions)?;
+
+        Ok(NewInvocation {
+            created,
+            name,
+            uuid,
+            status,
+            arguments_json,
+            instructions_json,
+        })
+    }
+}
 
 #[derive(Serialize, Queryable, Identifiable)]
 pub struct Package {

@@ -1,4 +1,16 @@
 table! {
+    invocations (id) {
+        id -> Integer,
+        created -> Timestamp,
+        name -> Nullable<Text>,
+        uuid -> Text,
+        status -> Text,
+        arguments_json -> Text,
+        instructions_json -> Text,
+    }
+}
+
+table! {
     packages (id) {
         id -> Integer,
         created -> Timestamp,
@@ -14,3 +26,8 @@ table! {
         filename -> Text,
     }
 }
+
+allow_tables_to_appear_in_same_query!(
+    invocations,
+    packages,
+);
