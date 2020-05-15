@@ -7,7 +7,7 @@ extern crate log;
 
 use actix_web::middleware;
 use actix_web::{App, HttpServer};
-use diesel::SqliteConnection;
+use diesel::pg::PgConnection;
 use diesel::{r2d2, r2d2::ConnectionManager};
 use dotenv::dotenv;
 use log::LevelFilter;
@@ -27,7 +27,7 @@ embed_migrations!();
 
 const DEF_PACKAGES_DIR: &str = "./packages";
 const DEF_TEMPORARY_DIR: &str = "./temporary";
-const DEF_DATABASE_URL: &str = "db.sqlite";
+const DEF_DATABASE_URL: &str = "postgres://postgres:postgres@postgres/postgres";
 const DEF_KAFKA_BROKERS: &str = "kafka:9092";
 
 #[derive(StructOpt)]
@@ -63,7 +63,7 @@ async fn main() -> std::io::Result<()> {
 
     // Create a database pool
     let database_url = env::var("DATABASE_URL").unwrap_or(String::from(DEF_DATABASE_URL));
-    let manager = ConnectionManager::<SqliteConnection>::new(database_url);
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
     let pool = r2d2::Pool::builder().build(manager).expect("Failed to create pool.");
 
     // Run database migrations

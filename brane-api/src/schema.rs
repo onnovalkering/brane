@@ -1,10 +1,10 @@
 table! {
     invocations (id) {
-        id -> Integer,
+        id -> Int4,
         created -> Timestamp,
-        name -> Nullable<Text>,
-        uuid -> Text,
-        status -> Text,
+        name -> Nullable<Varchar>,
+        uuid -> Varchar,
+        status -> Varchar,
         arguments_json -> Text,
         instructions_json -> Text,
     }
@@ -12,18 +12,18 @@ table! {
 
 table! {
     packages (id) {
-        id -> Integer,
+        id -> Int4,
         created -> Timestamp,
-        kind -> Text,
-        name -> Text,
+        kind -> Varchar,
+        name -> Varchar,
         uploaded -> Timestamp,
-        uuid -> Text,
-        version -> Text,
-        description -> Nullable<Text>,
+        uuid -> Varchar,
+        version -> Varchar,
+        description -> Nullable<Varchar>,
         functions_json -> Nullable<Text>,
         types_json -> Nullable<Text>,
-        checksum -> BigInt,
-        filename -> Text,
+        checksum -> Int8,
+        filename -> Varchar,
     }
 }
 

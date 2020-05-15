@@ -18,11 +18,11 @@ jobs:
       - name: Install dependencies
         run: |
           if [ `uname` = 'Linux' ]; then
-            sudo apt-get install -y libssl-dev libsqlite3-dev
+            sudo apt-get install -y libpq-dev libssl-dev
           fi
 
           if [ `uname` = 'Darwin' ]; then
-            brew install openssl sqlite
+            brew install libpq openssl
             export OPENSSL_ROOT_DIR='/usr/local/opt/openssl'
           fi
 
@@ -47,11 +47,11 @@ jobs:
       - name: Install dependencies
         run: |
           if [ `uname` = 'Linux' ]; then
-            sudo apt-get install -y libssl-dev libsqlite3-dev
+            sudo apt-get install -y libpq-dev libssl-dev
           fi
 
           if [ `uname` = 'Darwin' ]; then
-            brew install openssl sqlite
+            brew install libpq openssl
             export OPENSSL_ROOT_DIR='/usr/local/opt/openssl'
           fi
 

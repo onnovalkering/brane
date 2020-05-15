@@ -1,15 +1,15 @@
-CREATE TABLE `invocations` (
-  `id` INTEGER NOT NULL PRIMARY KEY
+CREATE TABLE "invocations" (
+    "id" SERIAL PRIMARY KEY
 
   -- metadata
-  ,`created` DATETIME NOT NULL
-  ,`name` VARCHAR
-  ,`uuid` VARCHAR NOT NULL
+  , "created" TIMESTAMP NOT NULL
+  , "name" VARCHAR
+  , "uuid" VARCHAR NOT NULL
 
   -- content
-  ,`status` VARCHAR NOT NULL
-  ,`arguments_json` VARCHAR NOT NULL
-  ,`instructions_json` VARCHAR NOT NULL
+  , "status" VARCHAR NOT NULL
+  , "arguments_json" TEXT NOT NULL
+  , "instructions_json" TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX `invocation_uuid` ON packages(`uuid`);
+CREATE UNIQUE INDEX "invocation_uuid" ON invocations("uuid");

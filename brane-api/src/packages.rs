@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use tar::Archive;
 use uuid::Uuid;
 
-type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
+type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 type Query = web::Query<Map<String>>;

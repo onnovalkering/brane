@@ -10,7 +10,7 @@ use serde::Deserialize;
 use specifications::common::Argument;
 use specifications::instructions::Instruction;
 
-type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
+type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 const MSG_NO_DB_CONNECTION: &str = "Couldn't get connection from db pool.";

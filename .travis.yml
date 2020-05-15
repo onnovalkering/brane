@@ -5,6 +5,7 @@ dist: bionic
 addons:
   apt:
     packages:
+      - libpq-dev
       - libssl-dev
 
 cache: cargo
