@@ -4,6 +4,8 @@ use actix_web::Scope;
 use actix_web::{web, HttpRequest, HttpResponse};
 use diesel::prelude::*;
 use diesel::{r2d2, r2d2::ConnectionManager};
+use futures::*;
+use rdkafka::producer::{FutureProducer, FutureRecord};
 use serde::Deserialize;
 use specifications::common::Argument;
 use specifications::instructions::Instruction;
@@ -17,6 +19,8 @@ const MSG_ONLY_HALTED_RESUMED: &str = "Only halted invocations can be halted.";
 const MSG_ONLY_RUNNING_STOPPED: &str = "Only running invocations can be stopped.";
 const MSG_ONLY_RUNNING_SUSPENED: &str = "Only running invocations can be suspended.";
 
+const TOPIC_CONTROL: &str = "control";
+
 ///
 ///
 ///
@@ -29,7 +33,6 @@ pub fn scope() -> Scope {
         .route("/{uuid}/resume", web::post().to(resume_invocation))
         .route("/{uuid}/stop", web::post().to(stop_invocation))
         .route("/{uuid}/suspend", web::post().to(suspend_invocation))
-
 }
 
 #[derive(Deserialize)]
@@ -45,20 +48,48 @@ pub struct CreateInvocation {
 async fn create_invocation(
     _req: HttpRequest,
     pool: web::Data<DbPool>,
+    producer: web::Data<FutureProducer>,
     json: web::Json<CreateInvocation>,
 ) -> HttpResponse {
     let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
 
     // Store invocation information in database
     let new_invocation = NewInvocation::new(json.name.clone(), &json.arguments, &json.instructions).unwrap();
-    let result = web::block(move || {
+    let new_invocation_uuid = new_invocation.uuid.clone();
+    let operation = web::block(move || {
         diesel::insert_into(schema::invocations::table)
             .values(&new_invocation)
             .execute(&conn)
     })
     .await;
 
-    if let Ok(_) = result {
+    // Something went wrong when creating the invocation.
+    if let Err(_) = operation {
+        return HttpResponse::InternalServerError().body("");
+    }
+
+    // Send control message (fire-and-forget) to announce the new invocation
+    let message_key = format!("invocation#{}", new_invocation_uuid);
+    let message = FutureRecord::to(TOPIC_CONTROL).payload("created").key(&message_key);
+
+    let announcement = producer
+        .send(message, 0)
+        .map(|delivery| {
+            let status = delivery.unwrap();
+            match status {
+                Ok(_) => {
+                    info!("Newly created invocation ({}) has been announced.", new_invocation_uuid);
+                    Ok(())
+                }
+                Err(error) => {
+                    error!("Unable to announce newly created invocation ({}):\n{:#?}", new_invocation_uuid, error);
+                    Err(())
+                }
+            }
+        })
+        .await;
+
+    if let Ok(_) = announcement {
         HttpResponse::Ok().body("")
     } else {
         HttpResponse::InternalServerError().body("")
@@ -93,10 +124,7 @@ async fn get_invocation(
 ) -> HttpResponse {
     let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
 
-    let invocations = web::block(move || {
-        db::invocations.filter(db::uuid.eq(&path.0)).load::<Invocation>(&conn)
-    })
-    .await;
+    let invocations = web::block(move || db::invocations.filter(db::uuid.eq(&path.0)).load::<Invocation>(&conn)).await;
 
     if let Ok(invocations) = invocations {
         if invocations.len() == 1 {
@@ -208,12 +236,7 @@ async fn stop_invocation(
         return HttpResponse::BadRequest().body(MSG_ONLY_RUNNING_STOPPED);
     }
 
-    let operation = web::block(move || {
-        diesel::update(&invocation)
-            .set(db::status.eq("stoping"))
-            .execute(&conn)
-    })
-    .await;
+    let operation = web::block(move || diesel::update(&invocation).set(db::status.eq("stoping")).execute(&conn)).await;
 
     if let Ok(_) = operation {
         HttpResponse::Accepted().body("")
