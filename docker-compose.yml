@@ -1,15 +1,27 @@
 version: '3'
 
 services:
-  zookeeper:
-    image: confluentinc/cp-zookeeper
+  postgres:
+    image: postgres:12
+    ports:
+      - 5432:5432
     environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
+      POSTGRES_PASSWORD: postgres
+
+  adminer:
+    image: adminer
+    ports:
+      - 8888:8080
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:5.5.0
     ports:
       - 2181:2181
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
 
   kafka:
-    image: confluentinc/cp-kafka
+    image: confluentinc/cp-kafka:5.5.0
     depends_on:
       - zookeeper
     ports: 
