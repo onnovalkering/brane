@@ -55,41 +55,23 @@ async fn create_invocation(
 
     // Store invocation information in database
     let new_invocation = NewInvocation::new(json.name.clone(), &json.arguments, &json.instructions).unwrap();
-    let new_invocation_uuid = new_invocation.uuid.clone();
-    let operation = web::block(move || {
+    let invocation = web::block(move || {
         diesel::insert_into(schema::invocations::table)
             .values(&new_invocation)
-            .execute(&conn)
+            .get_result::<Invocation>(&conn)
     })
     .await;
 
     // Something went wrong when creating the invocation.
-    if let Err(_) = operation {
+    if let Err(_) = invocation {
         return HttpResponse::InternalServerError().body("");
     }
 
     // Send control message (fire-and-forget) to announce the new invocation
-    let message_key = format!("invocation#{}", new_invocation_uuid);
-    let message = FutureRecord::to(TOPIC_CONTROL).payload("created").key(&message_key);
+    let invocation = invocation.unwrap();
+    let delivery = announce_status(&producer, &invocation.id, &invocation.status).await;
 
-    let announcement = producer
-        .send(message, 0)
-        .map(|delivery| {
-            let status = delivery.unwrap();
-            match status {
-                Ok(_) => {
-                    info!("Newly created invocation ({}) has been announced.", new_invocation_uuid);
-                    Ok(())
-                }
-                Err(error) => {
-                    error!("Unable to announce newly created invocation ({}):\n{:#?}", new_invocation_uuid, error);
-                    Err(())
-                }
-            }
-        })
-        .await;
-
-    if let Ok(_) = announcement {
+    if let Ok(_) = delivery {
         HttpResponse::Ok().body("")
     } else {
         HttpResponse::InternalServerError().body("")
@@ -176,6 +158,7 @@ async fn delete_invocation(
 async fn resume_invocation(
     _req: HttpRequest,
     pool: web::Data<DbPool>,
+    producer: web::Data<FutureProducer>,
     path: web::Path<(String,)>,
 ) -> HttpResponse {
     let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
@@ -195,17 +178,19 @@ async fn resume_invocation(
         return HttpResponse::BadRequest().body(MSG_ONLY_HALTED_RESUMED);
     }
 
-    // TODO: resume
-
-    let operation = web::block(move || {
+    let invocation = web::block(move || {
         diesel::update(&invocation)
             .set(db::status.eq("resuming"))
-            .execute(&conn)
+            .get_result::<Invocation>(&conn)
     })
     .await;
 
-    if let Ok(_) = operation {
-        HttpResponse::Accepted().body("")
+    // Send control message (fire-and-forget) to announce the new invocation
+    let invocation = invocation.unwrap();
+    let delivery = announce_status(&producer, &invocation.id, &invocation.status).await;
+
+    if let Ok(_) = delivery {
+        HttpResponse::Ok().body("")
     } else {
         HttpResponse::InternalServerError().body("")
     }
@@ -217,6 +202,7 @@ async fn resume_invocation(
 async fn stop_invocation(
     _req: HttpRequest,
     pool: web::Data<DbPool>,
+    producer: web::Data<FutureProducer>,
     path: web::Path<(String,)>,
 ) -> HttpResponse {
     let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
@@ -236,10 +222,19 @@ async fn stop_invocation(
         return HttpResponse::BadRequest().body(MSG_ONLY_RUNNING_STOPPED);
     }
 
-    let operation = web::block(move || diesel::update(&invocation).set(db::status.eq("stoping")).execute(&conn)).await;
+    let invocation = web::block(move || {
+        diesel::update(&invocation)
+            .set(db::status.eq("stoping"))
+            .get_result::<Invocation>(&conn)
+    })
+    .await;
 
-    if let Ok(_) = operation {
-        HttpResponse::Accepted().body("")
+    // Send control message (fire-and-forget) to announce the new invocation
+    let invocation = invocation.unwrap();
+    let delivery = announce_status(&producer, &invocation.id, &invocation.status).await;
+
+    if let Ok(_) = delivery {
+        HttpResponse::Ok().body("")
     } else {
         HttpResponse::InternalServerError().body("")
     }
@@ -251,6 +246,7 @@ async fn stop_invocation(
 async fn suspend_invocation(
     _req: HttpRequest,
     pool: web::Data<DbPool>,
+    producer: web::Data<FutureProducer>,
     path: web::Path<(String,)>,
 ) -> HttpResponse {
     let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
@@ -270,18 +266,59 @@ async fn suspend_invocation(
         return HttpResponse::BadRequest().body(MSG_ONLY_RUNNING_SUSPENED);
     }
 
-    // TODO: halt
-
-    let operation = web::block(move || {
+    let invocation = web::block(move || {
         diesel::update(&invocation)
             .set(db::status.eq("suspending"))
-            .execute(&conn)
+            .get_result::<Invocation>(&conn)
     })
     .await;
 
-    if let Ok(_) = operation {
-        HttpResponse::Accepted().body("")
+    // Send control message (fire-and-forget) to announce the new invocation
+    let invocation = invocation.unwrap();
+    let delivery = announce_status(&producer, &invocation.id, &invocation.status).await;
+
+    if let Ok(_) = delivery {
+        HttpResponse::Ok().body("")
     } else {
         HttpResponse::InternalServerError().body("")
     }
+}
+
+///
+///
+///
+async fn announce_status(
+    producer: &FutureProducer,
+    invocation_id: &i32,
+    status: &String,
+) -> Result<(), ()> {
+    let message_key = format!("inv#{}", invocation_id);
+    let message_payload = format!(r#"{{"status": "{}"}}"#, status);
+    let message = FutureRecord::to(TOPIC_CONTROL)
+        .payload(&message_payload)
+        .key(&message_key);
+
+    producer
+        .send(message, 0)
+        .map(|delivery| {
+            let delivery = delivery.unwrap();
+
+            match delivery {
+                Ok(_) => {
+                    info!(
+                        "Announced that the status of invocation #{} is now '{}'.",
+                        invocation_id, status
+                    );
+                    Ok(())
+                }
+                Err(error) => {
+                    info!(
+                        "Unable to announced that the status of invocation #{} is now '{}':\n{:#?}",
+                        invocation_id, status, error
+                    );
+                    Err(())
+                }
+            }
+        })
+        .await
 }
