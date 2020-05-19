@@ -135,6 +135,7 @@ impl NewPackage {
 
 #[derive(Clone)]
 pub struct Config {
+    pub docker_host: String,
     pub packages_dir: PathBuf,
     pub temporary_dir: PathBuf,
 }

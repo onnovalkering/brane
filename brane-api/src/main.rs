@@ -25,10 +25,11 @@ mod schema;
 
 embed_migrations!();
 
+const DEF_DATABASE_URL: &str = "postgres://postgres:postgres@postgres/postgres";
+const DEF_DOCKER_HOST: &str = "registry:5000";
+const DEF_KAFKA_BROKERS: &str = "kafka:9092";
 const DEF_PACKAGES_DIR: &str = "./packages";
 const DEF_TEMPORARY_DIR: &str = "./temporary";
-const DEF_DATABASE_URL: &str = "postgres://postgres:postgres@postgres/postgres";
-const DEF_KAFKA_BROKERS: &str = "kafka:9092";
 
 #[derive(StructOpt)]
 #[structopt(name = "brane-api", about = "The Brane API service.")]
@@ -79,7 +80,9 @@ async fn main() -> std::io::Result<()> {
         .expect("Couldn't create a Kafka producer.");
 
     // Prepare configuration
+    let docker_host = env::var("DOCKER_HOST").unwrap_or(String::from(DEF_DOCKER_HOST));
     let config = models::Config {
+        docker_host,
         packages_dir: PathBuf::from(packages_dir),
         temporary_dir: PathBuf::from(temporary_dir),
     };

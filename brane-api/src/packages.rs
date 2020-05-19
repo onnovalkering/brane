@@ -16,6 +16,7 @@ use specifications::package::PackageInfo;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
+use std::process::Command;
 use tar::Archive;
 use uuid::Uuid;
 
@@ -28,6 +29,7 @@ const MSG_NO_CHECKSUM: &str = "Checksum not provided.";
 const MSG_NAME_CONFLICT: &str = "Package with the same name and version already exists.";
 const MSG_NO_PACKAGE_INFO: &str = "Package doesn't contain a (valid) package.yml file.";
 const MSG_INFO_MISMATCH: &str = "Package information doesn't match the HTTP request.";
+const MSG_FAILED_TO_PUSH: &str = "Failed to push Docker image to (local) Docker registry.";
 
 ///
 ///
@@ -101,6 +103,7 @@ async fn upload_package(
 ) -> HttpResponse {
     let conn = pool.get().expect("Couldn't get connection from db pool.");
     let config = config.get_ref().clone();
+    let docker_host = config.docker_host;
     let packages_dir = config.packages_dir;
     let temporary_dir = config.temporary_dir;
     let name = path.0.clone();
@@ -170,10 +173,31 @@ async fn upload_package(
         return upload_badrequest(MSG_INFO_MISMATCH, temporary_dir, Some(upload_id));
     }
 
+    // In the case of a container package, store image in Docker registry
+    let image_tar = temp_workdir.join("image.tar");
+    if image_tar.exists() {
+        let image_tar = image_tar.into_os_string().into_string().unwrap();
+        let image_label = format!("{}:{}", name, version);
+
+        let push = web::block(move || {
+            Command::new("skopeo")
+                .arg("copy")
+                .arg("--dest-tls-verify=false")
+                .arg(format!("tarball:{}", image_tar))
+                .arg(format!("docker://{}/library/{}", docker_host, image_label))
+                .status()
+        })
+        .await;
+
+        if push.is_err() {
+            return HttpResponse::InternalServerError().body(MSG_FAILED_TO_PUSH);
+        }
+    }
+
     // Store package information in database and the archive in the packages dir
     let result = web::block(move || {
         fs::copy(temp_filepath, packages_dir.join(temp_filename)).unwrap();
-        upload_cleanup(temporary_dir, upload_id).unwrap();
+        // upload_cleanup(temporary_dir, upload_id).unwrap();
 
         diesel::insert_into(schema::packages::table)
             .values(&new_package)
