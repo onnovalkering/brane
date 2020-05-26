@@ -1,0 +1,11 @@
+[package]
+name = "brane-vm"
+version = "0.1.0"
+authors = ["Onno Valkering"]
+edition = "2018"
+
+[dependencies]
+failure = "0.1"
+futures = "0.3"
+log = "0.4"
+specifications = { path = "../specifications" }
