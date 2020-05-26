@@ -124,7 +124,7 @@ impl Compiler {
             unreachable!()
         };
 
-        let data_type = value.get_complex();
+        let data_type = value.get_complex().to_string();
 
         let instruction = Instruction::new_set_var(name.clone(), value, String::from("local"));
         let argument = Argument::new(name, data_type, None, None, None, None, None);
