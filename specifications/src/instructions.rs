@@ -8,6 +8,11 @@ use std::path::PathBuf;
 type Map<T> = std::collections::HashMap<String, T>;
 type FResult<T> = Result<T, failure::Error>;
 
+type ActTuple = (Map<String>, Option<String>, String, Map<Argument>, Option<String>);
+type MovTuple = (Map<String>, Vec<Condition>, Vec<Move>);
+type SubTuple = (Map<String>, Vec<Instruction>);
+type VarTuple = (Map<String>, Vec<Variable>, Vec<Variable>);
+
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -82,7 +87,10 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    pub fn new_get_var(name: String, data_type: String) -> Instruction {
+    pub fn new_get_var(
+        name: String,
+        data_type: String,
+    ) -> Instruction {
         let variable = Variable {
             name,
             value: Value::None,
@@ -97,8 +105,12 @@ impl Instruction {
         Instruction::new_var(get, set)
     }
 
-    pub fn new_set_var(name: String, value: Value, scope: String) -> Instruction {
-        let data_type = value.get_complex();
+    pub fn new_set_var(
+        name: String,
+        value: Value,
+        scope: String,
+    ) -> Instruction {
+        let data_type = value.get_complex().to_string();
 
         let variable = Variable {
             name,
@@ -112,9 +124,12 @@ impl Instruction {
         let set = vec![variable];
 
         Instruction::new_var(get, set)
-    }    
+    }
 
-    pub fn new_var(get: Vec<Variable>, set: Vec<Variable>) -> Instruction {
+    pub fn new_var(
+        get: Vec<Variable>,
+        set: Vec<Variable>,
+    ) -> Instruction {
         Instruction::Var {
             get,
             set,
@@ -147,6 +162,61 @@ impl Instruction {
             instructions,
         }
     }
+
+    pub fn new_mov(conditions: Vec<Condition>, branches: Vec<Move>) -> Instruction {
+        Instruction::Mov {
+            r#type: "MOV".to_string(),
+            meta: Map::<String>::new(),
+            branches,
+            conditions,
+        }
+    }
+
+    pub fn as_act(self) -> FResult<ActTuple> {
+        if let Instruction::Act {
+            meta,
+            assignment,
+            name,
+            input,
+            data_type,
+            ..
+        } = self
+        {
+            Ok((meta, assignment, name, input, data_type))
+        } else {
+            bail!("Illegal deconstruction of instruction as Act.");
+        }
+    }
+
+    pub fn as_mov(self) -> FResult<MovTuple> {
+        if let Instruction::Mov {
+            meta,
+            conditions,
+            branches,
+            ..
+        } = self
+        {
+            Ok((meta, conditions, branches))
+        } else {
+            bail!("Illegal deconstruction of instruction as Mov.");
+        }
+    }
+
+    pub fn as_sub(self) -> FResult<SubTuple> {
+        if let Instruction::Sub { meta, instructions, .. } = self {
+            Ok((meta, instructions))
+        } else {
+            bail!("Illegal deconstruction of instruction as Act.");
+        }
+    }
+
+    pub fn as_var(self) -> FResult<VarTuple> {
+        if let Instruction::Var { meta, get, set, .. } = self {
+            Ok((meta, get, set))
+        } else {
+            bail!("Illegal deconstruction of instruction as Var.");
+        }
+    }
 }
 
 #[skip_serializing_none]
@@ -164,10 +234,61 @@ pub struct Variable {
 #[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Condition {
-    left: String,
-    operator: Operator,
-    right: String,
+    pub left: Value,
+    pub operator: Operator,
+    pub right: Value,
 }
+
+impl Condition {
+    pub fn eq(left: Value, right: Value) -> Condition {
+        Condition {
+            left,
+            operator: Operator::Equals,
+            right
+        }
+    }
+
+    pub fn ne(left: Value, right: Value) -> Condition {
+        Condition {
+            left,
+            operator: Operator::NotEquals,
+            right
+        }
+    }
+
+    pub fn gt(left: Value, right: Value) -> Condition {
+        Condition {
+            left,
+            operator: Operator::Greater,
+            right
+        }
+    }
+
+    pub fn lt(left: Value, right: Value) -> Condition {
+        Condition {
+            left,
+            operator: Operator::Less,
+            right
+        }
+    }
+
+    pub fn ge(left: Value, right: Value) -> Condition {
+        Condition {
+            left,
+            operator: Operator::GreaterOrEqual,
+            right
+        }
+    }
+
+    pub fn le(left: Value, right: Value) -> Condition {
+        Condition {
+            left,
+            operator: Operator::LessOrEqual,
+            right
+        }
+    }
+}
+
 
 #[repr(u8)]
 #[serde(rename_all = "camelCase")]
@@ -184,8 +305,8 @@ pub enum Move {
 pub enum Operator {
     Equals = 1,
     NotEquals = 2,
-    Higher = 3,
+    Greater = 3,
     Less = 4,
-    HigherOrEqual = 5,
-    LowerOrEqual = 6,
+    GreaterOrEqual = 5,
+    LessOrEqual = 6,
 }

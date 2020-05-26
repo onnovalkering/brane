@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
+use std::cmp::{Ordering, PartialEq, PartialOrd};
 
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
@@ -53,11 +54,7 @@ impl FunctionNotation {
         infix: Option<Vec<String>>,
         postfix: Option<String>,
     ) -> FunctionNotation {
-        FunctionNotation {
-            infix,
-            postfix,
-            prefix,
-        }
+        FunctionNotation { infix, postfix, prefix }
     }
 }
 
@@ -87,20 +84,54 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn get_complex(&self) -> String {
-        use Value::*;
+    ///
+    ///
+    ///
+    pub fn get_complex(&self) -> &str {
         match self {
-            Array {
-                complex,
-                entries: _,
-            } => complex.to_string(),
-            Literal(literal) => literal.get_complex(),
-            None => String::from("void"),
-            Object {
-                complex,
-                entries: _,
-            } => complex.to_string(),
-            Variable(_) => String::from("variable")
+            Value::Array { complex, .. } => complex.as_str(),
+            Value::Literal(literal) => match literal {
+                Literal::Boolean(_) => "boolean",
+                Literal::Decimal(_) => "real",
+                Literal::Integer(_) => "integer",
+                Literal::Str(_) => "string",
+            },
+            Value::None => "void",
+            Value::Object { complex, .. } => complex,
+            Value::Variable(_) => "variable",
+        }
+    }
+}
+
+impl PartialEq for Value {
+    fn eq(
+        &self,
+        other: &Self,
+    ) -> bool {
+        use Value::*;
+
+        match (self, other) {
+            (None, None) => true,
+            (Literal(lhs), Literal(rhs)) => lhs.eq(rhs),
+            (Array { entries: lhs, .. }, Array { entries: rhs, .. }) => lhs.eq(rhs),
+            (Object { entries: lhs, .. }, Object { entries: rhs, .. }) => lhs.eq(rhs),
+            _ => false,
+        }
+    }
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(
+        &self,
+        other: &Self,
+    ) -> Option<Ordering> {
+        use Value::*;
+
+        match (self, other) {
+            (Literal(lhs), Literal(rhs)) => lhs.partial_cmp(rhs),
+            (Array { entries: lhs, .. }, Array { entries: rhs, .. }) => lhs.partial_cmp(rhs),
+            (Object { entries: lhs, .. }, Object { entries: rhs, .. }) => lhs.partial_cmp(rhs),
+            _ => Option::None,
         }
     }
 }
@@ -114,14 +145,36 @@ pub enum Literal {
     Str(String),
 }
 
-impl Literal {
-    pub fn get_complex(&self) -> String {
+impl PartialEq for Literal {
+    fn eq(
+        &self,
+        other: &Self,
+    ) -> bool {
         use Literal::*;
-        match self {
-            Boolean(_) => "boolean".to_string(),
-            Decimal(_) => "real".to_string(),
-            Integer(_) => "integer".to_string(),
-            Str(_) => "string".to_string(),
+
+        match (self, other) {
+            (Boolean(lhs), Boolean(rhs)) => lhs.eq(rhs),
+            (Decimal(lhs), Decimal(rhs)) => lhs.eq(rhs),
+            (Integer(lhs), Integer(rhs)) => lhs.eq(rhs),
+            (Str(lhs), Str(rhs)) => lhs.eq(rhs),
+            _ => false,
+        }
+    }
+}
+
+impl PartialOrd for Literal {
+    fn partial_cmp(
+        &self,
+        other: &Self,
+    ) -> Option<Ordering> {
+        use Literal::*;
+
+        match (self, other) {
+            (Boolean(lhs), Boolean(rhs)) => lhs.partial_cmp(rhs),
+            (Decimal(lhs), Decimal(rhs)) => lhs.partial_cmp(rhs),
+            (Integer(lhs), Integer(rhs)) => lhs.partial_cmp(rhs),
+            (Str(lhs), Str(rhs)) => lhs.partial_cmp(rhs),
+            _ => None,
         }
     }
 }
