@@ -1,5 +1,5 @@
 use crate::Payload;
-use specifications::common::{Argument, Literal, Value, Type};
+use specifications::common::{Argument, Literal, Type, Value};
 use specifications::container::ContainerInfo;
 use std::path::PathBuf;
 use std::process::Command;
@@ -24,7 +24,10 @@ pub async fn handle(
     assert_input(&action.input, &payload.arguments)?;
     initialize(&working_dir)?;
 
-    debug!("Executing '{}' using arguments:\n{:#?}", payload.action, payload.arguments);
+    debug!(
+        "Executing '{}' using arguments:\n{:#?}",
+        payload.action, payload.arguments
+    );
 
     let entrypoint = &container_info.entrypoint.exec;
     let command = action.command.as_ref().unwrap();
@@ -72,9 +75,7 @@ fn assert_input(
 ///
 ///
 ///
-fn initialize(
-    working_dir: &PathBuf
-) -> FResult<()> {
+fn initialize(working_dir: &PathBuf) -> FResult<()> {
     debug!("Initializing working directory");
 
     let init_sh = working_dir.join("init.sh");
@@ -82,9 +83,7 @@ fn initialize(
         return Ok(());
     }
 
-    let result = Command::new(init_sh)
-        .output()
-        .expect("Couldn't execute init.sh");
+    let result = Command::new(init_sh).output().expect("Couldn't execute init.sh");
 
     ensure!(result.status.success(), "Non-zero exit status for init.sh");
 
@@ -158,7 +157,7 @@ fn construct_envs(variables: &Map<Value>) -> FResult<Map<String>> {
 
                     envs.insert(format!("{}_{}", &name, index), value);
                 }
-            },
+            }
             Value::Literal(literal) => {
                 let value = match literal {
                     Boolean(value) => value.to_string(),
@@ -168,8 +167,8 @@ fn construct_envs(variables: &Map<Value>) -> FResult<Map<String>> {
                 };
 
                 envs.insert(name, value.clone());
-            },
-            _ => unimplemented!()
+            }
+            _ => unimplemented!(),
         }
     }
 
@@ -214,7 +213,7 @@ fn unwrap_yaml_hash(
                 let n = p.data_type.find("[").unwrap(); // Number of array dimensions
                 let value_type = p.data_type.chars().take(n).collect();
 
-                let mut entries = vec!();
+                let mut entries = vec![];
                 for element in elements.iter() {
                     let variable = unwrap_yaml_value(&element, &value_type)?;
                     entries.push(variable);
@@ -222,10 +221,8 @@ fn unwrap_yaml_hash(
 
                 let complex = String::from(&p.data_type);
                 Value::Array { complex, entries }
-            },
-            Yaml::Hash(_) => {
-                unimplemented!()
-            },
+            }
+            Yaml::Hash(_) => unimplemented!(),
             _ => unwrap_yaml_value(&map[&key], &p.data_type)?,
         };
 
@@ -238,14 +235,17 @@ fn unwrap_yaml_hash(
 ///
 ///
 ///
-fn unwrap_yaml_value(value: &Yaml, data_type: &String) -> FResult<Value> {
+fn unwrap_yaml_value(
+    value: &Yaml,
+    data_type: &String,
+) -> FResult<Value> {
     debug!("Unwrapping as {}: {:?} ", data_type, value);
 
     let value = match data_type.as_ref() {
         "boolean" => {
             let value = value.as_bool().unwrap();
             Value::Literal(Literal::Boolean(value))
-        },
+        }
         "integer" => {
             let value = value.as_i64().unwrap();
             Value::Literal(Literal::Integer(value))
@@ -270,7 +270,10 @@ const PREFIX: &str = "~~>";
 ///
 ///
 ///
-fn preprocess_stdout(stdout: String, mode: &Option<String>) -> FResult<String> {
+fn preprocess_stdout(
+    stdout: String,
+    mode: &Option<String>,
+) -> FResult<String> {
     let mode = mode.clone().unwrap_or(String::from("complete"));
 
     if mode == "complete" {

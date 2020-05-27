@@ -19,9 +19,3 @@ pub struct Payload {
     pub identifier: String,
     pub monitor_url: Option<String>,
 }
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Output {
-
-}
