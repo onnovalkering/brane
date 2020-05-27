@@ -1,0 +1,21 @@
+[package]
+name = "brane-init"
+version = "0.1.0"
+authors = ["Onno Valkering"]
+edition = "2018"
+
+[dependencies]
+base64 = "0.12"
+dialoguer = "0.6"
+env_logger = "0.7"
+failure = "0.1"
+log = "0.4"
+semver = "0.9"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.8"
+structopt = "0.3"
+specifications = { path = "../specifications" }
+tokio = { version = "0.2", features = ["full"] }
+tokio-util = "0.3"
+yaml-rust = "0.4"

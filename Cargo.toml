@@ -5,6 +5,8 @@ members = [
     "brane-cli",
     "brane-dsl",
     "brane-exec",
+    "brane-init",
     "brane-loop",
+    "brane-vm",
     "specifications",
 ]
