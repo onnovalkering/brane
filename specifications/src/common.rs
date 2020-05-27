@@ -140,8 +140,8 @@ impl PartialOrd for Value {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Literal {
     Boolean(bool),
-    Decimal(f64),
     Integer(i64),
+    Decimal(f64),
     Str(String),
 }
 
