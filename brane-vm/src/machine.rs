@@ -1,8 +1,12 @@
 use crate::environment::Environment;
+use brane_exec::{docker, ExecuteInfo};
+use serde_json::json;
 use specifications::common::{Literal, Value};
 use specifications::instructions::{Instruction, Instruction::*, Move, Move::*, Operator::*};
+use std::path::PathBuf;
 
 type FResult<T> = Result<T, failure::Error>;
+type Map<T> = std::collections::HashMap<String, T>;
 
 ///
 ///
@@ -23,7 +27,7 @@ impl Machine {
     ///
     ///
     ///
-    pub fn interpret(
+    pub async fn interpret(
         &mut self,
         instructions: Vec<Instruction>,
     ) -> FResult<()> {
@@ -32,7 +36,7 @@ impl Machine {
         while self.cursor != cursor_max {
             let instruction = instructions.get(self.cursor).unwrap().clone();
             let movement = match instruction {
-                Act { .. } => self.handle_act(instruction)?,
+                Act { .. } => self.handle_act(instruction).await?,
                 Mov { .. } => self.handle_mov(instruction)?,
                 Sub { .. } => self.handle_sub(instruction)?,
                 Var { .. } => self.handle_var(instruction)?,
@@ -51,19 +55,49 @@ impl Machine {
     ///
     ///
     ///
-    fn handle_act(
+    async fn handle_act(
         &mut self,
-        _instruction: Instruction,
+        instruction: Instruction,
     ) -> FResult<Move> {
-        let name = String::from("counter");
-        let counter = self.environment.get(&name);
-        if let Value::Literal(Literal::Integer(value)) = counter {
-            println!("Counter: {}", value + 1);
-            self.environment
-                .set(&name, &Value::Literal(Literal::Integer(value + 1)));
-        } else {
-            bail!("invalid");
-        };
+        let (meta, assignment, name, input, data_type) = instruction.as_act()?;
+        let mut arguments = Map::<Literal>::new();
+        for (key, value) in input.iter() {
+            let literal = match value {
+                Value::Literal(literal) => literal.clone(),
+                Value::Variable(variable) => {
+                    if let Value::Literal(literal) = self.environment.get(variable) {
+                        literal
+                    } else {
+                        unreachable!()
+                    }
+                }
+                _ => unreachable!(),
+            };
+
+            arguments.insert(key.clone(), literal);
+        }
+
+        let image = meta.get("image").expect("Missing `image` metadata property");
+        let image_file = meta.get("image_file").map(|p| PathBuf::from(p));
+        let payload = json!({
+            "identifier": "1+1",
+            "action": name,
+            "arguments": arguments,
+        });
+
+        let exec = ExecuteInfo::new(image.clone(), image_file, payload);
+        let (stdout, _) = docker::run_and_wait(exec).await?;
+
+        if let Some(ref assignment) = assignment {
+            let output: Map<Value> = serde_json::from_str(&stdout).unwrap();
+            let value = output.get("c").unwrap();
+
+            if value.get_complex() != data_type.unwrap() {
+                bail!("Data types don't match!");
+            }
+
+            self.environment.set(assignment, value);
+        }
 
         Ok(Forward)
     }
@@ -121,15 +155,15 @@ impl Machine {
     ///
     fn handle_sub(
         &mut self,
-        instruction: Instruction,
+        _instruction: Instruction,
     ) -> FResult<Move> {
-        let (_, instructions) = instruction.as_sub()?;
-        let child_env = self.environment.child();
+        // let (_, instructions) = instruction.as_sub()?;
+        // let child_env = self.environment.child();
 
-        let mut child_vm = Machine::new(child_env);
-        child_vm.interpret(instructions)?;
+        // let mut child_vm = Machine::new(child_env);
+        // child_vm.interpret(instructions)?;
 
-        Ok(Forward)
+        unimplemented!();
     }
 
     ///
@@ -158,53 +192,42 @@ impl Machine {
 mod tests {
     use super::*;
     use crate::environment::InMemoryEnvironment;
-    use specifications::common::{Argument, Literal, Value};
-    use specifications::instructions::{Condition};
+    use specifications::common::{Literal, Value};
 
     type Map<T> = std::collections::HashMap<String, T>;
 
-    #[test]
-    fn it_works() {
+    #[tokio::test]
+    async fn it_works() {
+        let mut meta = Map::<String>::new();
+        meta.insert("image".to_string(), "arithmetic:1.0.0".to_string());
+        let mut input = Map::<Value>::new();
+        input.insert(String::from("a"), Value::Variable(String::from("a")));
+        input.insert(String::from("b"), Value::Variable(String::from("b")));
+
         let instructions = vec![
             Instruction::new_set_var(
-                String::from("counter"),
-                Value::Literal(Literal::Integer(0)),
+                String::from("a"),
+                Value::Literal(Literal::Integer(1)),
                 String::from("local"),
             ),
-            Instruction::new_sub(vec![
-                Instruction::new_act(
-                    String::from("???"),
-                    Map::<Argument>::new(),
-                    Map::<String>::new(),
-                    None,
-                    None,
-                ),
-                Instruction::new_mov(
-                    vec![Condition::le(
-                        Value::Variable(String::from("counter")),
-                        Value::Literal(Literal::Integer(10)),
-                    )],
-                    vec![Backward],
-                ),
-            ]),
-            Instruction::new_act(
-                String::from("???"),
-                Map::<Argument>::new(),
-                Map::<String>::new(),
-                None,
-                None,
+            Instruction::new_set_var(
+                String::from("b"),
+                Value::Literal(Literal::Integer(2)),
+                String::from("local"),
             ),
-            Instruction::new_mov(
-                vec![Condition::le(
-                    Value::Variable(String::from("counter")),
-                    Value::Literal(Literal::Integer(3)),
-                )],
-                vec![Backward],
+            Instruction::new_act(
+                String::from("add"),
+                input,
+                meta,
+                Some(String::from("c")),
+                Some(String::from("integer")),
             ),
         ];
 
         let environment = InMemoryEnvironment::new(None, None);
         let mut machine = Machine::new(Box::new(environment));
-        machine.interpret(instructions).unwrap();
+        machine.interpret(instructions).await.unwrap();
+
+        assert_eq!(machine.environment.get("c"), Value::Literal(Literal::Integer(3)));
     }
 }

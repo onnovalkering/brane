@@ -20,9 +20,7 @@ pub trait Environment {
         value: &Value,
     );
 
-    fn child(
-        &self
-    ) -> Box<dyn Environment>;
+    fn child(&self) -> Box<dyn Environment>;
 }
 
 ///
@@ -38,13 +36,13 @@ impl InMemoryEnvironment {
     ///
     ///
     ///
-    pub fn new(arguments: Option<Map<Value>>, parent: Option<Rc<dyn Environment>>) -> Self {
+    pub fn new(
+        arguments: Option<Map<Value>>,
+        parent: Option<Rc<dyn Environment>>,
+    ) -> Self {
         let variables = arguments.unwrap_or_else(Map::<Value>::new);
 
-        InMemoryEnvironment {
-            variables,
-            parent,
-        }
+        InMemoryEnvironment { variables, parent }
     }
 }
 
@@ -100,9 +98,7 @@ impl Environment for InMemoryEnvironment {
     ///
     ///
     ///
-    fn child(
-        &self
-    ) -> Box<dyn Environment> {
+    fn child(&self) -> Box<dyn Environment> {
         let current = Rc::new(self.clone());
         let environment = InMemoryEnvironment::new(None, Some(current));
 
