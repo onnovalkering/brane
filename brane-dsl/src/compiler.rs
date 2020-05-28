@@ -323,7 +323,7 @@ pub fn terms_to_instructions(
                 let range = find_location.start()..find_location.end();
                 let coverage = term_pattern_clone.get(range.clone()).unwrap();
 
-                let mut input = Map::<Argument>::new();
+                let mut input = Map::<Value>::new();
                 let mut arguments = function.arguments.iter();
                 let mut consumed_temp: Option<String> = None;
 
@@ -340,7 +340,7 @@ pub fn terms_to_instructions(
 
                             input.insert(
                                 argument.name.clone(),
-                                Argument::new(arg, "variable".to_string(), None, None, None, None, None),
+                                Value::Variable(arg),
                             );
                         } else {
                             unreachable!();

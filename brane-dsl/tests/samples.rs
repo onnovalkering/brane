@@ -12,5 +12,7 @@ fn hello_world() {
     let program = fs::read_to_string("./resources/hello-world.bk").unwrap();
     let instructions = compiler.compile(&program).unwrap();
 
+    println!("{:?}", instructions);
+
     assert!(instructions.len() > 0);
 }
