@@ -163,7 +163,10 @@ impl Instruction {
         }
     }
 
-    pub fn new_mov(conditions: Vec<Condition>, branches: Vec<Move>) -> Instruction {
+    pub fn new_mov(
+        conditions: Vec<Condition>,
+        branches: Vec<Move>,
+    ) -> Instruction {
         Instruction::Mov {
             r#type: "MOV".to_string(),
             meta: Map::<String>::new(),
@@ -240,55 +243,72 @@ pub struct Condition {
 }
 
 impl Condition {
-    pub fn eq(left: Value, right: Value) -> Condition {
+    pub fn eq(
+        left: Value,
+        right: Value,
+    ) -> Condition {
         Condition {
             left,
             operator: Operator::Equals,
-            right
+            right,
         }
     }
 
-    pub fn ne(left: Value, right: Value) -> Condition {
+    pub fn ne(
+        left: Value,
+        right: Value,
+    ) -> Condition {
         Condition {
             left,
             operator: Operator::NotEquals,
-            right
+            right,
         }
     }
 
-    pub fn gt(left: Value, right: Value) -> Condition {
+    pub fn gt(
+        left: Value,
+        right: Value,
+    ) -> Condition {
         Condition {
             left,
             operator: Operator::Greater,
-            right
+            right,
         }
     }
 
-    pub fn lt(left: Value, right: Value) -> Condition {
+    pub fn lt(
+        left: Value,
+        right: Value,
+    ) -> Condition {
         Condition {
             left,
             operator: Operator::Less,
-            right
+            right,
         }
     }
 
-    pub fn ge(left: Value, right: Value) -> Condition {
+    pub fn ge(
+        left: Value,
+        right: Value,
+    ) -> Condition {
         Condition {
             left,
             operator: Operator::GreaterOrEqual,
-            right
+            right,
         }
     }
 
-    pub fn le(left: Value, right: Value) -> Condition {
+    pub fn le(
+        left: Value,
+        right: Value,
+    ) -> Condition {
         Condition {
             left,
             operator: Operator::LessOrEqual,
-            right
+            right,
         }
     }
 }
-
 
 #[repr(u8)]
 #[serde(rename_all = "camelCase")]

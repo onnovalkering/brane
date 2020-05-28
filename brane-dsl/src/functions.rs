@@ -1,7 +1,7 @@
 use itertools::interleave;
+use regex;
 use specifications::common::Argument;
 use specifications::package::{Function, PackageInfo};
-use regex;
 
 type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;

@@ -2,8 +2,8 @@ use diesel::pg::PgConnection;
 use diesel::{r2d2, r2d2::ConnectionManager};
 use dotenv::dotenv;
 use futures::StreamExt;
-use log::{info, warn};
 use log::LevelFilter;
+use log::{info, warn};
 use rdkafka::client::ClientContext;
 use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
 use rdkafka::consumer::stream_consumer::StreamConsumer;
@@ -27,7 +27,7 @@ struct CLI {
 }
 
 #[tokio::main]
-async fn main() -> std::io::Result<()>{
+async fn main() -> std::io::Result<()> {
     dotenv().ok();
 
     let mut logger = env_logger::builder();
@@ -53,9 +53,7 @@ async fn main() -> std::io::Result<()>{
         .create()
         .expect("Consumer creation failed");
 
-    consumer
-        .subscribe(&vec![TOPIC_CONTROL])
-        .expect("Failed to subscribe");
+    consumer.subscribe(&vec![TOPIC_CONTROL]).expect("Failed to subscribe");
 
     let mut message_stream = consumer.start();
 
@@ -71,8 +69,15 @@ async fn main() -> std::io::Result<()>{
                         ""
                     }
                 };
-                info!("key: '{:?}', payload: '{}', topic: {}, partition: {}, offset: {}, timestamp: {:?}",
-                      m.key(), payload, m.topic(), m.partition(), m.offset(), m.timestamp());
+                info!(
+                    "key: '{:?}', payload: '{}', topic: {}, partition: {}, offset: {}, timestamp: {:?}",
+                    m.key(),
+                    payload,
+                    m.topic(),
+                    m.partition(),
+                    m.offset(),
+                    m.timestamp()
+                );
                 if let Some(headers) = m.headers() {
                     for i in 0..headers.count() {
                         let header = headers.get(i).unwrap();

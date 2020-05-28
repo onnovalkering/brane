@@ -129,7 +129,10 @@ fn build_payload(container_info: &ContainerInfo) -> FResult<Payload> {
 ///
 ///
 ///
-fn prompt<T>(name: &str, data_type: &str) -> std::io::Result<T>
+fn prompt<T>(
+    name: &str,
+    data_type: &str,
+) -> std::io::Result<T>
 where
     T: Clone + FromStr + Display,
     T::Err: Display + Debug,

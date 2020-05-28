@@ -338,10 +338,7 @@ pub fn terms_to_instructions(
                         if let Some(argument) = arguments.next() {
                             debug!("Input: {:?} <- {:?}", &argument.name, &arg);
 
-                            input.insert(
-                                argument.name.clone(),
-                                Value::Variable(arg),
-                            );
+                            input.insert(argument.name.clone(), Value::Variable(arg));
                         } else {
                             unreachable!();
                         }

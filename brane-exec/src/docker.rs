@@ -1,4 +1,5 @@
 use crate::ExecuteInfo;
+use base64;
 use bollard::container::{
     Config, CreateContainerOptions, LogOutput, LogsOptions, RemoveContainerOptions, StartContainerOptions,
     WaitContainerOptions,
@@ -8,13 +9,12 @@ use bollard::image::ImportImageOptions;
 use bollard::Docker;
 use futures_util::stream::TryStreamExt;
 use hyper::Body;
+use serde_json;
 use std::default::Default;
 use tokio::fs::File as TFile;
 use tokio::stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use uuid::Uuid;
-use serde_json;
-use base64;
 
 type FResult<T> = Result<T, failure::Error>;
 
@@ -125,8 +125,8 @@ async fn import_image(
 
 #[cfg(test)]
 mod tests {
-    use serde_json::{json, Value as JValue};
     use super::*;
+    use serde_json::{json, Value as JValue};
     use std::path::PathBuf;
     use tokio;
 

@@ -1,8 +1,8 @@
 use crate::schema::{invocations, packages};
 use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
-use specifications::instructions::Instruction;
 use specifications::common::Argument;
+use specifications::instructions::Instruction;
 use specifications::package::PackageInfo;
 use std::path::PathBuf;
 use uuid::Uuid;
