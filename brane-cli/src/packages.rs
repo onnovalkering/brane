@@ -78,7 +78,7 @@ pub fn list() -> FResult<()> {
 
     let mut table = Table::new();
     table.set_format(format);
-    table.add_row(row!["ID", "NAME", "VERSION", "CREATED"]);
+    table.add_row(row!["ID", "NAME", "VERSION", "KIND", "CREATED"]);
 
     // Add a row to the table for each version of each group.
     let packages = fs::read_dir(packages_dir)?;
@@ -103,12 +103,13 @@ pub fn list() -> FResult<()> {
 
                 let id = pad_str(&uuid[..8], 10, Alignment::Left, Some(".."));
                 let name = pad_str(&package_info.name, 20, Alignment::Left, Some(".."));
-                let version = pad_str(&package_info.version, 15, Alignment::Left, Some(".."));
+                let version = pad_str(&package_info.version, 10, Alignment::Left, Some(".."));
+                let kind = pad_str(&package_info.kind, 10, Alignment::Left, Some(".."));
                 let elapsed = Duration::from_secs((now - &package_info.created.timestamp()) as u64);
                 let created = format!("{} ago", HumanDuration(elapsed));
                 let created = pad_str(&created, 15, Alignment::Left, None);
 
-                table.add_row(row![id, name, version, created]);
+                table.add_row(row![id, name, version, kind, created]);
             }
         }
     }
