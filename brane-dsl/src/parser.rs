@@ -74,7 +74,7 @@ impl AstTerm {
 ///
 ///
 ///
-pub fn parse(input: &String) -> FResult<Vec<AstNode>> {
+pub fn parse(input: &str) -> FResult<Vec<AstNode>> {
     let mut ast = vec![];
 
     let pairs = BakeryParser::parse(Rule::program, &input)?;
@@ -122,10 +122,7 @@ fn parse_assignment_rule(rule: Pair<Rule>) -> FResult<AstNode> {
         terms.push(parse_term_rule(term)?);
     }
 
-    Ok(AstNode::Assignment {
-        name: name,
-        terms: terms,
-    })
+    Ok(AstNode::Assignment { name, terms })
 }
 
 ///
@@ -139,7 +136,7 @@ fn parse_call_rule(rule: Pair<Rule>) -> FResult<AstNode> {
         terms.push(parse_term_rule(term)?);
     }
 
-    Ok(AstNode::Call { terms: terms })
+    Ok(AstNode::Call { terms })
 }
 
 ///
@@ -157,9 +154,9 @@ fn parse_condition_rule(rule: Pair<Rule>) -> FResult<AstNode> {
     };
 
     Ok(AstNode::Condition {
-        predicate: predicate,
-        if_exec: if_exec,
-        el_exec: el_exec,
+        predicate,
+        if_exec,
+        el_exec,
     })
 }
 
@@ -191,10 +188,7 @@ fn parse_import_rule(rule: Pair<Rule>) -> FResult<AstNode> {
         None
     };
 
-    Ok(AstNode::Import {
-        module: module,
-        version: version,
-    })
+    Ok(AstNode::Import { module, version })
 }
 
 ///
@@ -247,10 +241,7 @@ fn parse_parameter_rule(rule: Pair<Rule>) -> FResult<AstNode> {
     let name = parameter.next().unwrap().as_str().to_string();
     let complex = parameter.next().unwrap().as_str().to_string();
 
-    Ok(AstNode::Parameter {
-        name: name,
-        complex: complex,
-    })
+    Ok(AstNode::Parameter { name, complex })
 }
 
 ///
@@ -262,10 +253,7 @@ fn parse_repeat_rule(rule: Pair<Rule>) -> FResult<AstNode> {
     let predicate = Box::new(parse_call_rule(repeat.next().unwrap())?);
     let exec = Box::new(parse_execution_rule(repeat.next().unwrap())?);
 
-    Ok(AstNode::Repeat {
-        predicate: predicate,
-        exec: exec,
-    })
+    Ok(AstNode::Repeat { predicate, exec })
 }
 
 ///
@@ -319,7 +307,7 @@ fn parse_terminate_rule(rule: Pair<Rule>) -> FResult<AstNode> {
         None
     };
 
-    Ok(AstNode::Terminate { terms: terms })
+    Ok(AstNode::Terminate { terms })
 }
 
 ///

@@ -105,7 +105,7 @@ pub fn list() -> FResult<()> {
                 let name = pad_str(&package_info.name, 20, Alignment::Left, Some(".."));
                 let version = pad_str(&package_info.version, 10, Alignment::Left, Some(".."));
                 let kind = pad_str(&package_info.kind, 10, Alignment::Left, Some(".."));
-                let elapsed = Duration::from_secs((now - &package_info.created.timestamp()) as u64);
+                let elapsed = Duration::from_secs((now - package_info.created.timestamp()) as u64);
                 let created = format!("{} ago", HumanDuration(elapsed));
                 let created = pad_str(&created, 15, Alignment::Left, None);
 
@@ -130,7 +130,7 @@ pub fn remove(
     // Remove without confirmation if explicity stated package version.
     if let Some(version) = version {
         let package_dir = get_package_dir(&name, Some(&version))?;
-        if let Err(_) = fs::remove_dir_all(&package_dir) {
+        if fs::remove_dir_all(&package_dir).is_err() {
             println!("No package with name '{}' and version '{}' exists!", name, version);
         }
 
@@ -174,15 +174,12 @@ pub fn test(
     name: String,
     version: Option<String>,
 ) -> FResult<()> {
-    let version_or_latest = version.unwrap_or(String::from("latest"));
+    let version_or_latest = version.unwrap_or_else(|| String::from("latest"));
     let package_dir = get_package_dir(&name, Some(&version_or_latest))?;
     ensure!(package_dir.exists(), "No package found.");
 
     let package_info = PackageInfo::from_path(package_dir.join("package.yml"))?;
-    ensure!(
-        package_info.kind == String::from("ecu"),
-        "Only testing of ECU packages is supported."
-    );
+    ensure!(package_info.kind == "ecu", "Only testing of ECU packages is supported.");
 
     let image_tag = format!("{}:{}", package_info.name, package_info.version);
     let image_file = package_dir.join("image.tar");

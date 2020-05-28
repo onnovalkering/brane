@@ -46,7 +46,6 @@ fn create_package_info(cwl_document: &CwlDocument) -> FResult<PackageInfo> {
         .version
         .clone()
         .expect("Please add s:version to your CWL document.");
-    let description = schema.description.clone();
 
     let (function_name, function, types) = match cwl_document {
         CwlDocument::CommandLineTool(clt) => build_clt_function(clt)?,
@@ -59,7 +58,7 @@ fn create_package_info(cwl_document: &CwlDocument) -> FResult<PackageInfo> {
     let package_info = PackageInfo::new(
         name,
         version,
-        description,
+        schema.description,
         String::from("cwl"),
         Some(functions),
         Some(types),

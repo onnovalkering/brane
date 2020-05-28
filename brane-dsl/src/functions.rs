@@ -1,5 +1,4 @@
 use itertools::interleave;
-use regex;
 use specifications::common::Argument;
 use specifications::package::{Function, PackageInfo};
 
@@ -31,9 +30,9 @@ pub fn get_module_patterns(module: &PackageInfo) -> FResult<Vec<FunctionPattern>
 
         let function_pattern = FunctionPattern {
             arguments: function.arguments.clone(),
-            meta: meta,
+            meta,
             name: name.clone(),
-            pattern: pattern,
+            pattern,
             return_type: function.return_type.clone(),
         };
 
@@ -49,7 +48,7 @@ pub fn get_module_patterns(module: &PackageInfo) -> FResult<Vec<FunctionPattern>
 fn build_pattern(function: &Function) -> FResult<String> {
     let mut pattern = vec![];
 
-    if let None = &function.notation {
+    if function.notation.is_none() {
         bail!("No function notation...");
     }
 
@@ -63,7 +62,7 @@ fn build_pattern(function: &Function) -> FResult<String> {
         .iter()
         .map(|arg| {
             let data_type = regex::escape(&arg.data_type);
-            let data_type = if data_type.ends_with("]") {
+            let data_type = if data_type.ends_with(']') {
                 format!("{}|array", data_type)
             } else if data_type.chars().next().unwrap().is_uppercase() {
                 format!("{}|object", data_type)
@@ -71,7 +70,7 @@ fn build_pattern(function: &Function) -> FResult<String> {
                 data_type
             };
 
-            format!("<\\w+:({})>", data_type).to_owned()
+            format!("<\\w+:({})>", data_type)
         })
         .collect();
 

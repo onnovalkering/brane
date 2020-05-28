@@ -76,7 +76,7 @@ pub async fn pull(
     let temp_filepath = env::temp_dir().join(package.filename);
     let mut temp_file = File::create(&temp_filepath)?;
     while let Some(chunk) = package_archive.chunk().await? {
-        temp_file.write(&chunk)?;
+        temp_file.write_all(&chunk)?; // If causes bug, use .write(&chunk)
     }
 
     // Verify checksum

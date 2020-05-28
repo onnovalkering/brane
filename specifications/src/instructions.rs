@@ -1,7 +1,6 @@
-use crate::common::{Argument, FunctionNotation, Type, Value};
+use crate::common::{FunctionNotation, Type, Value};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-use serde_yaml;
 use std::fs;
 use std::path::PathBuf;
 
@@ -175,7 +174,7 @@ impl Instruction {
         }
     }
 
-    pub fn as_act(self) -> FResult<ActTuple> {
+    pub fn deconstruct_act(self) -> FResult<ActTuple> {
         if let Instruction::Act {
             meta,
             assignment,
@@ -191,7 +190,7 @@ impl Instruction {
         }
     }
 
-    pub fn as_mov(self) -> FResult<MovTuple> {
+    pub fn deconstruct_mov(self) -> FResult<MovTuple> {
         if let Instruction::Mov {
             meta,
             conditions,
@@ -205,7 +204,7 @@ impl Instruction {
         }
     }
 
-    pub fn as_sub(self) -> FResult<SubTuple> {
+    pub fn deconstruct_sub(self) -> FResult<SubTuple> {
         if let Instruction::Sub { meta, instructions, .. } = self {
             Ok((meta, instructions))
         } else {
@@ -213,7 +212,7 @@ impl Instruction {
         }
     }
 
-    pub fn as_var(self) -> FResult<VarTuple> {
+    pub fn deconstruct_var(self) -> FResult<VarTuple> {
         if let Instruction::Var { meta, get, set, .. } = self {
             Ok((meta, get, set))
         } else {

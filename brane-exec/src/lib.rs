@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate log;
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JValue;
 use std::path::PathBuf;

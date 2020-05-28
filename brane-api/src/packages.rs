@@ -51,11 +51,11 @@ impl Package {
 
         let id = Uuid::parse_str(&self.uuid).unwrap();
         let created = DateTime::<Utc>::from_utc(self.created, Utc);
-        let functions = serde_json::from_str(&functions_json.unwrap_or(String::from("{}"))).unwrap();
-        let types = serde_json::from_str(&types_json.unwrap_or(String::from("{}"))).unwrap();
+        let functions = serde_json::from_str(&functions_json.unwrap_or_else(|| String::from("{}"))).unwrap();
+        let types = serde_json::from_str(&types_json.unwrap_or_else(|| String::from("{}"))).unwrap();
 
         PackageInfo {
-            id: id,
+            id,
             created,
             description: self.description.clone(),
             functions: Some(functions),
@@ -76,7 +76,7 @@ async fn get_packages(
     web::Query(query): Query,
 ) -> HttpResponse {
     let conn = pool.get().expect("Couldn't get connection from db pool.");
-    let term = query.get("t").map(|t| String::from(t)).unwrap_or(String::new());
+    let term = query.get("t").map(String::from).unwrap_or_default();
 
     let packages = db::packages
         .filter(db::name.like(format!("%{}%", term)))
@@ -205,7 +205,7 @@ async fn upload_package(
     })
     .await;
 
-    if let Ok(_) = result {
+    if result.is_ok() {
         HttpResponse::Ok().body("")
     } else {
         HttpResponse::InternalServerError().body("")
@@ -221,7 +221,7 @@ fn upload_badrequest(
     upload_id: Option<String>,
 ) -> HttpResponse {
     if let Some(upload_id) = upload_id {
-        if let Err(_) = upload_cleanup(temporary_dir, upload_id) {
+        if upload_cleanup(temporary_dir, upload_id).is_err() {
             return HttpResponse::InternalServerError().body("");
         }
     }
@@ -259,7 +259,7 @@ async fn get_package(
     let packages = db::packages.filter(db::name.eq(name)).load::<Package>(&conn);
 
     if let Ok(packages) = packages {
-        if packages.len() > 0 {
+        if !packages.is_empty() {
             let package_infos: Vec<PackageInfo> = packages.iter().map(|p| p.as_info()).collect();
             HttpResponse::Ok().json(package_infos)
         } else {
@@ -320,16 +320,16 @@ async fn delete_package_version(
         .optional()
         .unwrap();
 
-    if let None = package {
+    if package.is_none() {
         return HttpResponse::NotFound().body("");
     }
 
     let package = package.unwrap();
-    if let Err(_) = fs::remove_file(packages_dir.join(&package.filename)) {
+    if fs::remove_file(packages_dir.join(&package.filename)).is_err() {
         return HttpResponse::InternalServerError().body("Failed to delete package archive.");
     }
 
-    if let Ok(_) = diesel::delete(&package).execute(&conn) {
+    if diesel::delete(&package).execute(&conn).is_ok() {
         HttpResponse::Ok().body("")
     } else {
         HttpResponse::InternalServerError().body("")
@@ -357,7 +357,7 @@ async fn download_package_archive(
         .optional()
         .unwrap();
 
-    if let None = package {
+    if package.is_none() {
         return HttpResponse::NotFound().body("");
     }
 

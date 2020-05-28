@@ -57,13 +57,13 @@ async fn main() -> std::io::Result<()> {
     }
 
     // Prepare the filesystem
-    let packages_dir = env::var("PACKAGES_DIR").unwrap_or(String::from(DEF_PACKAGES_DIR));
-    let temporary_dir = env::var("TEMPORARY_DIR").unwrap_or(String::from(DEF_TEMPORARY_DIR));
+    let packages_dir = env::var("PACKAGES_DIR").unwrap_or_else(|_| String::from(DEF_PACKAGES_DIR));
+    let temporary_dir = env::var("TEMPORARY_DIR").unwrap_or_else(|_| String::from(DEF_TEMPORARY_DIR));
     fs::create_dir_all(&temporary_dir)?;
     fs::create_dir_all(&packages_dir)?;
 
     // Create a database pool
-    let database_url = env::var("DATABASE_URL").unwrap_or(String::from(DEF_DATABASE_URL));
+    let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| String::from(DEF_DATABASE_URL));
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     let pool = r2d2::Pool::builder().build(manager).expect("Failed to create pool.");
 
@@ -72,7 +72,7 @@ async fn main() -> std::io::Result<()> {
     embedded_migrations::run(&conn).expect("Failed to run database migrations.");
 
     // Create Kafka producer
-    let kafka_brokers = env::var("KAFKA_BROKERS").unwrap_or(String::from(DEF_KAFKA_BROKERS));
+    let kafka_brokers = env::var("KAFKA_BROKERS").unwrap_or_else(|_| String::from(DEF_KAFKA_BROKERS));
     let producer: FutureProducer = ClientConfig::new()
         .set("bootstrap.servers", &kafka_brokers)
         .set("message.timeout.ms", "5000")
@@ -80,7 +80,7 @@ async fn main() -> std::io::Result<()> {
         .expect("Couldn't create a Kafka producer.");
 
     // Prepare configuration
-    let docker_host = env::var("DOCKER_HOST").unwrap_or(String::from(DEF_DOCKER_HOST));
+    let docker_host = env::var("DOCKER_HOST").unwrap_or_else(|_| String::from(DEF_DOCKER_HOST));
     let config = models::Config {
         docker_host,
         packages_dir: PathBuf::from(packages_dir),

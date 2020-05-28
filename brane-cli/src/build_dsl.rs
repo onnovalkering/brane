@@ -1,6 +1,5 @@
 use crate::{packages, registry};
 use brane_dsl::compiler::Compiler;
-use serde_yaml;
 use specifications::instructions::Instruction;
 use specifications::package::{Function, PackageInfo};
 use std::fs::{self, File};
@@ -37,23 +36,23 @@ pub async fn handle(
 ///
 ///
 fn generate_package_info(
-    dsl_document: &String,
-    _instructions: &Vec<Instruction>,
+    dsl_document: &str,
+    _instructions: &[Instruction],
 ) -> FResult<PackageInfo> {
     let yamls = YamlLoader::load_from_str(&dsl_document).unwrap();
     let info = yamls.first().expect("Document doesn't start with a info section");
 
     let name = info["name"]
         .as_str()
-        .map(|d| String::from(d))
+        .map(String::from)
         .expect("Info section doesn't contain a 'name' property.");
 
     let version = info["version"]
         .as_str()
-        .map(|d| String::from(d))
+        .map(String::from)
         .expect("Info section doesn't contain a 'version' property.");
 
-    let description = info["description"].as_str().map(|d| String::from(d));
+    let description = info["description"].as_str().map(String::from);
 
     // Construct function descriptions
     let functions = Map::<Function>::new();
@@ -76,7 +75,7 @@ fn generate_package_info(
 ///
 ///
 fn prepare_directory(
-    instructions: &Vec<Instruction>,
+    instructions: &[Instruction],
     dsl_file: &PathBuf,
     package_info: &PackageInfo,
     package_dir: &PathBuf,

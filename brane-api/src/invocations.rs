@@ -63,15 +63,15 @@ async fn create_invocation(
     .await;
 
     // Something went wrong when creating the invocation.
-    if let Err(_) = invocation {
+    if invocation.is_err() {
         return HttpResponse::InternalServerError().body("");
     }
 
     // Send control message (fire-and-forget) to announce the new invocation
     let invocation = invocation.unwrap();
-    let delivery = announce_status(&producer, &invocation.id, &invocation.status).await;
+    let delivery = announce_status(&producer, invocation.id, &invocation.status).await;
 
-    if let Ok(_) = delivery {
+    if delivery.is_ok() {
         HttpResponse::Ok().body("")
     } else {
         HttpResponse::InternalServerError().body("")
@@ -136,16 +136,16 @@ async fn delete_invocation(
         .optional()
         .unwrap();
 
-    if let None = invocation {
+    if invocation.is_none() {
         return HttpResponse::NotFound().body("");
     }
 
     let invocation = invocation.unwrap();
-    if invocation.status != String::from("stopped") {
+    if invocation.status != "stopped" {
         return HttpResponse::BadRequest().body(MSG_ONLY_STOPPED_DELETED);
     }
 
-    if let Ok(_) = diesel::delete(&invocation).execute(&conn) {
+    if diesel::delete(&invocation).execute(&conn).is_ok() {
         HttpResponse::Ok().body("")
     } else {
         HttpResponse::InternalServerError().body("")
@@ -169,12 +169,12 @@ async fn resume_invocation(
         .optional()
         .unwrap();
 
-    if let None = invocation {
+    if invocation.is_none() {
         return HttpResponse::NotFound().body("");
     }
 
     let invocation = invocation.unwrap();
-    if invocation.status != String::from("halted") {
+    if invocation.status != "halted" {
         return HttpResponse::BadRequest().body(MSG_ONLY_HALTED_RESUMED);
     }
 
@@ -187,9 +187,9 @@ async fn resume_invocation(
 
     // Send control message (fire-and-forget) to announce the new invocation
     let invocation = invocation.unwrap();
-    let delivery = announce_status(&producer, &invocation.id, &invocation.status).await;
+    let delivery = announce_status(&producer, invocation.id, &invocation.status).await;
 
-    if let Ok(_) = delivery {
+    if delivery.is_ok() {
         HttpResponse::Ok().body("")
     } else {
         HttpResponse::InternalServerError().body("")
@@ -213,12 +213,12 @@ async fn stop_invocation(
         .optional()
         .unwrap();
 
-    if let None = invocation {
+    if invocation.is_none() {
         return HttpResponse::NotFound().body("");
     }
 
     let invocation = invocation.unwrap();
-    if invocation.status != String::from("running") {
+    if invocation.status != "running" {
         return HttpResponse::BadRequest().body(MSG_ONLY_RUNNING_STOPPED);
     }
 
@@ -231,9 +231,9 @@ async fn stop_invocation(
 
     // Send control message (fire-and-forget) to announce the new invocation
     let invocation = invocation.unwrap();
-    let delivery = announce_status(&producer, &invocation.id, &invocation.status).await;
+    let delivery = announce_status(&producer, invocation.id, &invocation.status).await;
 
-    if let Ok(_) = delivery {
+    if delivery.is_ok() {
         HttpResponse::Ok().body("")
     } else {
         HttpResponse::InternalServerError().body("")
@@ -257,12 +257,12 @@ async fn suspend_invocation(
         .optional()
         .unwrap();
 
-    if let None = invocation {
+    if invocation.is_none() {
         return HttpResponse::NotFound().body("");
     }
 
     let invocation = invocation.unwrap();
-    if invocation.status != String::from("running") {
+    if invocation.status != "running" {
         return HttpResponse::BadRequest().body(MSG_ONLY_RUNNING_SUSPENED);
     }
 
@@ -275,9 +275,9 @@ async fn suspend_invocation(
 
     // Send control message (fire-and-forget) to announce the new invocation
     let invocation = invocation.unwrap();
-    let delivery = announce_status(&producer, &invocation.id, &invocation.status).await;
+    let delivery = announce_status(&producer, invocation.id, &invocation.status).await;
 
-    if let Ok(_) = delivery {
+    if delivery.is_ok() {
         HttpResponse::Ok().body("")
     } else {
         HttpResponse::InternalServerError().body("")
@@ -289,8 +289,8 @@ async fn suspend_invocation(
 ///
 async fn announce_status(
     producer: &FutureProducer,
-    invocation_id: &i32,
-    status: &String,
+    invocation_id: i32,
+    status: &str,
 ) -> Result<(), ()> {
     let message_key = format!("inv#{}", invocation_id);
     let message_payload = format!(r#"{{"status": "{}"}}"#, status);

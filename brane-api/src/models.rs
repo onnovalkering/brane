@@ -40,7 +40,7 @@ impl NewInvocation {
     pub fn new(
         name: Option<String>,
         arguments: &Map<Argument>,
-        instructions: &Vec<Instruction>,
+        instructions: &[Instruction],
     ) -> FResult<Self> {
         let created = Utc::now().naive_utc();
         let uuid = Uuid::new_v4().to_string();

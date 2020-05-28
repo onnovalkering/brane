@@ -1,5 +1,4 @@
 use crate::ExecuteInfo;
-use base64;
 use bollard::container::{
     Config, CreateContainerOptions, LogOutput, LogsOptions, RemoveContainerOptions, StartContainerOptions,
     WaitContainerOptions,
@@ -9,7 +8,6 @@ use bollard::image::ImportImageOptions;
 use bollard::Docker;
 use futures_util::stream::TryStreamExt;
 use hyper::Body;
-use serde_json;
 use std::default::Default;
 use tokio::fs::File as TFile;
 use tokio::stream::StreamExt;
@@ -25,13 +23,13 @@ pub async fn run_and_wait(exec: ExecuteInfo) -> FResult<(String, String)> {
     let docker = Docker::connect_with_local_defaults()?;
 
     // Import image if a image file was provided
-    if let Some(_) = exec.image_file {
+    if exec.image_file.is_some() {
         import_image(&docker, &exec).await?;
     }
 
     // Start container and wait for completion
     let name = create_and_start_container(&docker, &exec).await?;
-    &docker
+    docker
         .wait_container(&name, None::<WaitContainerOptions<String>>)
         .try_collect::<Vec<_>>()
         .await?;
@@ -62,7 +60,7 @@ pub async fn run_and_wait(exec: ExecuteInfo) -> FResult<(String, String)> {
         ..Default::default()
     });
 
-    &docker.remove_container(&name, remove_options).await?;
+    docker.remove_container(&name, remove_options).await?;
 
     Ok((stdout, stderr))
 }
@@ -105,7 +103,7 @@ async fn import_image(
     let image_file = &exec.image_file.clone().unwrap();
 
     // Abort, if image is already loaded
-    if let Ok(_) = docker.inspect_image(&exec.image).await {
+    if docker.inspect_image(&exec.image).await.is_ok() {
         return Ok(());
     }
 

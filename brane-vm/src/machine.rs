@@ -59,7 +59,7 @@ impl Machine {
         &mut self,
         instruction: Instruction,
     ) -> FResult<Move> {
-        let (meta, assignment, name, input, data_type) = instruction.as_act()?;
+        let (meta, assignment, name, input, data_type) = instruction.deconstruct_act()?;
         let mut arguments = Map::<Literal>::new();
         for (key, value) in input.iter() {
             let literal = match value {
@@ -78,7 +78,7 @@ impl Machine {
         }
 
         let image = meta.get("image").expect("Missing `image` metadata property");
-        let image_file = meta.get("image_file").map(|p| PathBuf::from(p));
+        let image_file = meta.get("image_file").map(PathBuf::from);
         let payload = json!({
             "identifier": "1+1",
             "action": name,
@@ -109,7 +109,7 @@ impl Machine {
         &mut self,
         instruction: Instruction,
     ) -> FResult<Move> {
-        let (_, conditions, branches) = instruction.as_mov()?;
+        let (_, conditions, branches) = instruction.deconstruct_mov()?;
 
         let mut movement = if conditions.len() == branches.len() {
             // Default, may be overriden based on the specific branch
@@ -173,7 +173,7 @@ impl Machine {
         &mut self,
         instruction: Instruction,
     ) -> FResult<Move> {
-        let (_, get, set) = instruction.as_var()?;
+        let (_, get, set) = instruction.deconstruct_var()?;
 
         for variable in get {
             let variable_exists = self.environment.exists(&variable.name);

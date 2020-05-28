@@ -42,7 +42,7 @@ pub async fn handle(
 ///
 ///
 fn assert_input(
-    parameters: &Vec<Argument>,
+    parameters: &[Argument],
     arguments: &Map<Value>,
 ) -> FResult<()> {
     debug!("Asserting input arguments");
@@ -94,8 +94,8 @@ fn initialize(working_dir: &PathBuf) -> FResult<()> {
 ///
 ///
 fn execute(
-    entrypoint: &String,
-    command_args: &Vec<String>,
+    entrypoint: &str,
+    command_args: &[String],
     arguments: &Map<Value>,
     working_dir: &PathBuf,
 ) -> FResult<String> {
@@ -180,14 +180,14 @@ fn construct_envs(variables: &Map<Value>) -> FResult<Map<String>> {
 ///
 fn capture_output(
     stdout: String,
-    params: &Vec<Argument>,
+    params: &[Argument],
     mode: &Option<String>,
     c_types: &Option<Map<Type>>,
 ) -> FResult<Map<Value>> {
     let stdout = preprocess_stdout(stdout, &mode)?;
     let docs = YamlLoader::load_from_str(&stdout)?;
 
-    let c_types = c_types.clone().unwrap_or(Map::<Type>::new());
+    let c_types = c_types.clone().unwrap_or_default();
     let output = unwrap_yaml_hash(&docs[0], params, &c_types)?;
 
     Ok(output)
@@ -198,7 +198,7 @@ fn capture_output(
 ///
 fn unwrap_yaml_hash(
     value: &Yaml,
-    params: &Vec<Argument>,
+    params: &[Argument],
     _types: &Map<Type>,
 ) -> FResult<Map<Value>> {
     let map = value.as_hash().unwrap();
@@ -210,8 +210,8 @@ fn unwrap_yaml_hash(
 
         let value = match value {
             Yaml::Array(elements) => {
-                let n = p.data_type.find("[").unwrap(); // Number of array dimensions
-                let value_type = p.data_type.chars().take(n).collect();
+                let n = p.data_type.find('[').unwrap(); // Number of array dimensions
+                let value_type: String = p.data_type.chars().take(n).collect();
 
                 let mut entries = vec![];
                 for element in elements.iter() {
@@ -237,11 +237,11 @@ fn unwrap_yaml_hash(
 ///
 fn unwrap_yaml_value(
     value: &Yaml,
-    data_type: &String,
+    data_type: &str,
 ) -> FResult<Value> {
     debug!("Unwrapping as {}: {:?} ", data_type, value);
 
-    let value = match data_type.as_ref() {
+    let value = match data_type {
         "boolean" => {
             let value = value.as_bool().unwrap();
             Value::Literal(Literal::Boolean(value))
@@ -274,7 +274,7 @@ fn preprocess_stdout(
     stdout: String,
     mode: &Option<String>,
 ) -> FResult<String> {
-    let mode = mode.clone().unwrap_or(String::from("complete"));
+    let mode = mode.clone().unwrap_or_else(|| String::from("complete"));
 
     if mode == "complete" {
         return Ok(stdout);
@@ -285,7 +285,7 @@ fn preprocess_stdout(
     if mode == "marked" {
         let mut capture = false;
 
-        for line in stdout.split("\n") {
+        for line in stdout.split('\n') {
             if !capture && line.trim_start().starts_with(MARK_START) {
                 capture = true;
                 continue;
@@ -300,7 +300,7 @@ fn preprocess_stdout(
     }
 
     if mode == "prefixed" {
-        for line in stdout.split("\n") {
+        for line in stdout.split('\n') {
             if line.starts_with(PREFIX) {
                 captured.push(line.trim_start_matches(PREFIX));
             }

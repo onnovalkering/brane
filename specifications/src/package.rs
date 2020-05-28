@@ -2,7 +2,6 @@ use crate::common::{Argument, FunctionNotation, Type};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-use serde_yaml;
 use std::fs;
 use std::path::PathBuf;
 use uuid::Uuid;

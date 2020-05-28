@@ -12,7 +12,7 @@ pub fn calculate_crc32(path: &PathBuf) -> FResult<u32> {
     let mut file = File::open(&path)?;
     let mut hasher = Hasher::new();
 
-    let chunk_size = 0x4E2000;
+    let chunk_size = 0x004E_2000;
     loop {
         let mut chunk = Vec::with_capacity(chunk_size);
         let n = file.by_ref().take(chunk_size as u64).read_to_end(&mut chunk)?;

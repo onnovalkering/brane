@@ -55,7 +55,7 @@ impl Compiler {
     ///
     pub fn quick_compile(
         package_index: PackageIndex,
-        input: &String,
+        input: &str,
     ) -> FResult<Vec<Instruction>> {
         let mut compiler = Compiler::new(CompilerOptions::none(), package_index)?;
         compiler.compile(input)
@@ -66,7 +66,7 @@ impl Compiler {
     ///
     pub fn compile(
         &mut self,
-        input: &String,
+        input: &str,
     ) -> FResult<Vec<Instruction>> {
         let ast = parser::parse(input)?;
         let mut instructions = vec![];
@@ -263,7 +263,7 @@ impl Compiler {
             }
 
             // Otherwise, set output from call as terminate variable.
-            Ok(terms_to_instructions(terms, Some(terminate), &mut self.state)?)
+            Ok(terms_to_instructions(terms, Some(terminate), &self.state)?)
         } else {
             // Set empty variable in case of no return terms.
             Ok((vec![], String::from("unit")))
@@ -380,7 +380,7 @@ pub fn terms_to_instructions(
 
     // Modify assignment of last ACT instruction, if specified.
     if let Some(result_var) = result_var {
-        ensure!(instructions.len() > 0, "Created no ACT instructions.");
+        ensure!(!instructions.is_empty(), "Created no ACT instructions.");
 
         match instructions.remove(instructions.len() - 1) {
             Instruction::Act {
