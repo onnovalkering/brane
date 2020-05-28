@@ -1,6 +1,8 @@
 name: arithmetic
 version: 1.0.0
 
+base: alpine
+
 kind: compute
 
 entrypoint:

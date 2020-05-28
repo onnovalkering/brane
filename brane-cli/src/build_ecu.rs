@@ -87,7 +87,11 @@ fn generate_dockerfile(container_info: &ContainerInfo) -> FResult<String> {
     writeln!(contents, "ENTRYPOINT [\"./init\"]")?;
 
     // Add dependencies
-    write!(contents, "RUN apt-get update && apt-get install -y ")?;
+    if base.starts_with("alpine") {
+        write!(contents, "RUN apk add --no-cache ")?;
+    } else {
+        write!(contents, "RUN apt-get update && apt-get install -y ")?;
+    }
     if let Some(dependencies) = &container_info.dependencies {
         for dependency in dependencies {
             write!(contents, "{} ", dependency)?;
