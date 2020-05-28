@@ -1,7 +1,7 @@
 use crate::schema::{invocations, packages};
 use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
-use specifications::common::Argument;
+use specifications::common::Value;
 use specifications::instructions::Instruction;
 use specifications::package::PackageInfo;
 use std::path::PathBuf;
@@ -39,7 +39,7 @@ pub struct NewInvocation {
 impl NewInvocation {
     pub fn new(
         name: Option<String>,
-        arguments: &Map<Argument>,
+        arguments: &Map<Value>,
         instructions: &[Instruction],
     ) -> FResult<Self> {
         let created = Utc::now().naive_utc();

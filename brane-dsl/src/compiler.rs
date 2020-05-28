@@ -5,8 +5,8 @@ use rand::distributions::Alphanumeric;
 use rand::Rng;
 use regex::Regex;
 use semver::Version;
-use specifications::common::{Argument, Value};
-use specifications::instructions::Instruction;
+use specifications::common::{Value, Variable};
+use specifications::instructions::*;
 
 type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
@@ -102,7 +102,7 @@ impl Compiler {
         &mut self,
         name: String,
         terms: Vec<AstTerm>,
-    ) -> FResult<(Option<Argument>, Option<Instruction>)> {
+    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
         if terms.len() == 1 && terms[0].is_value() {
             self.handle_assignment_value_node(name, &terms[0])
         } else {
@@ -117,19 +117,17 @@ impl Compiler {
         &mut self,
         name: String,
         value: &AstTerm,
-    ) -> FResult<(Option<Argument>, Option<Instruction>)> {
-        let value = if let AstTerm::Value(value) = value {
-            value.clone()
+    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
+        let (value, data_type) = if let AstTerm::Value(value) = value {
+            (Some(value.clone()), value.data_type().to_string())
         } else {
             unreachable!()
         };
 
-        let data_type = value.get_complex().to_string();
+        let variable = Variable::new(name, data_type, None, value);
+        let instruction = VarInstruction::new(Default::default(), vec![variable.clone()], Default::default());
 
-        let instruction = Instruction::new_set_var(name.clone(), value, String::from("local"));
-        let argument = Argument::new(name, data_type, None, None, None, None, None);
-
-        Ok((Some(argument), Some(instruction)))
+        Ok((Some(variable), Some(instruction)))
     }
 
     ///
@@ -139,13 +137,13 @@ impl Compiler {
         &mut self,
         name: String,
         terms: Vec<AstTerm>,
-    ) -> FResult<(Option<Argument>, Option<Instruction>)> {
+    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
         let (instructions, data_type) = terms_to_instructions(terms, Some(name.clone()), &self.state)?;
-        let subroutine = Instruction::new_sub(instructions);
+        let subroutine = SubInstruction::new(instructions, Default::default());
 
-        let var = Argument::new(name, data_type, None, None, None, None, None);
+        let variable = Variable::new(name, data_type, None, None);
 
-        Ok((Some(var), Some(subroutine)))
+        Ok((Some(variable), Some(subroutine)))
     }
 
     ///
@@ -154,9 +152,9 @@ impl Compiler {
     fn handle_call_node(
         &mut self,
         terms: Vec<AstTerm>,
-    ) -> FResult<(Option<Argument>, Option<Instruction>)> {
+    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
         let (instructions, _) = terms_to_instructions(terms, None, &self.state)?;
-        let subroutine = Instruction::new_sub(instructions);
+        let subroutine = SubInstruction::new(instructions, Default::default());
 
         Ok((None, Some(subroutine)))
     }
@@ -168,7 +166,7 @@ impl Compiler {
         &mut self,
         module: String,
         version: Option<Version>,
-    ) -> FResult<(Option<Argument>, Option<Instruction>)> {
+    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
         let package_info = self.package_index.get(&module, version.as_ref());
         if let Some(package_info) = package_info {
             let package_patterns = functions::get_module_patterns(package_info)?;
@@ -185,20 +183,20 @@ impl Compiler {
     fn handle_parameter_node(
         &mut self,
         name: String,
-        complex: String,
-    ) -> FResult<(Option<Argument>, Option<Instruction>)> {
-        let data_type = match complex.as_str() {
+        data_type: String,
+    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
+        let data_type = match data_type.as_str() {
             "Boolean" => "boolean",
             "Integer" => "integer",
             "Decimal" => "real",
             "String" => "string",
-            _ => complex.as_str(),
+            _ => data_type.as_str(),
         };
 
-        let instruction = Instruction::new_get_var(name.clone(), data_type.to_string());
-        let argument = Argument::new(name, data_type.to_string(), None, None, None, None, None);
+        let variable = Variable::new(name, String::from(data_type), None, None);
+        let instruction = VarInstruction::new(vec![variable.clone()], Default::default(), Default::default());
 
-        Ok((Some(argument), Some(instruction)))
+        Ok((Some(variable), Some(instruction)))
     }
 
     ///
@@ -208,7 +206,7 @@ impl Compiler {
         &mut self,
         _predicate: AstNode,
         _exec: AstNode,
-    ) -> FResult<(Option<Argument>, Option<Instruction>)> {
+    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
         unimplemented!();
     }
 
@@ -218,20 +216,23 @@ impl Compiler {
     fn handle_terminate_node(
         &mut self,
         terms: Option<Vec<AstTerm>>,
-    ) -> FResult<(Option<Argument>, Option<Instruction>)> {
+    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
         debug!("Terminate: {:?}", terms);
 
         // Always set a variable called 'terminate' in the local scope.
         let (mut instructions, _) = self.set_terminate_variable_locally(terms)?;
 
         // Return terminate in output scope.
-        instructions.push(Instruction::new_set_var(
-            "terminate".to_string(),
-            Value::None,
-            "output".to_string(),
-        ));
+        let variable = Variable::new(
+            String::from("terminate"),
+            String::from("unit"),
+            Some(String::from("output")),
+            None,
+        );
+        let instruction = VarInstruction::new(Default::default(), vec![variable], Default::default());
+        instructions.push(instruction);
 
-        let subroutine = Instruction::new_sub(instructions);
+        let subroutine = SubInstruction::new(instructions, Default::default());
 
         Ok((None, Some(subroutine)))
     }
@@ -250,14 +251,15 @@ impl Compiler {
             if terms.len() == 1 {
                 if let AstTerm::Name(name) = &terms[0] {
                     if let Some(data_type) = self.state.variables.get(name) {
-                        return Ok((
-                            vec![Instruction::new_set_var(
-                                terminate,
-                                Value::Variable(name.clone()),
-                                "output".to_string(),
-                            )],
-                            data_type.to_string(),
-                        ));
+                        let value = Value::Pointer {
+                            variable: name.clone(),
+                            data_type: data_type.clone(),
+                        };
+                        let variable =
+                            Variable::new(terminate, data_type.clone(), Some(String::from("output")), Some(value));
+                        let instruction = VarInstruction::new(Default::default(), vec![variable], Default::default());
+
+                        return Ok((vec![instruction], data_type.to_string()));
                     }
                 }
             }
@@ -324,7 +326,7 @@ pub fn terms_to_instructions(
                 let coverage = term_pattern_clone.get(range.clone()).unwrap();
 
                 let mut input = Map::<Value>::new();
-                let mut arguments = function.arguments.iter();
+                let mut parameters = function.parameters.iter();
                 let mut consumed_temp: Option<String> = None;
 
                 // Map each placeholder to function parameters
@@ -335,10 +337,15 @@ pub fn terms_to_instructions(
                             consumed_temp = Some(arg.clone());
                         }
 
-                        if let Some(argument) = arguments.next() {
-                            debug!("Input: {:?} <- {:?}", &argument.name, &arg);
-
-                            input.insert(argument.name.clone(), Value::Variable(arg));
+                        if let Some(parameter) = parameters.next() {
+                            debug!("Input: {:?} <- {:?}", &parameter.name, &arg);
+                            input.insert(
+                                parameter.name.clone(),
+                                Value::Pointer {
+                                    variable: arg,
+                                    data_type: parameter.data_type.clone(),
+                                },
+                            );
                         } else {
                             unreachable!();
                         }
@@ -360,12 +367,12 @@ pub fn terms_to_instructions(
                 term_pattern.replace_range(range, segment.as_str());
 
                 // Construct ACT instruction
-                let instruction = Instruction::new_act(
+                let instruction = ActInstruction::new(
                     function.name.clone(),
                     input,
-                    function.meta.clone(),
                     Some(temp_var),
                     Some(function.return_type.to_string()),
+                    function.meta.clone(),
                 );
                 instructions.push(instruction);
 
@@ -383,17 +390,11 @@ pub fn terms_to_instructions(
         ensure!(!instructions.is_empty(), "Created no ACT instructions.");
 
         match instructions.remove(instructions.len() - 1) {
-            Instruction::Act {
-                assignment: _,
-                input,
-                meta,
-                name,
-                r#type: _,
-                data_type,
-            } => {
-                let updated = Instruction::new_act(name, input, meta, Some(result_var), data_type.clone());
+            Instruction::Act(act) => {
+                let updated =
+                    ActInstruction::new(act.name, act.input, Some(result_var), act.data_type.clone(), act.meta);
 
-                if let Some(data_type) = data_type {
+                if let Some(data_type) = act.data_type {
                     return_data_type = data_type
                 }
 
@@ -428,7 +429,7 @@ fn build_terms_pattern(
                 term_pattern_segments.push(symbol.to_string());
             }
             AstTerm::Value(value) => {
-                let segment = format!("<{}>", value.get_complex());
+                let segment = format!("<{}>", value.data_type());
                 term_pattern_segments.push(segment);
             }
         }

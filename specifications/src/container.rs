@@ -1,4 +1,4 @@
-use crate::common::{Argument, FunctionNotation, Type};
+use crate::common::{CallPattern, Parameter, Type};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::fs;
@@ -49,9 +49,9 @@ pub struct Action {
     pub command: Option<ActionCommand>,
     pub description: Option<String>,
     pub endpoint: Option<ActionEndpoint>,
-    pub notation: Option<FunctionNotation>,
-    pub input: Vec<Argument>,
-    pub output: Vec<Argument>,
+    pub pattern: Option<CallPattern>,
+    pub input: Vec<Parameter>,
+    pub output: Vec<Parameter>,
 }
 
 #[skip_serializing_none]

@@ -2,34 +2,119 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::cmp::{Ordering, PartialEq, PartialOrd};
 
+type Map<T> = std::collections::HashMap<String, T>;
+
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Argument {
+pub struct Parameter {
     #[serde(rename = "type")]
     pub data_type: String,
-    pub default: Option<String>,
-    pub description: Option<String>,
+    pub default: Option<Value>,
     pub name: String,
-    pub optional: Option<bool>,
-    pub properties: Option<Vec<Argument>>,
-    pub secret: Option<bool>,
+    pub optional: bool,
 }
 
-impl Argument {
+impl Parameter {
+    ///
+    ///
+    ///
     pub fn new(
         name: String,
         data_type: String,
-        description: Option<String>,
-        optional: Option<bool>,
-        default: Option<String>,
-        secret: Option<bool>,
-        properties: Option<Vec<Argument>>,
-    ) -> Argument {
-        Argument {
+        optional: bool,
+        default: Option<Value>,
+    ) -> Self {
+        Parameter {
             data_type,
             default,
-            description,
+            name,
+            optional,
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Function {
+    pub parameters: Vec<Parameter>,
+    pub pattern: Option<CallPattern>,
+    pub return_type: String,
+}
+
+impl Function {
+    ///
+    ///
+    ///
+    pub fn new(
+        parameters: Vec<Parameter>,
+        pattern: Option<CallPattern>,
+        return_type: String,
+    ) -> Self {
+        Function {
+            parameters,
+            pattern,
+            return_type,
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct CallPattern {
+    pub infix: Option<Vec<String>>,
+    pub postfix: Option<String>,
+    pub prefix: Option<String>,
+}
+
+impl CallPattern {
+    ///
+    ///
+    ///
+    pub fn new(
+        prefix: Option<String>,
+        infix: Option<Vec<String>>,
+        postfix: Option<String>,
+    ) -> Self {
+        CallPattern { infix, postfix, prefix }
+    }
+}
+
+#[skip_serializing_none]
+#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Type {
+    pub name: String,
+    pub properties: Vec<Property>,
+}
+
+#[skip_serializing_none]
+#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Property {
+    #[serde(rename = "type")]
+    pub data_type: String,
+    pub default: Option<Value>,
+    pub name: String,
+    pub optional: Option<bool>,
+    pub properties: Option<Vec<Property>>,
+    pub secret: Option<bool>,
+}
+
+impl Property {
+    pub fn new(
+        name: String,
+        data_type: String,
+        properties: Option<Vec<Property>>,
+        default: Option<Value>,
+        optional: Option<bool>,
+        secret: Option<bool>,
+    ) -> Self {
+        Property {
+            data_type,
+            default,
             name,
             optional,
             properties,
@@ -38,72 +123,54 @@ impl Argument {
     }
 }
 
-#[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct FunctionNotation {
-    pub infix: Option<Vec<String>>,
-    pub postfix: Option<String>,
-    pub prefix: Option<String>,
-}
-
-#[allow(unused)]
-impl FunctionNotation {
-    pub fn new(
-        prefix: Option<String>,
-        infix: Option<Vec<String>>,
-        postfix: Option<String>,
-    ) -> FunctionNotation {
-        FunctionNotation { infix, postfix, prefix }
-    }
-}
-
-#[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Type {
-    pub description: Option<String>,
-    pub name: String,
-    pub properties: Option<Vec<Argument>>,
-}
-
-#[serde(untagged, rename_all = "camelCase")]
+#[serde(tag = "variant", rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Value {
     Array {
-        complex: String,
+        #[serde(rename = "type")]
+        data_type: String,
         entries: Vec<Value>,
     },
-    Literal(Literal),
-    None,
-    Object {
-        complex: String,
-        entries: Vec<(String, Value)>,
+    Boolean(bool),
+    Integer(i64),
+    Pointer {
+        #[serde(rename = "type")]
+        data_type: String,
+        variable: String,
     },
-    Variable(String),
+    Real(f64),
+    Struct {
+        #[serde(rename = "type")]
+        data_type: String,
+        properties: Map<Value>,
+    },
+    Unicode(String),
+    Unit,
 }
 
 impl Value {
     ///
     ///
     ///
-    pub fn get_complex(&self) -> &str {
+    pub fn data_type(&self) -> &str {
+        use Value::*;
         match self {
-            Value::Array { complex, .. } => complex.as_str(),
-            Value::Literal(literal) => match literal {
-                Literal::Boolean(_) => "boolean",
-                Literal::Decimal(_) => "real",
-                Literal::Integer(_) => "integer",
-                Literal::Str(_) => "string",
-            },
-            Value::None => "void",
-            Value::Object { complex, .. } => complex,
-            Value::Variable(_) => "variable",
+            Array { data_type, .. } => data_type.as_str(),
+            Boolean(_) => "boolean",
+            Integer(_) => "integer",
+            Pointer { data_type, .. } => data_type.as_str(),
+            Real(_) => "real",
+            Struct { data_type, .. } => data_type.as_str(),
+            Unicode(_) => "unicode",
+            Unit => "unit",
         }
     }
 }
 
 impl PartialEq for Value {
+    ///
+    ///
+    ///
     fn eq(
         &self,
         other: &Self,
@@ -111,16 +178,23 @@ impl PartialEq for Value {
         use Value::*;
 
         match (self, other) {
-            (None, None) => true,
-            (Literal(lhs), Literal(rhs)) => lhs.eq(rhs),
-            (Array { entries: lhs, .. }, Array { entries: rhs, .. }) => lhs.eq(rhs),
-            (Object { entries: lhs, .. }, Object { entries: rhs, .. }) => lhs.eq(rhs),
+            (Array { .. }, Array { .. }) => unimplemented!(),
+            (Boolean(lhs), Boolean(rhs)) => lhs.eq(rhs),
+            (Integer(lhs), Integer(rhs)) => lhs.eq(rhs),
+            (Pointer { .. }, Pointer { .. }) => unimplemented!(),
+            (Real(lhs), Real(rhs)) => lhs.eq(rhs),
+            (Struct { .. }, Struct { .. }) => unimplemented!(),
+            (Unicode(lhs), Unicode(rhs)) => lhs.eq(rhs),
+            (Unit, Unit) => true,
             _ => false,
         }
     }
 }
 
 impl PartialOrd for Value {
+    ///
+    ///
+    ///
     fn partial_cmp(
         &self,
         other: &Self,
@@ -128,53 +202,41 @@ impl PartialOrd for Value {
         use Value::*;
 
         match (self, other) {
-            (Literal(lhs), Literal(rhs)) => lhs.partial_cmp(rhs),
-            (Array { entries: lhs, .. }, Array { entries: rhs, .. }) => lhs.partial_cmp(rhs),
-            (Object { entries: lhs, .. }, Object { entries: rhs, .. }) => lhs.partial_cmp(rhs),
+            (Boolean(lhs), Boolean(rhs)) => lhs.partial_cmp(rhs),
+            (Integer(lhs), Integer(rhs)) => lhs.partial_cmp(rhs),
+            (Real(lhs), Real(rhs)) => lhs.partial_cmp(rhs),
+            (Unicode(lhs), Unicode(rhs)) => lhs.partial_cmp(rhs),
             _ => Option::None,
         }
     }
 }
 
-#[serde(untagged, rename_all = "camelCase")]
+#[skip_serializing_none]
+#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum Literal {
-    Boolean(bool),
-    Integer(i64),
-    Decimal(f64),
-    Str(String),
+pub struct Variable {
+    #[serde(rename = "type")]
+    pub data_type: String,
+    pub name: String,
+    pub scope: Option<String>,
+    pub value: Option<Value>,
 }
 
-impl PartialEq for Literal {
-    fn eq(
-        &self,
-        other: &Self,
-    ) -> bool {
-        use Literal::*;
-
-        match (self, other) {
-            (Boolean(lhs), Boolean(rhs)) => lhs.eq(rhs),
-            (Decimal(lhs), Decimal(rhs)) => lhs.eq(rhs),
-            (Integer(lhs), Integer(rhs)) => lhs.eq(rhs),
-            (Str(lhs), Str(rhs)) => lhs.eq(rhs),
-            _ => false,
-        }
-    }
-}
-
-impl PartialOrd for Literal {
-    fn partial_cmp(
-        &self,
-        other: &Self,
-    ) -> Option<Ordering> {
-        use Literal::*;
-
-        match (self, other) {
-            (Boolean(lhs), Boolean(rhs)) => lhs.partial_cmp(rhs),
-            (Decimal(lhs), Decimal(rhs)) => lhs.partial_cmp(rhs),
-            (Integer(lhs), Integer(rhs)) => lhs.partial_cmp(rhs),
-            (Str(lhs), Str(rhs)) => lhs.partial_cmp(rhs),
-            _ => None,
+impl Variable {
+    ///
+    ///
+    ///
+    pub fn new(
+        name: String,
+        data_type: String,
+        scope: Option<String>,
+        value: Option<Value>,
+    ) -> Self {
+        Variable {
+            data_type,
+            name,
+            scope,
+            value,
         }
     }
 }

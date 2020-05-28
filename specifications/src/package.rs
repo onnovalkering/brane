@@ -1,4 +1,4 @@
-use crate::common::{Argument, FunctionNotation, Type};
+use crate::common::{Function, Type};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -58,29 +58,5 @@ impl PackageInfo {
         let result = serde_yaml::from_str(&contents)?;
 
         Ok(result)
-    }
-}
-
-#[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Function {
-    pub arguments: Vec<Argument>,
-    pub notation: Option<FunctionNotation>,
-    pub return_type: String,
-}
-
-#[allow(unused)]
-impl Function {
-    pub fn new(
-        arguments: Vec<Argument>,
-        notation: Option<FunctionNotation>,
-        return_type: String,
-    ) -> Function {
-        Function {
-            arguments,
-            notation,
-            return_type,
-        }
     }
 }

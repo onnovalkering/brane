@@ -3,17 +3,19 @@
         "created": "2020-05-11T11:17:44.459935Z",
         "functions": {
             "add": {
-                "arguments": [
+                "parameters": [
                     {
                         "name": "a",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     },
                     {
                         "name": "b",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     }
                 ],
-                "notation": {
+                "pattern": {
                     "infix": [
                         "+"
                     ]
@@ -21,17 +23,19 @@
                 "returnType": "integer"
             },
             "divide": {
-                "arguments": [
+                "parameters": [
                     {
                         "name": "a",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     },
                     {
                         "name": "b",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     }
                 ],
-                "notation": {
+                "pattern": {
                     "infix": [
                         "/"
                     ]
@@ -39,17 +43,19 @@
                 "returnType": "integer"
             },
             "multiply": {
-                "arguments": [
+                "parameters": [
                     {
                         "name": "a",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     },
                     {
                         "name": "b",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     }
                 ],
-                "notation": {
+                "pattern": {
                     "infix": [
                         "*"
                     ]
@@ -57,17 +63,19 @@
                 "returnType": "integer"
             },
             "substract": {
-                "arguments": [
+                "parameters": [
                     {
                         "name": "a",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     },
                     {
                         "name": "b",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     }
                 ],
-                "notation": {
+                "pattern": {
                     "infix": [
                         "-"
                     ]
@@ -85,17 +93,19 @@
         "created": "2020-05-11T11:17:44.459935Z",
         "functions": {
             "add": {
-                "arguments": [
+                "parameters": [
                     {
                         "name": "a",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     },
                     {
                         "name": "b",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     }
                 ],
-                "notation": {
+                "pattern": {
                     "infix": [
                         "+"
                     ]
@@ -103,17 +113,19 @@
                 "returnType": "integer"
             },
             "divide": {
-                "arguments": [
+                "parameters": [
                     {
                         "name": "a",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     },
                     {
                         "name": "b",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     }
                 ],
-                "notation": {
+                "pattern": {
                     "infix": [
                         "/"
                     ]
@@ -121,17 +133,19 @@
                 "returnType": "integer"
             },
             "multiply": {
-                "arguments": [
+                "parameters": [
                     {
                         "name": "a",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     },
                     {
                         "name": "b",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     }
                 ],
-                "notation": {
+                "pattern": {
                     "infix": [
                         "*"
                     ]
@@ -139,17 +153,19 @@
                 "returnType": "integer"
             },
             "substract": {
-                "arguments": [
+                "parameters": [
                     {
                         "name": "a",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     },
                     {
                         "name": "b",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     }
                 ],
-                "notation": {
+                "pattern": {
                     "infix": [
                         "-"
                     ]
@@ -167,17 +183,19 @@
         "created": "2020-05-11T11:17:44.459935Z",
         "functions": {
             "add": {
-                "arguments": [
+                "parameters": [
                     {
                         "name": "a",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     },
                     {
                         "name": "b",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     }
                 ],
-                "notation": {
+                "pattern": {
                     "infix": [
                         "+"
                     ]
@@ -185,17 +203,19 @@
                 "returnType": "integer"
             },
             "divide": {
-                "arguments": [
+                "parameters": [
                     {
                         "name": "a",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     },
                     {
                         "name": "b",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     }
                 ],
-                "notation": {
+                "pattern": {
                     "infix": [
                         "/"
                     ]
@@ -203,17 +223,19 @@
                 "returnType": "integer"
             },
             "multiply": {
-                "arguments": [
+                "parameters": [
                     {
                         "name": "a",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     },
                     {
                         "name": "b",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     }
                 ],
-                "notation": {
+                "pattern": {
                     "infix": [
                         "*"
                     ]
@@ -221,17 +243,19 @@
                 "returnType": "integer"
             },
             "substract": {
-                "arguments": [
+                "parameters": [
                     {
                         "name": "a",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     },
                     {
                         "name": "b",
-                        "type": "integer"
+                        "type": "integer",
+                        "optional": false
                     }
                 ],
-                "notation": {
+                "pattern": {
                     "infix": [
                         "-"
                     ]

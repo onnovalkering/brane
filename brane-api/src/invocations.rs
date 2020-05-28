@@ -7,7 +7,7 @@ use diesel::{r2d2, r2d2::ConnectionManager};
 use futures::*;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use serde::Deserialize;
-use specifications::common::Argument;
+use specifications::common::Value;
 use specifications::instructions::Instruction;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
@@ -38,7 +38,7 @@ pub fn scope() -> Scope {
 #[derive(Deserialize)]
 pub struct CreateInvocation {
     pub name: Option<String>,
-    pub arguments: Map<Argument>,
+    pub arguments: Map<Value>,
     pub instructions: Vec<Instruction>,
 }
 

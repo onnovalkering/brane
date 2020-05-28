@@ -1,13 +1,14 @@
 use pest::iterators::Pair;
 use pest::Parser;
 use semver::Version;
-use specifications::common::{Literal, Value};
+use specifications::common::Value;
 
 #[derive(Parser)]
 #[grammar = "grammer/bakery.pest"]
 pub struct BakeryParser;
 
 type FResult<T> = Result<T, failure::Error>;
+type Map<T> = std::collections::HashMap<String, T>;
 
 #[derive(Debug)]
 pub enum AstNode {
@@ -64,9 +65,10 @@ impl AstTerm {
     ///
     ///
     pub fn is_value(&self) -> bool {
-        match self {
-            AstTerm::Value(_) => true,
-            _ => false,
+        if let AstTerm::Value(_) = self {
+            true
+        } else {
+            false
         }
     }
 }
@@ -194,14 +196,14 @@ fn parse_import_rule(rule: Pair<Rule>) -> FResult<AstNode> {
 ///
 ///
 ///
-fn parse_literal_rule(rule: Pair<Rule>) -> FResult<Literal> {
+fn parse_literal_rule(rule: Pair<Rule>) -> FResult<Value> {
     let literal = rule.into_inner().next().unwrap();
 
     match literal.as_rule() {
-        Rule::boolean => Ok(Literal::Boolean(literal.as_str().parse()?)),
-        Rule::decimal => Ok(Literal::Decimal(literal.as_str().parse()?)),
-        Rule::integer => Ok(Literal::Integer(literal.as_str().parse()?)),
-        Rule::string => Ok(Literal::Str(parse_string_rule(literal)?)),
+        Rule::boolean => Ok(Value::Boolean(literal.as_str().parse()?)),
+        Rule::decimal => Ok(Value::Real(literal.as_str().parse()?)),
+        Rule::integer => Ok(Value::Integer(literal.as_str().parse()?)),
+        Rule::string => Ok(Value::Unicode(parse_string_rule(literal)?)),
         _ => unreachable!(),
     }
 }
@@ -216,20 +218,20 @@ fn parse_name_rule(rule: Pair<Rule>) -> FResult<String> {
 ///
 ///
 ///
-fn parse_object_rule(rule: Pair<Rule>) -> FResult<Vec<(String, Value)>> {
-    let entries = rule.into_inner();
+fn parse_object_rule(rule: Pair<Rule>) -> FResult<Map<Value>> {
+    let object = rule.into_inner();
 
-    let mut values = vec![];
-    for entry in entries {
-        let mut entry_inner = entry.into_inner();
+    let mut properties = Map::<Value>::new();
+    for prop in object {
+        let mut prop_inner = prop.into_inner();
 
-        let name = entry_inner.next().unwrap().as_str().to_string();
-        let value = entry_inner.next().unwrap();
+        let name = prop_inner.next().unwrap().as_str().to_string();
+        let value = prop_inner.next().unwrap();
 
-        values.push((name, parse_value_rule(value)?));
+        properties.insert(name, parse_value_rule(value)?);
     }
 
-    Ok(values)
+    Ok(properties)
 }
 
 ///
@@ -318,14 +320,14 @@ fn parse_value_rule(rule: Pair<Rule>) -> FResult<Value> {
 
     match value.as_rule() {
         Rule::array => Ok(Value::Array {
+            data_type: "array".to_string(), // TODO: specify actual type
             entries: parse_array_rule(value)?,
-            complex: "array".to_string(),
         }),
-        Rule::object => Ok(Value::Object {
-            entries: parse_object_rule(value)?,
-            complex: "object".to_string(),
+        Rule::object => Ok(Value::Struct {
+            data_type: "object".to_string(), // TODO: specify actual type
+            properties: parse_object_rule(value)?,
         }),
-        Rule::literal => Ok(Value::Literal(parse_literal_rule(value)?)),
+        Rule::literal => Ok(parse_literal_rule(value)?),
         _ => unreachable!(),
     }
 }

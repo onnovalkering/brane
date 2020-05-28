@@ -1,5 +1,5 @@
 use crate::Payload;
-use specifications::common::{Argument, Literal, Type, Value};
+use specifications::common::{Parameter, Type, Value};
 use specifications::container::ContainerInfo;
 use std::path::PathBuf;
 use std::process::Command;
@@ -42,7 +42,7 @@ pub async fn handle(
 ///
 ///
 fn assert_input(
-    parameters: &[Argument],
+    parameters: &[Parameter],
     arguments: &Map<Value>,
 ) -> FResult<()> {
     debug!("Asserting input arguments");
@@ -57,7 +57,7 @@ fn assert_input(
         ensure!(argument.is_some(), "Argument not provided: {}", p.name);
 
         let argument = argument.unwrap();
-        let actual_type = argument.get_complex();
+        let actual_type = argument.data_type();
 
         if expected_type != actual_type {
             bail!(
@@ -141,34 +141,37 @@ fn construct_envs(variables: &Map<Value>) -> FResult<Map<String>> {
     for (name, variable) in variables.iter() {
         let name = name.to_ascii_uppercase();
 
-        use Literal::*;
         match variable {
             Value::Array { entries, .. } => {
                 envs.insert(name.clone(), entries.len().to_string());
 
                 for (index, entry) in entries.iter().enumerate() {
                     let value = match entry {
-                        Value::Literal(Boolean(value)) => value.to_string(),
-                        Value::Literal(Integer(value)) => value.to_string(),
-                        Value::Literal(Decimal(value)) => value.to_string(),
-                        Value::Literal(Str(value)) => value.to_string(),
+                        Value::Boolean(value) => value.to_string(),
+                        Value::Integer(value) => value.to_string(),
+                        Value::Real(value) => value.to_string(),
+                        Value::Unicode(value) => value.to_string(),
                         _ => unreachable!(),
                     };
 
                     envs.insert(format!("{}_{}", &name, index), value);
                 }
             }
-            Value::Literal(literal) => {
-                let value = match literal {
-                    Boolean(value) => value.to_string(),
-                    Integer(value) => value.to_string(),
-                    Decimal(value) => value.to_string(),
-                    Str(value) => value.to_string(),
-                };
-
-                envs.insert(name, value.clone());
+            Value::Boolean(value) => {
+                envs.insert(name, value.to_string());
             }
-            _ => unimplemented!(),
+            Value::Integer(value) => {
+                envs.insert(name, value.to_string());
+            }
+            Value::Pointer { .. } => unreachable!(),
+            Value::Real(value) => {
+                envs.insert(name, value.to_string());
+            }
+            Value::Struct { .. } => unimplemented!(),
+            Value::Unicode(value) => {
+                envs.insert(name, value.to_string());
+            }
+            Value::Unit => unreachable!(),
         }
     }
 
@@ -180,7 +183,7 @@ fn construct_envs(variables: &Map<Value>) -> FResult<Map<String>> {
 ///
 fn capture_output(
     stdout: String,
-    params: &[Argument],
+    parameters: &[Parameter],
     mode: &Option<String>,
     c_types: &Option<Map<Type>>,
 ) -> FResult<Map<Value>> {
@@ -188,7 +191,7 @@ fn capture_output(
     let docs = YamlLoader::load_from_str(&stdout)?;
 
     let c_types = c_types.clone().unwrap_or_default();
-    let output = unwrap_yaml_hash(&docs[0], params, &c_types)?;
+    let output = unwrap_yaml_hash(&docs[0], parameters, &c_types)?;
 
     Ok(output)
 }
@@ -198,13 +201,13 @@ fn capture_output(
 ///
 fn unwrap_yaml_hash(
     value: &Yaml,
-    params: &[Argument],
+    parameters: &[Parameter],
     _types: &Map<Type>,
 ) -> FResult<Map<Value>> {
     let map = value.as_hash().unwrap();
 
     let mut output = Map::<Value>::new();
-    for p in params {
+    for p in parameters {
         let key = Yaml::from_str(p.name.as_str());
         let value = &map[&key];
 
@@ -219,8 +222,8 @@ fn unwrap_yaml_hash(
                     entries.push(variable);
                 }
 
-                let complex = String::from(&p.data_type);
-                Value::Array { complex, entries }
+                let data_type = p.data_type.to_string();
+                Value::Array { data_type, entries }
             }
             Yaml::Hash(_) => unimplemented!(),
             _ => unwrap_yaml_value(&map[&key], &p.data_type)?,
@@ -244,19 +247,19 @@ fn unwrap_yaml_value(
     let value = match data_type {
         "boolean" => {
             let value = value.as_bool().unwrap();
-            Value::Literal(Literal::Boolean(value))
+            Value::Boolean(value)
         }
         "integer" => {
             let value = value.as_i64().unwrap();
-            Value::Literal(Literal::Integer(value))
+            Value::Integer(value)
         }
         "real" => {
             let value = value.as_f64().unwrap();
-            Value::Literal(Literal::Decimal(value))
+            Value::Real(value)
         }
         _ => {
             let value = String::from(value.as_str().unwrap());
-            Value::Literal(Literal::Str(value))
+            Value::Unicode(value)
         }
     };
 

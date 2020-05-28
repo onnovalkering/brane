@@ -1,236 +1,81 @@
-use crate::common::{FunctionNotation, Type, Value};
+use crate::common::{Value, Variable};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-use std::fs;
-use std::path::PathBuf;
 
 type Map<T> = std::collections::HashMap<String, T>;
-type FResult<T> = Result<T, failure::Error>;
-
-type ActTuple = (Map<String>, Option<String>, String, Map<Value>, Option<String>);
-type MovTuple = (Map<String>, Vec<Condition>, Vec<Move>);
-type SubTuple = (Map<String>, Vec<Instruction>);
-type VarTuple = (Map<String>, Vec<Variable>, Vec<Variable>);
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Instructions {
-    pub functions: Vec<Function>,
-    pub meta: InstructionsMeta,
-    pub types: Option<Map<Type>>,
-}
-
-impl Instructions {
-    pub fn from_path(path: PathBuf) -> FResult<Instructions> {
-        let contents = fs::read_to_string(path)?;
-
-        Instructions::from_string(contents)
-    }
-
-    pub fn from_string(contents: String) -> FResult<Instructions> {
-        let result = serde_yaml::from_str(&contents)?;
-
-        Ok(result)
-    }
-}
-
-#[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct InstructionsMeta {
-    pub description: Option<String>,
-    pub name: String,
-    pub version: String,
-}
-
-#[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Function {
-    pub description: Option<String>,
-    pub instructions: Vec<Instruction>,
-    pub name: String,
-    pub notation: Option<FunctionNotation>,
-}
-
-#[skip_serializing_none]
-#[serde(untagged, rename_all = "camelCase")]
+#[serde(tag = "variant", rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Instruction {
-    Act {
-        meta: Map<String>,
-        r#type: String,
-        assignment: Option<String>,
-        name: String,
-        input: Map<Value>,
-        data_type: Option<String>,
-    },
-    Mov {
-        meta: Map<String>,
-        r#type: String,
-        conditions: Vec<Condition>,
-        branches: Vec<Move>,
-    },
-    Var {
-        meta: Map<String>,
-        r#type: String,
-        get: Vec<Variable>,
-        set: Vec<Variable>,
-    },
-    Sub {
-        meta: Map<String>,
-        r#type: String,
-        instructions: Vec<Instruction>,
-    },
+    Act(ActInstruction),
+    Mov(MovInstruction),
+    Sub(SubInstruction),
+    Var(VarInstruction),
 }
 
-impl Instruction {
-    pub fn new_get_var(
-        name: String,
-        data_type: String,
-    ) -> Instruction {
-        let variable = Variable {
-            name,
-            value: Value::None,
-            data_type,
-            description: None,
-            scope: "input".to_string(),
-        };
+#[skip_serializing_none]
+#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ActInstruction {
+    pub assignment: Option<String>,
+    pub data_type: Option<String>,
+    pub input: Map<Value>,
+    pub meta: Map<String>,
+    pub name: String,
+}
 
-        let get = vec![variable];
-        let set = vec![];
-
-        Instruction::new_var(get, set)
-    }
-
-    pub fn new_set_var(
-        name: String,
-        value: Value,
-        scope: String,
-    ) -> Instruction {
-        let data_type = value.get_complex().to_string();
-
-        let variable = Variable {
-            name,
-            value,
-            data_type,
-            description: None,
-            scope,
-        };
-
-        let get = vec![];
-        let set = vec![variable];
-
-        Instruction::new_var(get, set)
-    }
-
-    pub fn new_var(
-        get: Vec<Variable>,
-        set: Vec<Variable>,
-    ) -> Instruction {
-        Instruction::Var {
-            get,
-            set,
-            meta: Map::<String>::new(),
-            r#type: "VAR".to_string(),
-        }
-    }
-
-    pub fn new_act(
+impl ActInstruction {
+    ///
+    ///
+    ///
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(
         name: String,
         input: Map<Value>,
-        meta: Map<String>,
         assignment: Option<String>,
         data_type: Option<String>,
+        meta: Map<String>,
     ) -> Instruction {
-        Instruction::Act {
+        let act = ActInstruction {
+            meta,
+            assignment,
             name,
             input,
-            assignment,
-            meta,
-            r#type: "ACT".to_string(),
             data_type,
-        }
-    }
+        };
 
-    pub fn new_sub(instructions: Vec<Instruction>) -> Instruction {
-        Instruction::Sub {
-            r#type: "SUB".to_string(),
-            meta: Map::<String>::new(),
-            instructions,
-        }
+        Instruction::Act(act)
     }
+}
 
+#[skip_serializing_none]
+#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MovInstruction {
+    pub branches: Vec<Move>,
+    pub conditions: Vec<Condition>,
+    pub meta: Map<String>,
+}
+
+impl MovInstruction {
+    ///
+    ///
+    ///
+    #[allow(clippy::new_ret_no_self)]
     pub fn new_mov(
         conditions: Vec<Condition>,
         branches: Vec<Move>,
+        meta: Map<String>,
     ) -> Instruction {
-        Instruction::Mov {
-            r#type: "MOV".to_string(),
-            meta: Map::<String>::new(),
+        let mov = MovInstruction {
             branches,
             conditions,
-        }
-    }
-
-    pub fn deconstruct_act(self) -> FResult<ActTuple> {
-        if let Instruction::Act {
             meta,
-            assignment,
-            name,
-            input,
-            data_type,
-            ..
-        } = self
-        {
-            Ok((meta, assignment, name, input, data_type))
-        } else {
-            bail!("Illegal deconstruction of instruction as Act.");
-        }
-    }
+        };
 
-    pub fn deconstruct_mov(self) -> FResult<MovTuple> {
-        if let Instruction::Mov {
-            meta,
-            conditions,
-            branches,
-            ..
-        } = self
-        {
-            Ok((meta, conditions, branches))
-        } else {
-            bail!("Illegal deconstruction of instruction as Mov.");
-        }
+        Instruction::Mov(mov)
     }
-
-    pub fn deconstruct_sub(self) -> FResult<SubTuple> {
-        if let Instruction::Sub { meta, instructions, .. } = self {
-            Ok((meta, instructions))
-        } else {
-            bail!("Illegal deconstruction of instruction as Act.");
-        }
-    }
-
-    pub fn deconstruct_var(self) -> FResult<VarTuple> {
-        if let Instruction::Var { meta, get, set, .. } = self {
-            Ok((meta, get, set))
-        } else {
-            bail!("Illegal deconstruction of instruction as Var.");
-        }
-    }
-}
-
-#[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Variable {
-    #[serde(rename = "type")]
-    pub data_type: String,
-    pub description: Option<String>,
-    pub name: String,
-    pub scope: String,
-    pub value: Value,
 }
 
 #[serde(rename_all = "camelCase")]
@@ -242,6 +87,9 @@ pub struct Condition {
 }
 
 impl Condition {
+    ///
+    ///
+    ///
     pub fn eq(
         left: Value,
         right: Value,
@@ -253,6 +101,9 @@ impl Condition {
         }
     }
 
+    ///
+    ///
+    ///
     pub fn ne(
         left: Value,
         right: Value,
@@ -264,6 +115,9 @@ impl Condition {
         }
     }
 
+    ///
+    ///
+    ///
     pub fn gt(
         left: Value,
         right: Value,
@@ -275,6 +129,9 @@ impl Condition {
         }
     }
 
+    ///
+    ///
+    ///
     pub fn lt(
         left: Value,
         right: Value,
@@ -286,6 +143,9 @@ impl Condition {
         }
     }
 
+    ///
+    ///
+    ///
     pub fn ge(
         left: Value,
         right: Value,
@@ -297,6 +157,9 @@ impl Condition {
         }
     }
 
+    ///
+    ///
+    ///
     pub fn le(
         left: Value,
         right: Value,
@@ -328,4 +191,52 @@ pub enum Operator {
     Less = 4,
     GreaterOrEqual = 5,
     LessOrEqual = 6,
+}
+
+#[skip_serializing_none]
+#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SubInstruction {
+    pub instructions: Vec<Instruction>,
+    pub meta: Map<String>,
+}
+
+impl SubInstruction {
+    ///
+    ///
+    ///
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(
+        instructions: Vec<Instruction>,
+        meta: Map<String>,
+    ) -> Instruction {
+        let sub = SubInstruction { instructions, meta };
+
+        Instruction::Sub(sub)
+    }
+}
+
+#[skip_serializing_none]
+#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct VarInstruction {
+    pub get: Vec<Variable>,
+    pub meta: Map<String>,
+    pub set: Vec<Variable>,
+}
+
+impl VarInstruction {
+    ///
+    ///
+    ///
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(
+        get: Vec<Variable>,
+        set: Vec<Variable>,
+        meta: Map<String>,
+    ) -> Instruction {
+        let var = VarInstruction { get, meta, set };
+
+        Instruction::Var(var)
+    }
 }

@@ -9,8 +9,8 @@ use cwl::v11_wf::{
     WorkflowOutputParameterType, WorkflowOutputType, WorkflowOutputs, WorkflowSteps,
 };
 use cwl::{v11::CwlDocument, v11_clt::CommandLineTool, v11_wf::Workflow};
-use specifications::common::{Argument, Type};
-use specifications::package::{Function, PackageInfo};
+use specifications::common::{Function, Parameter, Property, Type};
+use specifications::package::PackageInfo;
 use std::io::Write;
 use std::path::PathBuf;
 use std::{fs, fs::File};
@@ -94,8 +94,7 @@ fn build_clt_function(clt: &CommandLineTool) -> FResult<(String, Function, Map<T
 
     let input = Type {
         name: format!("{}Input", uppercase_first_letter(name.as_str())),
-        description: None,
-        properties: Some(input_properties),
+        properties: input_properties,
     };
 
     // Construct custom output type
@@ -107,12 +106,11 @@ fn build_clt_function(clt: &CommandLineTool) -> FResult<(String, Function, Map<T
 
     let output = Type {
         name: format!("{}Output", uppercase_first_letter(name.as_str())),
-        description: None,
-        properties: Some(output_properties),
+        properties: output_properties,
     };
 
-    let argument = Argument::new(String::from("input"), input.name.clone(), None, None, None, None, None);
-    let function = Function::new(vec![argument], None, output.name.clone());
+    let parameter = Parameter::new(String::from("input"), input.name.clone(), false, None);
+    let function = Function::new(vec![parameter], None, output.name.clone());
 
     let mut types = Map::<Type>::new();
     types.insert(input.name.clone(), input);
@@ -148,8 +146,7 @@ fn build_wf_function(wf: &Workflow) -> FResult<(String, Function, Map<Type>)> {
 
     let input = Type {
         name: format!("{}Input", uppercase_first_letter(name.as_str())),
-        description: None,
-        properties: Some(input_properties),
+        properties: input_properties,
     };
 
     // Construct custom output type
@@ -161,12 +158,11 @@ fn build_wf_function(wf: &Workflow) -> FResult<(String, Function, Map<Type>)> {
 
     let output = Type {
         name: format!("{}Output", uppercase_first_letter(name.as_str())),
-        description: None,
-        properties: Some(output_properties),
+        properties: output_properties,
     };
 
-    let argument = Argument::new(String::from("input"), input.name.clone(), None, None, None, None, None);
-    let function = Function::new(vec![argument], None, output.name.clone());
+    let parameter = Parameter::new(String::from("input"), input.name.clone(), false, None);
+    let function = Function::new(vec![parameter], None, output.name.clone());
 
     let mut types = Map::<Type>::new();
     types.insert(input.name.clone(), input);
@@ -192,7 +188,7 @@ fn uppercase_first_letter(s: &str) -> String {
 fn construct_clt_input_prop(
     name: String,
     input_paramter: &CommandInputParameter,
-) -> FResult<Argument> {
+) -> FResult<Property> {
     let data_type = if let CommandInputParameterType::Type(r#type) = &input_paramter.r#type {
         if let CommandLineToolInputType::CwlType(cwl_type) = r#type {
             if let CwlType::Str(data_type) = cwl_type {
@@ -207,7 +203,7 @@ fn construct_clt_input_prop(
         bail!("Unsupported type notation for paramter: {}", name);
     };
 
-    Ok(Argument::new(name, data_type, None, None, None, None, None))
+    Ok(Property::new(name, data_type, None, None, None, None))
 }
 
 ///
@@ -216,7 +212,7 @@ fn construct_clt_input_prop(
 fn construct_clt_output_prop(
     name: String,
     output_parameter: &CommandOutputParameter,
-) -> FResult<Argument> {
+) -> FResult<Property> {
     let data_type = if let CommandOutputParameterType::Type(r#type) = &output_parameter.r#type {
         if let CommandLineToolOutputType::CwlType(cwl_type) = r#type {
             if let CwlType::Str(data_type) = cwl_type {
@@ -231,7 +227,7 @@ fn construct_clt_output_prop(
         bail!("Unsupported type notation for paramter: {}", name);
     };
 
-    Ok(Argument::new(name, data_type, None, None, None, None, None))
+    Ok(Property::new(name, data_type, None, None, None, None))
 }
 
 ///
@@ -240,7 +236,7 @@ fn construct_clt_output_prop(
 fn construct_wf_input_prop(
     name: String,
     input_paramter: &WorkflowInputParameter,
-) -> FResult<Argument> {
+) -> FResult<Property> {
     let data_type = if let WorkflowInputParameterType::Type(r#type) = &input_paramter.r#type {
         if let WorkflowInputType::CwlType(cwl_type) = r#type {
             if let CwlType::Str(data_type) = cwl_type {
@@ -255,7 +251,7 @@ fn construct_wf_input_prop(
         bail!("Unsupported type notation for paramter: {}", name);
     };
 
-    Ok(Argument::new(name, data_type, None, None, None, None, None))
+    Ok(Property::new(name, data_type, None, None, None, None))
 }
 
 ///
@@ -264,7 +260,7 @@ fn construct_wf_input_prop(
 fn construct_wf_output_prop(
     name: String,
     output_parameter: &WorkflowOutputParameter,
-) -> FResult<Argument> {
+) -> FResult<Property> {
     let data_type = if let WorkflowOutputParameterType::Type(r#type) = &output_parameter.r#type {
         if let WorkflowOutputType::CwlType(cwl_type) = r#type {
             if let CwlType::Str(data_type) = cwl_type {
@@ -279,7 +275,7 @@ fn construct_wf_output_prop(
         bail!("Unsupported type notation for paramter: {}", name);
     };
 
-    Ok(Argument::new(name, data_type, None, None, None, None, None))
+    Ok(Property::new(name, data_type, None, None, None, None))
 }
 
 ///

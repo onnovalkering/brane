@@ -1,7 +1,8 @@
 use crate::{packages, registry};
 use brane_dsl::compiler::Compiler;
+use specifications::common::Function;
 use specifications::instructions::Instruction;
-use specifications::package::{Function, PackageInfo};
+use specifications::package::PackageInfo;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::path::PathBuf;

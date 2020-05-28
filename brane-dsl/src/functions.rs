@@ -1,13 +1,13 @@
 use itertools::interleave;
-use specifications::common::Argument;
-use specifications::package::{Function, PackageInfo};
+use specifications::common::{Function, Parameter};
+use specifications::package::PackageInfo;
 
 type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 #[derive(Clone, Debug)]
 pub struct FunctionPattern {
-    pub arguments: Vec<Argument>,
+    pub parameters: Vec<Parameter>,
     pub name: String,
     pub meta: Map<String>,
     pub pattern: String,
@@ -29,7 +29,7 @@ pub fn get_module_patterns(module: &PackageInfo) -> FResult<Vec<FunctionPattern>
         meta.insert("version".to_string(), module.version.clone());
 
         let function_pattern = FunctionPattern {
-            arguments: function.arguments.clone(),
+            parameters: function.parameters.clone(),
             meta,
             name: name.clone(),
             pattern,
@@ -48,17 +48,17 @@ pub fn get_module_patterns(module: &PackageInfo) -> FResult<Vec<FunctionPattern>
 fn build_pattern(function: &Function) -> FResult<String> {
     let mut pattern = vec![];
 
-    if function.notation.is_none() {
+    if function.pattern.is_none() {
         bail!("No function notation...");
     }
 
-    let notation = function.notation.clone().unwrap();
+    let notation = function.pattern.clone().unwrap();
     if let Some(prefix) = notation.prefix {
         pattern.push(regex::escape(&prefix));
     }
 
     let mut arguments: Vec<String> = function
-        .arguments
+        .parameters
         .iter()
         .map(|arg| {
             let data_type = regex::escape(&arg.data_type);

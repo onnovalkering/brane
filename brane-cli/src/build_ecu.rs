@@ -1,6 +1,7 @@
 use crate::packages;
+use specifications::common::Function;
 use specifications::container::ContainerInfo;
-use specifications::package::{Function, PackageInfo};
+use specifications::package::PackageInfo;
 use std::fmt::Write as FmtWrite;
 use std::fs;
 use std::fs::File;
@@ -43,10 +44,10 @@ fn generate_package_info(container_info: &ContainerInfo) -> FResult<PackageInfo>
     let mut functions = Map::<Function>::new();
     for (action_name, action) in &container_info.actions {
         let arguments = action.input.clone();
-        let notation = action.notation.clone();
+        let pattern = action.pattern.clone();
         let return_type = action.output[0].data_type.to_string();
 
-        let function = Function::new(arguments, notation, return_type);
+        let function = Function::new(arguments, pattern, return_type);
         functions.insert(action_name.clone(), function);
     }
 

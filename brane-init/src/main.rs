@@ -3,7 +3,7 @@ use brane_init::{exec, Payload};
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input as Prompt, Select};
 use log::LevelFilter;
-use specifications::common::{Literal::*, Value};
+use specifications::common::Value;
 use specifications::container::ContainerInfo;
 use std::path::PathBuf;
 use std::process;
@@ -103,15 +103,14 @@ fn build_payload(container_info: &ContainerInfo) -> FResult<Payload> {
     let mut arguments = Map::<Value>::new();
     for i in &action.input {
         let data_type = i.data_type.as_str();
-        let literal = match data_type {
-            "boolean" => Boolean(prompt(&i.name, data_type)?),
-            "integer" => Integer(prompt(&i.name, data_type)?),
-            "real" => Decimal(prompt(&i.name, data_type)?),
-            "string" => Str(prompt(&i.name, data_type)?),
+        let value = match data_type {
+            "boolean" => Value::Boolean(prompt(&i.name, data_type)?),
+            "integer" => Value::Integer(prompt(&i.name, data_type)?),
+            "real" => Value::Real(prompt(&i.name, data_type)?),
+            "string" => Value::Unicode(prompt(&i.name, data_type)?),
             _ => continue,
         };
 
-        let value = Value::Literal(literal);
         arguments.insert(i.name.clone(), value);
     }
 
