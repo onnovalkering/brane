@@ -8,7 +8,7 @@ use std::path::PathBuf;
 type Map<T> = std::collections::HashMap<String, T>;
 type FResult<T> = Result<T, failure::Error>;
 
-type ActTuple = (Map<String>, Option<String>, String, Map<Argument>, Option<String>);
+type ActTuple = (Map<String>, Option<String>, String, Map<Value>, Option<String>);
 type MovTuple = (Map<String>, Vec<Condition>, Vec<Move>);
 type SubTuple = (Map<String>, Vec<Instruction>);
 type VarTuple = (Map<String>, Vec<Variable>, Vec<Variable>);
@@ -64,7 +64,7 @@ pub enum Instruction {
         r#type: String,
         assignment: Option<String>,
         name: String,
-        input: Map<Argument>,
+        input: Map<Value>,
         data_type: Option<String>,
     },
     Mov {
@@ -140,7 +140,7 @@ impl Instruction {
 
     pub fn new_act(
         name: String,
-        input: Map<Argument>,
+        input: Map<Value>,
         meta: Map<String>,
         assignment: Option<String>,
         data_type: Option<String>,
