@@ -1,24 +1,35 @@
 #[macro_use]
 extern crate log;
 
+use serde::{Deserialize, Serialize};
+use serde_json::Value as JValue;
+use std::path::PathBuf;
+
 pub mod docker;
 
-type Map<T> = std::collections::HashMap<String, T>;
-
 ///
 ///
 ///
+#[derive(Deserialize, Serialize)]
 pub struct ExecuteInfo {
     pub image: String,
-    pub payload: String,
+    pub image_file: Option<PathBuf>,
+    pub payload: JValue,
 }
 
 impl ExecuteInfo {
     ///
     ///
     ///
-    pub fn new(image: String, payload: String) -> Self {
-        ExecuteInfo { image, payload }
+    pub fn new(
+        image: String,
+        image_file: Option<PathBuf>,
+        payload: JValue,
+    ) -> Self {
+        ExecuteInfo {
+            image,
+            image_file,
+            payload,
+        }
     }
 }
-
