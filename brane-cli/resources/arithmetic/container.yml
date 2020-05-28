@@ -1,24 +1,27 @@
-name: arithmetic-service
+name: arithmetic
 version: 1.0.0
 
-entrypoint: 
-  kind: service
-  exec: run.js
+kind: compute
+
+entrypoint:
+  kind: task
+  exec: run.sh
 
 dependencies:
-  - nodejs
+  - bash
 
 files:
-  - run.js
+  - run.sh
 
 actions:
   add:
-    endpoint:
-      path: /add
+    command:
+      args:
+        - add
 
     notation:
       infix:
-        - "+"      
+        - "+"
 
     input:
       - name: a
@@ -31,8 +34,9 @@ actions:
         type: integer
 
   substract:
-    endpoint:
-      path: /substract
+    command:
+      args:
+        - substract
 
     notation:
       infix:
@@ -46,15 +50,16 @@ actions:
 
     output:
       - name: c
-        type: integer  
+        type: integer
 
   multiply:
-    endpoint:
-      path: /multiply
+    command:
+      args:
+        - multiply
 
     notation:
       infix:
-        - "*"      
+        - "*"
 
     input:
       - name: a
@@ -64,15 +69,16 @@ actions:
 
     output:
       - name: c
-        type: integer       
+        type: integer
 
   divide:
-    endpoint:
-      path: /divide
+    command:
+      args:
+        - divide
 
     notation:
       infix:
-        - "/"      
+        - "/"
 
     input:
       - name: a
@@ -82,4 +88,4 @@ actions:
 
     output:
       - name: c
-        type: integer                
+        type: integer

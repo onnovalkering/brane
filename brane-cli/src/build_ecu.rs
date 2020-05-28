@@ -11,7 +11,7 @@ use std::process::Command;
 type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
-const INIT_URL: &str = "https://github.com/brane-ri/entrypoint/releases/download/v0.2.0/entrypoint";
+const INIT_URL: &str = "https://github.com/brane-ri/entrypoint/releases/download/v0.2.0/brane-init";
 
 ///
 ///
@@ -55,7 +55,7 @@ fn generate_package_info(container_info: &ContainerInfo) -> FResult<PackageInfo>
         container_info.name.clone(),
         container_info.version.clone(),
         container_info.description.clone(),
-        String::from("cwl"),
+        String::from("ecu"),
         Some(functions),
         None,
     );
@@ -81,9 +81,9 @@ fn generate_dockerfile(container_info: &ContainerInfo) -> FResult<String> {
         }
     }
 
-    // Add entrypoint
+    // Add Brane entrypoint
     writeln!(contents, "ADD {} init", INIT_URL)?;
-    writeln!(contents, "RUN chmod +x ./init")?;
+    writeln!(contents, "RUN chmod +x init")?;
     writeln!(contents, "ENTRYPOINT [\"./init\"]")?;
 
     // Add dependencies
@@ -96,7 +96,7 @@ fn generate_dockerfile(container_info: &ContainerInfo) -> FResult<String> {
     writeln!(contents)?;
 
     // Copy files
-    writeln!(contents, "COPY container.yml /usr/local/share/ep/actiongroup.yml")?;
+    writeln!(contents, "COPY container.yml /container.yml")?;
     writeln!(contents, "ADD wd.tar.gz /opt")?;
     writeln!(contents, "WORKDIR /opt/wd")?;
 
