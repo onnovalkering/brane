@@ -12,7 +12,7 @@ pub struct Parameter {
     pub data_type: String,
     pub default: Option<Value>,
     pub name: String,
-    pub optional: bool,
+    pub optional: Option<bool>,
 }
 
 impl Parameter {
@@ -22,7 +22,7 @@ impl Parameter {
     pub fn new(
         name: String,
         data_type: String,
-        optional: bool,
+        optional: Option<bool>,
         default: Option<Value>,
     ) -> Self {
         Parameter {
@@ -123,7 +123,7 @@ impl Property {
     }
 }
 
-#[serde(tag = "variant", rename_all = "camelCase")]
+#[serde(tag = "v", content = "c", rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Value {
     Array {
