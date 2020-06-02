@@ -1,5 +1,6 @@
 use crate::environment::Environment;
 use brane_exec::{docker, ExecuteInfo};
+use futures::executor::block_on;
 use serde_json::json;
 use specifications::common::Value;
 use specifications::instructions::{Instruction, Instruction::*, Move, Move::*, Operator::*};
@@ -13,7 +14,7 @@ type Map<T> = std::collections::HashMap<String, T>;
 ///
 pub struct Machine {
     cursor: usize,
-    environment: Box<dyn Environment>,
+    pub environment: Box<dyn Environment>,
 }
 
 impl Machine {
@@ -27,16 +28,16 @@ impl Machine {
     ///
     ///
     ///
-    pub async fn interpret(
+    pub fn interpret(
         &mut self,
         instructions: Vec<Instruction>,
-    ) -> FResult<()> {
+    ) -> FResult<Option<Value>> {
         let cursor_max = instructions.len();
 
         while self.cursor != cursor_max {
             let instruction = instructions.get(self.cursor).unwrap().clone();
             let movement = match instruction {
-                Act(_) => self.handle_act(instruction).await?,
+                Act(_) => self.handle_act(instruction)?,
                 Mov(_) => self.handle_mov(instruction)?,
                 Sub(_) => self.handle_sub(instruction)?,
                 Var(_) => self.handle_var(instruction)?,
@@ -49,13 +50,19 @@ impl Machine {
             }
         }
 
-        Ok(())
+        // Return terminate (return) value
+        if self.environment.exists("terminate") {
+            let value = self.environment.get("terminate");
+            return Ok(Some(value));
+        }
+
+        Ok(None)
     }
 
     ///
     ///
     ///
-    async fn handle_act(
+    fn handle_act(
         &mut self,
         instruction: Instruction,
     ) -> FResult<Move> {
@@ -65,16 +72,27 @@ impl Machine {
             bail!("Not a ACT instruction.");
         };
 
+        // Prepare arguments
+        let mut arguments = Map::<Value>::new();
+        for (name, _) in act.input {
+            let value = self.environment.get(&name);
+            arguments.insert(name, value);
+        }
+
+        // Prepare payload
         let image = act.meta.get("image").expect("Missing `image` metadata property");
         let image_file = act.meta.get("image_file").map(PathBuf::from);
         let payload = json!({
             "identifier": "1+1",
             "action": act.name,
-            "arguments": act.input,
+            "arguments": arguments,
         });
 
         let exec = ExecuteInfo::new(image.clone(), image_file, payload);
-        let (stdout, _) = docker::run_and_wait(exec).await?;
+        let (stdout, stderr) = block_on(docker::run_and_wait(exec))?;
+        if stderr.len() > 0 {
+            error!("{}", stderr);
+        }
 
         if let Some(ref assignment) = act.assignment {
             let output: Map<Value> = serde_json::from_str(&stdout).unwrap();
@@ -147,9 +165,28 @@ impl Machine {
     ///
     fn handle_sub(
         &mut self,
-        _instruction: Instruction,
+        instruction: Instruction,
     ) -> FResult<Move> {
-        unimplemented!();
+        let sub = if let Sub(sub) = instruction {
+            sub
+        } else {
+            bail!("Not a SUB instruction.");
+        };
+
+        let mut sub_machine = Machine::new(self.environment.child());
+        sub_machine.interpret(sub.instructions)?;
+
+        // Commit variables to parent (this) machine
+        let sub_variables = sub_machine.variables();
+        for (name, value) in sub_variables.iter() {
+            self.environment.set(&name, &value);
+        }
+
+        Ok(Forward)
+    }
+
+    fn variables(&self) -> Map<Value> {
+        self.environment.variables()
     }
 
     ///

@@ -21,6 +21,8 @@ pub trait Environment {
     );
 
     fn child(&self) -> Box<dyn Environment>;
+
+    fn variables(&self) -> Map<Value>;
 }
 
 ///
@@ -103,5 +105,12 @@ impl Environment for InMemoryEnvironment {
         let environment = InMemoryEnvironment::new(None, Some(current));
 
         Box::new(environment)
+    }
+
+    ///
+    ///
+    ///
+    fn variables(&self) -> Map<Value> {
+        self.variables.clone()
     }
 }
