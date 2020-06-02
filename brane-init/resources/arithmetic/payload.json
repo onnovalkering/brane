@@ -1,9 +1,14 @@
 {
     "action": "add",
     "arguments": {
-        "a": 1,
-        "b": 1
+        "a": {
+            "c": 1,
+            "v": "integer"
+        },
+        "b": {
+            "c": 1,
+            "v": "integer"
+        }
     },
-    "captureMode": 1,
-    "identifier": "1"
+    "identifier": "1+1"
 }
