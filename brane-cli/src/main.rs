@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate human_panic;
 
-use brane::{build_api, build_cwl, build_dsl, build_ecu, packages, registry};
+use brane::{build_api, build_cwl, build_dsl, build_ecu, packages, registry, repl};
 use log::LevelFilter;
 use std::path::PathBuf;
 use std::process;
@@ -69,6 +69,11 @@ enum SubCommand {
         version: Option<String>,
         #[structopt(short, long, help = "Don't ask for confirmation")]
         force: bool,
+    },
+
+    #[structopt(name = "repl", about = "Start an interactive DSL session")]
+    Repl {
+
     },
 
     #[structopt(name = "test", about = "Test a package locally")]
@@ -139,6 +144,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         Remove { name, version, force } => {
             packages::remove(name, version, force).unwrap();
         }
+        Repl {} => {
+            repl::start().await?;
+        },
         Test { name, version } => {
             packages::test(name, version)?;
         }

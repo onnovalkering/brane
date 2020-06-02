@@ -11,6 +11,7 @@ pub mod build_dsl;
 pub mod build_ecu;
 pub mod packages;
 pub mod registry;
+pub mod repl;
 pub mod utils;
 
 use semver::Version;

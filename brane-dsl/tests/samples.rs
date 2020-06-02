@@ -7,7 +7,7 @@ use std::path::PathBuf;
 fn hello_world() {
     let index = PackageIndex::from_path(&PathBuf::from("./resources/packages.json")).unwrap();
 
-    let options = CompilerOptions::none();
+    let options = CompilerOptions::default();
     let mut compiler = Compiler::new(options, index).unwrap();
 
     let program = fs::read_to_string("./resources/hello-world.bk").unwrap();
