@@ -20,6 +20,11 @@ pub trait Environment {
         value: &Value,
     );
 
+    fn remove(
+        &mut self,
+        name: &str
+    );
+
     fn child(&self) -> Box<dyn Environment>;
 
     fn variables(&self) -> Map<Value>;
@@ -95,6 +100,16 @@ impl Environment for InMemoryEnvironment {
         value: &Value,
     ) {
         self.variables.insert(name.to_string(), value.clone());
+    }
+
+    ///
+    ///
+    ///
+    fn remove(
+        &mut self,
+        name: &str,
+    ) {
+        self.variables.remove(name);
     }
 
     ///

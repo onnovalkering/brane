@@ -34,6 +34,9 @@ impl Machine {
     ) -> FResult<Option<Value>> {
         let cursor_max = instructions.len();
 
+        self.cursor = 0;
+        self.environment.remove("terminate");
+
         while self.cursor != cursor_max {
             let instruction = instructions.get(self.cursor).unwrap().clone();
             let movement = match instruction {
@@ -53,6 +56,7 @@ impl Machine {
         // Return terminate (return) value
         if self.environment.exists("terminate") {
             let value = self.environment.get("terminate");
+
             return Ok(Some(value));
         }
 
@@ -71,6 +75,8 @@ impl Machine {
         } else {
             bail!("Not a ACT instruction.");
         };
+
+        debug!("Handling ACT instruction:\n{:#?}", act);
 
         // Prepare arguments
         let mut arguments = Map::<Value>::new();
