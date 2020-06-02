@@ -11,11 +11,27 @@ use specifications::instructions::*;
 type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
-pub struct CompilerOptions {}
+pub struct CompilerOptions {
+    pub return_call: bool,
+}
 
 impl CompilerOptions {
-    pub fn none() -> Self {
-        CompilerOptions {}
+    ///
+    ///
+    ///
+    pub fn default() -> Self {
+        CompilerOptions {
+            return_call: false,
+        }
+    }
+
+    ///
+    ///
+    ///
+    pub fn repl() -> Self {
+        CompilerOptions {
+            return_call: true,
+        }
     }
 }
 
@@ -57,7 +73,7 @@ impl Compiler {
         package_index: PackageIndex,
         input: &str,
     ) -> FResult<Vec<Instruction>> {
-        let mut compiler = Compiler::new(CompilerOptions::none(), package_index)?;
+        let mut compiler = Compiler::new(CompilerOptions::default(), package_index)?;
         compiler.compile(input)
     }
 
@@ -75,7 +91,13 @@ impl Compiler {
         for node in ast {
             let (variable, instruction) = match node {
                 Assignment { name, terms } => self.handle_assignment_node(name, terms)?,
-                Call { terms } => self.handle_call_node(terms)?,
+                Call { terms } => {
+                    if self.options.return_call {
+                        self.handle_assignment_call_node(String::from("terminate"), terms)?
+                    } else {
+                        self.handle_call_node(terms)?
+                    }
+                },
                 Parameter { name, complex } => self.handle_parameter_node(name, complex)?,
                 Repeat { predicate, exec } => self.handle_repeat_node(*predicate, *exec)?,
                 Terminate { terms } => self.handle_terminate_node(terms)?,
@@ -103,11 +125,23 @@ impl Compiler {
         name: String,
         terms: Vec<AstTerm>,
     ) -> FResult<(Option<Variable>, Option<Instruction>)> {
-        if terms.len() == 1 && terms[0].is_value() {
-            self.handle_assignment_value_node(name, &terms[0])
-        } else {
-            self.handle_assignment_call_node(name, terms)
+        debug!("Handling assignment node: {:?}", terms);
+
+        if terms.len() == 1 {
+            match &terms[0] {
+                AstTerm::Name(variable) => {
+                    if self.state.variables.contains_key(variable) {
+                        return self.handle_assignment_value_node(name, &terms[0]);
+                    }
+                }
+                AstTerm::Value(_) => {
+                    return self.handle_assignment_value_node(name, &terms[0]);
+                }
+                _ => unreachable!(),
+            }
         }
+
+        self.handle_assignment_call_node(name, terms)
     }
 
     ///
@@ -118,10 +152,15 @@ impl Compiler {
         name: String,
         value: &AstTerm,
     ) -> FResult<(Option<Variable>, Option<Instruction>)> {
-        let (value, data_type) = if let AstTerm::Value(value) = value {
-            (Some(value.clone()), value.data_type().to_string())
-        } else {
-            unreachable!()
+        let (value, data_type) = match value {
+            AstTerm::Value(value) => (Some(value.clone()), value.data_type().to_string()),
+            AstTerm::Name(variable) => {
+                let data_type = self.state.variables.get(variable).unwrap();
+                let value = Value::Pointer { variable: variable.clone(), data_type: data_type.clone() };
+
+                (Some(value.clone()), data_type.clone())
+            },
+            _ => unreachable!(),
         };
 
         let variable = Variable::new(name, data_type, None, value);
