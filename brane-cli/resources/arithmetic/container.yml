@@ -21,7 +21,7 @@ actions:
       args:
         - add
 
-    notation:
+    pattern:
       infix:
         - "+"
 
@@ -40,7 +40,7 @@ actions:
       args:
         - substract
 
-    notation:
+    pattern:
       infix:
         - "-"
 
@@ -59,7 +59,7 @@ actions:
       args:
         - multiply
 
-    notation:
+    pattern:
       infix:
         - "*"
 
@@ -78,7 +78,7 @@ actions:
       args:
         - divide
 
-    notation:
+    pattern:
       infix:
         - "/"
 

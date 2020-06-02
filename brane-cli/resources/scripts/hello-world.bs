@@ -2,8 +2,10 @@
 name: hello-world
 version: 1.0.0
 ---
-import "arithmetic-task"
+import "arithmetic"
 
 a := ?? as Integer
 b := ?? as Integer
 c := a + b
+
+return c

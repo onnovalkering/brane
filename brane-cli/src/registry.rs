@@ -6,7 +6,8 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use reqwest::{self, multipart::Form, multipart::Part, Body, Client, Method};
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JValue;
+use serde_json::{json, Value as JValue};
+use specifications::package::PackageInfo;
 use std::env;
 use std::fs::{self, File};
 use std::io::prelude::*;
@@ -156,9 +157,38 @@ pub async fn search(term: String) -> FResult<()> {
 ///
 ///
 ///
-pub async fn get_package_index() -> FResult<PackageIndex> {
-    let url = "http://127.0.0.1:8080/packages";
-    let packages: JValue = reqwest::get(url).await?.json().await?;
+pub async fn get_package_index(online: bool) -> FResult<PackageIndex> {
+    let packages: JValue = if online {
+        let url = "http://127.0.0.1:8080/packages";
+        reqwest::get(url).await?.json().await?
+    } else {
+        let packages_dir = packages::get_packages_dir();
+        if !packages_dir.exists() {
+            return Ok(PackageIndex::empty());
+        }
+
+        let mut package_infos = Vec::<PackageInfo>::new();
+
+        let packages = fs::read_dir(packages_dir)?;
+        for package in packages {
+            let package_path = package?.path();
+            if !package_path.is_dir() {
+                continue;
+            }
+
+            let versions = fs::read_dir(package_path)?;
+            for version in versions {
+                let path = version?.path();
+                let package_file = path.join("package.yml");
+
+                if let Ok(package_info) = PackageInfo::from_path(package_file) {
+                    package_infos.push(package_info);
+                }
+            }
+        }
+
+        json!(package_infos)
+    };
 
     PackageIndex::from_value(packages)
 }

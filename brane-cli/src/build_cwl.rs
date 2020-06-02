@@ -109,7 +109,7 @@ fn build_clt_function(clt: &CommandLineTool) -> FResult<(String, Function, Map<T
         properties: output_properties,
     };
 
-    let parameter = Parameter::new(String::from("input"), input.name.clone(), false, None);
+    let parameter = Parameter::new(String::from("input"), input.name.clone(), Some(false), None);
     let function = Function::new(vec![parameter], None, output.name.clone());
 
     let mut types = Map::<Type>::new();
@@ -161,7 +161,7 @@ fn build_wf_function(wf: &Workflow) -> FResult<(String, Function, Map<Type>)> {
         properties: output_properties,
     };
 
-    let parameter = Parameter::new(String::from("input"), input.name.clone(), false, None);
+    let parameter = Parameter::new(String::from("input"), input.name.clone(), Some(false), None);
     let function = Function::new(vec![parameter], None, output.name.clone());
 
     let mut types = Map::<Type>::new();

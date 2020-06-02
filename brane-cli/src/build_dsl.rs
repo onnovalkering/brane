@@ -22,7 +22,7 @@ pub async fn handle(
     let dsl_document = fs::read_to_string(&dsl_file)?;
 
     // Compile to instructions
-    let package_index = registry::get_package_index().await?;
+    let package_index = registry::get_package_index(false).await?;
     let instructions = Compiler::quick_compile(package_index, &dsl_document)?;
 
     // Prepare package directory

@@ -140,7 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             packages::remove(name, version, force).unwrap();
         }
         Test { name, version } => {
-            packages::test(name, version).unwrap();
+            packages::test(name, version)?;
         }
         Search { term } => {
             registry::search(term).await?;
