@@ -34,11 +34,11 @@ const DEF_TEMPORARY_DIR: &str = "./temporary";
 #[derive(StructOpt)]
 #[structopt(name = "brane-api", about = "The Brane API service.")]
 struct CLI {
-    #[structopt(short, long, help = "Enable debug mode")]
+    #[structopt(short, long, help = "Enable debug mode", env = "DEBUG")]
     debug: bool,
-    #[structopt(short = "o", long, help = "Host to bind", default_value = "127.0.0.1")]
+    #[structopt(short = "o", long, help = "Host to bind", default_value = "127.0.0.1", env = "HOST")]
     host: String,
-    #[structopt(short, long, help = "Port to bind", default_value = "8080")]
+    #[structopt(short, long, help = "Port to bind", default_value = "8080", env = "PORT")]
     port: u16,
 }
 

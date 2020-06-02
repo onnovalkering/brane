@@ -1,10 +1,13 @@
 FROM rust as build
 
+RUN apt-get update && apt-get install -y \
+    cmake \
+ && rm -rf /var/lib/apt/lists/*
+
 RUN USER=root cargo new --bin brane-api
 WORKDIR /brane-api
 
 # Copy over project manifests
-COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
 
 # This will prepare dependencies
@@ -12,7 +15,9 @@ RUN cargo build --release
 RUN rm src/*.rs
 
 # Copy over project source code
+COPY ./migrations ./migrations
 COPY ./src ./src
+COPY ./diesel.toml ./diesel.toml
 
 # This will build a release binary
 RUN rm ./target/release/deps/brane_api*
@@ -22,8 +27,8 @@ RUN cargo build --release
 FROM ubuntu:20.04
 
 RUN apt-get update && apt-get install -y \
-    libsqlite3-dev \
-    sqlite3 \
+    libpq-dev \
+    libssl-dev\
  && rm -rf /var/lib/apt/lists/*
 
 # Copy the release binary from the build stage
