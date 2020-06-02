@@ -27,6 +27,7 @@ pub fn get_module_patterns(module: &PackageInfo) -> FResult<Vec<FunctionPattern>
         meta.insert("kind".to_string(), module.kind.clone());
         meta.insert("name".to_string(), module.name.clone());
         meta.insert("version".to_string(), module.version.clone());
+        meta.insert(String::from("image"), format!("{}:{}", module.name, module.version));
 
         let function_pattern = FunctionPattern {
             parameters: function.parameters.clone(),

@@ -220,18 +220,7 @@ impl Compiler {
         debug!("Terminate: {:?}", terms);
 
         // Always set a variable called 'terminate' in the local scope.
-        let (mut instructions, _) = self.set_terminate_variable_locally(terms)?;
-
-        // Return terminate in output scope.
-        let variable = Variable::new(
-            String::from("terminate"),
-            String::from("unit"),
-            Some(String::from("output")),
-            None,
-        );
-        let instruction = VarInstruction::new(Default::default(), vec![variable], Default::default());
-        instructions.push(instruction);
-
+        let (instructions, _) = self.set_terminate_variable_locally(terms)?;
         let subroutine = SubInstruction::new(instructions, Default::default());
 
         Ok((None, Some(subroutine)))
