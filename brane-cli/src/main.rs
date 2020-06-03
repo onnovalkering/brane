@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate human_panic;
 
-use brane::{build_api, build_cwl, build_dsl, build_ecu, packages, registry, repl};
+use brane::{build_api, build_cwl, build_dsl, build_ecu, packages, registry, repl, test};
 use log::LevelFilter;
 use std::path::PathBuf;
 use std::process;
@@ -148,7 +148,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             repl::start().await?;
         },
         Test { name, version } => {
-            packages::test(name, version)?;
+            test::handle(name, version)?;
         }
         Search { term } => {
             registry::search(term).await?;

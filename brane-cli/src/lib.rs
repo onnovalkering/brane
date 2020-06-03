@@ -12,6 +12,7 @@ pub mod build_ecu;
 pub mod packages;
 pub mod registry;
 pub mod repl;
+pub mod test;
 pub mod utils;
 
 use semver::Version;
