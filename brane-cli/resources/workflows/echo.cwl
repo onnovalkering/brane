@@ -13,11 +13,11 @@ label: echo
 baseCommand: echo
 
 inputs:
-  message:
+  input:
     type: string
     inputBinding:
       position: 1
 
 outputs:
-  message:
+  output:
     type: stdout

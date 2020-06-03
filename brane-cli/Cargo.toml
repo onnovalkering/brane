@@ -11,11 +11,13 @@ console = "0.11"
 crc32fast = "1.2"
 cwl = { git = "https://github.com/onnovalkering/cwl-rs" }
 brane-dsl = { path = "../brane-dsl" }
+brane-exec = { path = "../brane-exec" }
 brane-vm = { path = "../brane-vm" }
 dialoguer = "0.6"
 env_logger = "0.7"
 failure = "0.1"
 flate2 = "1.0"
+fs_extra = "1.1"
 human-panic = "1.0"
 hyper = "0.13"
 indicatif = "0.14"
@@ -30,6 +32,7 @@ serde_yaml = "0.8"
 structopt = "0.3"
 specifications = { path = "../specifications" }
 tar = "0.4"
+tempfile = "3"
 tokio = { version = "0.2", features = ["full"] }
 tokio-util = "0.3"
 yaml-rust = "0.4"

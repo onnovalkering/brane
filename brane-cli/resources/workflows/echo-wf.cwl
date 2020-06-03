@@ -3,7 +3,7 @@ $base: "https://w3id.org/cwl/cwl#"
 $namespaces:
   s: "http://schema.org/"
 
-s:name: "echo-wf"
+s:name: "echo"
 s:description: "Simple echo workflow."
 s:version: "1.0.0"
 
@@ -12,19 +12,19 @@ class: Workflow
 label: echo-wf
 
 inputs:
-  message:
+  input:
     type: string
 
 steps:
   echo-step:
     run: echo.cwl
     in:
-      message: message
+      input: input
     out:
-      - message
+      - output
 
 outputs:
-  message:
+  output:
     type: File
-    outputSource: echo-step/message
+    outputSource: echo-step/output
 

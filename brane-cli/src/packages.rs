@@ -1,14 +1,14 @@
-use dialoguer::Confirm;
 use chrono::Utc;
 use console::{pad_str, Alignment};
+use dialoguer::Confirm;
 use indicatif::HumanDuration;
 use prettytable::format::FormatBuilder;
 use prettytable::Table;
 use semver::Version;
 use specifications::package::PackageInfo;
 use std::fs;
-use std::time::Duration;
 use std::path::PathBuf;
+use std::time::Duration;
 
 type FResult<T> = Result<T, failure::Error>;
 

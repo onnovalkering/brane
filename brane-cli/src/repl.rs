@@ -1,7 +1,7 @@
 use crate::registry;
-use linefeed::{Interface, ReadResult};
 use brane_dsl::compiler::{Compiler, CompilerOptions};
 use brane_vm::{environment::InMemoryEnvironment, machine::Machine};
+use linefeed::{Interface, ReadResult};
 use specifications::common::Value;
 
 type FResult<T> = Result<T, failure::Error>;
@@ -38,8 +38,7 @@ pub async fn start() -> FResult<()> {
                         println!("{:?}", value);
                     }
                 }
-
-            },
+            }
             Err(err) => {
                 error!("{:?}", err);
             }

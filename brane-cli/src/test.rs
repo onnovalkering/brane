@@ -1,19 +1,22 @@
 use crate::packages;
 use brane_vm::{environment::InMemoryEnvironment, machine::Machine};
 use dialoguer::theme::ColorfulTheme;
-use dialoguer::Input as Prompt;
+use dialoguer::{Input as Prompt, Select};
+use fs_extra::{copy_items, dir::CopyOptions};
+use serde_json::Value as JValue;
 use serde_yaml;
 use specifications::common::Value;
 use specifications::instructions::Instruction;
 use specifications::package::PackageInfo;
-use std::fs::File;
-use std::io::BufReader;
+use std::fs::{self, File};
+use std::io::prelude::*;
+use std::io::{BufReader, Write};
+use std::path::PathBuf;
 use std::process::Command;
 use std::{
     fmt::{Debug, Display},
     str::FromStr,
 };
-use std::path::PathBuf;
 
 type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
@@ -53,10 +56,95 @@ fn test_api(
 ///
 ///
 fn test_cwl(
-    _package_dir: PathBuf,
-    _package_info: PackageInfo,
+    package_dir: PathBuf,
+    package_info: PackageInfo,
 ) -> FResult<()> {
-    unimplemented!()
+    let functions = package_info.functions.unwrap();
+    let types = package_info.types.unwrap();
+
+    let function_list: Vec<String> = functions.keys().map(|k| k.to_string()).collect();
+    let index = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("The function the execute")
+        .default(0)
+        .items(&function_list[..])
+        .interact()?;
+
+    let name = &function_list[index];
+    let function = &functions[name];
+    let input_type = function.parameters[0].data_type.clone();
+    let input_obj = types.get(&input_type).unwrap();
+
+    println!("\nPlease provide input for the chosen function:\n");
+
+    let mut arguments = Map::<String>::new();
+    for p in &input_obj.properties {
+        let data_type = p.data_type.as_str();
+        let value = match data_type {
+            "boolean" => {
+                let value: bool = prompt(&p.name, data_type)?;
+                value.to_string()
+            }
+            "integer" => {
+                let value: i64 = prompt(&p.name, data_type)?;
+                value.to_string()
+            }
+            "real" => {
+                let value: f64 = prompt(&p.name, data_type)?;
+                value.to_string()
+            }
+            "string" => {
+                let value: String = prompt(&p.name, data_type)?;
+                value
+            }
+            _ => continue,
+        };
+
+        arguments.insert(p.name.clone(), value);
+    }
+
+    println!();
+
+    // Copy package directory to working dir
+    let working_dir = tempfile::tempdir()?.into_path();
+    let package_content = fs::read_dir(package_dir)?
+        .map(|e| e.unwrap().path())
+        .collect::<Vec<PathBuf>>();
+
+    copy_items(&package_content, &working_dir, &CopyOptions::new())?;
+
+    let input_path = working_dir.join("input.json");
+    let mut input_file = File::create(input_path)?;
+    writeln!(input_file, "{}", &serde_json::to_string(&arguments)?)?;
+
+    let working_dir_path = working_dir.to_string_lossy().to_string();
+    let output = Command::new("docker")
+        .arg("run")
+        .arg("--rm")
+        .args(vec!["-v", "/var/run/docker.sock:/var/run/docker.sock"])
+        .args(vec!["-v", "/tmp:/tmp"])
+        .args(vec!["-v", &format!("{}:{}", working_dir_path, working_dir_path)])
+        .args(vec!["-w", &working_dir_path])
+        .arg("commonworkflowlanguage/cwltool")
+        .arg("--quiet")
+        .arg("document.cwl")
+        .arg("input.json")
+        .output()
+        .expect("Couldn't run 'docker' command.");
+
+    ensure!(output.status.success(), "Failed to run CWL workflow.");
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let output_obj: Map<JValue> = serde_json::from_str(&stdout)?;
+
+    for (name, value_info) in output_obj.iter() {
+        let mut value = String::new();
+        let mut value_file = File::open(value_info["path"].as_str().unwrap())?;
+        value_file.read_to_string(&mut value)?;
+
+        println!("{}: {}", name, value);
+    }
+
+    Ok(())
 }
 
 ///

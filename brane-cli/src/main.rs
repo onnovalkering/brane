@@ -72,9 +72,7 @@ enum SubCommand {
     },
 
     #[structopt(name = "repl", about = "Start an interactive DSL session")]
-    Repl {
-
-    },
+    Repl {},
 
     #[structopt(name = "test", about = "Test a package locally")]
     Test {
@@ -146,7 +144,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
         Repl {} => {
             repl::start().await?;
-        },
+        }
         Test { name, version } => {
             test::handle(name, version)?;
         }
