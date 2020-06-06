@@ -6,13 +6,13 @@ edition = "2018"
 
 [dependencies]
 appdirs = "0.2"
+brane-dsl = { path = "../brane-dsl" }
+brane-exec = { path = "../brane-exec" }
+brane-vm = { path = "../brane-vm" }
 chrono = "0.4"
 console = "0.11"
 crc32fast = "1.2"
 cwl = { git = "https://github.com/onnovalkering/cwl-rs" }
-brane-dsl = { path = "../brane-dsl" }
-brane-exec = { path = "../brane-exec" }
-brane-vm = { path = "../brane-vm" }
 dialoguer = "0.6"
 env_logger = "0.7"
 failure = "0.1"
@@ -23,14 +23,15 @@ hyper = "0.13"
 indicatif = "0.14"
 linefeed = "0.6"
 log = "0.4"
+openapiv3 = "0.3"
 prettytable-rs = "0.8"
 reqwest = {version = "0.10", features = ["json", "stream"] }
 semver = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.8"
-structopt = "0.3"
 specifications = { path = "../specifications" }
+structopt = "0.3"
 tar = "0.4"
 tempfile = "3"
 tokio = { version = "0.2", features = ["full"] }

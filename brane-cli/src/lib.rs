@@ -5,10 +5,10 @@ extern crate log;
 #[macro_use]
 extern crate prettytable;
 
-pub mod build_api;
 pub mod build_cwl;
 pub mod build_dsl;
 pub mod build_ecu;
+pub mod build_oas;
 pub mod packages;
 pub mod registry;
 pub mod repl;

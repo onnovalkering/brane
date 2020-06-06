@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate human_panic;
 
-use brane::{build_api, build_cwl, build_dsl, build_ecu, packages, registry, repl, test};
+use brane::{build_cwl, build_dsl, build_ecu, build_oas, packages, registry, repl, test};
 use log::LevelFilter;
 use std::path::PathBuf;
 use std::process;
@@ -118,10 +118,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use SubCommand::*;
     match options.sub_command {
         Build { context, file, kind } => match kind.to_lowercase().as_str() {
-            "api" => build_api::handle(context, file).unwrap(),
             "cwl" => build_cwl::handle(context, file).unwrap(),
             "dsl" => build_dsl::handle(context, file).await?,
             "ecu" => build_ecu::handle(context, file).unwrap(),
+            "oas" => build_oas::handle(context, file).unwrap(),
             _ => println!("Unsupported package kind: {}", kind),
         },
         List {} => {
@@ -146,7 +146,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             repl::start().await?;
         }
         Test { name, version } => {
-            test::handle(name, version)?;
+            test::handle(name, version).await?;
         }
         Search { term } => {
             registry::search(term).await?;

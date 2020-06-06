@@ -1,11 +1,14 @@
 use crate::packages;
+use brane_exec::openapi;
 use brane_vm::{environment::InMemoryEnvironment, machine::Machine};
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input as Prompt, Select};
 use fs_extra::{copy_items, dir::CopyOptions};
 use serde_json::Value as JValue;
+use openapiv3::OpenAPI;
+use console::style;
 use serde_yaml;
-use specifications::common::Value;
+use specifications::common::{Function, Type, Value};
 use specifications::instructions::Instruction;
 use specifications::package::PackageInfo;
 use std::fs::{self, File};
@@ -24,7 +27,7 @@ type Map<T> = std::collections::HashMap<String, T>;
 ///
 ///
 ///
-pub fn handle(
+pub async fn handle(
     name: String,
     version: Option<String>,
 ) -> FResult<()> {
@@ -34,7 +37,7 @@ pub fn handle(
 
     let package_info = PackageInfo::from_path(package_dir.join("package.yml"))?;
     match package_info.kind.as_str() {
-        "api" => test_api(package_dir, package_info),
+        "oas" => test_oas(package_dir, package_info).await,
         "cwl" => test_cwl(package_dir, package_info),
         "dsl" => test_dsl(package_dir, package_info),
         "ecu" => test_ecu(package_dir, package_info),
@@ -45,11 +48,27 @@ pub fn handle(
 ///
 ///
 ///
-fn test_api(
-    _package_dir: PathBuf,
-    _package_info: PackageInfo,
+async fn test_oas(
+    package_dir: PathBuf,
+    package_info: PackageInfo,
 ) -> FResult<()> {
-    unimplemented!()
+    let functions = package_info.functions.unwrap();
+    let types = package_info.types.unwrap();
+    let (function_name, arguments) = prompt_for_input(&functions, &types)?;
+
+    let oas_reader = BufReader::new(File::open(&package_dir.join("document.yml"))?);
+    let oas_document: OpenAPI = serde_yaml::from_reader(oas_reader)?;
+
+    let json = openapi::execute(function_name.clone(), arguments, &oas_document).await?;
+
+    let function = functions.get(&function_name).unwrap();
+    let output_type = types.get(&function.return_type).unwrap();
+
+    for property in &output_type.properties {
+        println!("{}:\n{}\n", style(&property.name).bold().cyan(), json[&property.name].as_str().unwrap());
+    }
+
+    Ok(())
 }
 
 ///
@@ -61,48 +80,7 @@ fn test_cwl(
 ) -> FResult<()> {
     let functions = package_info.functions.unwrap();
     let types = package_info.types.unwrap();
-
-    let function_list: Vec<String> = functions.keys().map(|k| k.to_string()).collect();
-    let index = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("The function the execute")
-        .default(0)
-        .items(&function_list[..])
-        .interact()?;
-
-    let name = &function_list[index];
-    let function = &functions[name];
-    let input_type = function.parameters[0].data_type.clone();
-    let input_obj = types.get(&input_type).unwrap();
-
-    println!("\nPlease provide input for the chosen function:\n");
-
-    let mut arguments = Map::<String>::new();
-    for p in &input_obj.properties {
-        let data_type = p.data_type.as_str();
-        let value = match data_type {
-            "boolean" => {
-                let value: bool = prompt(&p.name, data_type)?;
-                value.to_string()
-            }
-            "integer" => {
-                let value: i64 = prompt(&p.name, data_type)?;
-                value.to_string()
-            }
-            "real" => {
-                let value: f64 = prompt(&p.name, data_type)?;
-                value.to_string()
-            }
-            "string" => {
-                let value: String = prompt(&p.name, data_type)?;
-                value
-            }
-            _ => continue,
-        };
-
-        arguments.insert(p.name.clone(), value);
-    }
-
-    println!();
+    let (_, arguments) = prompt_for_input(&functions, &types)?;
 
     // Copy package directory to working dir
     let working_dir = tempfile::tempdir()?.into_path();
@@ -267,6 +245,58 @@ fn test_ecu(
     }
 
     Ok(())
+}
+
+///
+///
+///
+fn prompt_for_input(
+    functions: &Map<Function>,
+    types: &Map<Type>,
+) -> FResult<(String, Map<String>)> {
+    let function_list: Vec<String> = functions.keys().map(|k| k.to_string()).collect();
+    let index = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("The function the execute")
+        .default(0)
+        .items(&function_list[..])
+        .interact()?;
+
+    let function_name = &function_list[index];
+    let function = &functions[function_name];
+    let input_type = function.parameters[0].data_type.clone();
+    let input_obj = types.get(&input_type).unwrap();
+
+    println!("\nPlease provide input for the chosen function:\n");
+
+    let mut arguments = Map::<String>::new();
+    for p in &input_obj.properties {
+        let data_type = p.data_type.as_str();
+        let value = match data_type {
+            "boolean" => {
+                let value: bool = prompt(&p.name, data_type)?;
+                value.to_string()
+            }
+            "integer" => {
+                let value: i64 = prompt(&p.name, data_type)?;
+                value.to_string()
+            }
+            "real" => {
+                let value: f64 = prompt(&p.name, data_type)?;
+                value.to_string()
+            }
+            "string" => {
+                let value: String = prompt(&p.name, data_type)?;
+                value
+            }
+            _ => continue,
+        };
+
+        arguments.insert(p.name.clone(), value);
+    }
+
+    println!();
+
+    Ok((function_name.clone(), arguments))
 }
 
 ///
