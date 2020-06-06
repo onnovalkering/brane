@@ -1,4 +1,4 @@
-use brane_exec::{ExecuteInfo, docker::*};
+use brane_exec::{docker::*, ExecuteInfo};
 use serde_json::{json, Value as JValue};
 use std::path::PathBuf;
 use tokio;

@@ -3,6 +3,7 @@ use serde_json::Value as JValue;
 use std::path::PathBuf;
 
 pub mod docker;
+pub mod openapi;
 
 ///
 ///
