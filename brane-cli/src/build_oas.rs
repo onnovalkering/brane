@@ -1,6 +1,9 @@
 use crate::packages;
+use console::style;
 use openapiv3::OpenAPI;
-use openapiv3::{Operation, Parameter as OParameter, SchemaKind, ParameterSchemaOrContent, ReferenceOr, Schema, Type as OType};
+use openapiv3::{
+    Operation, Parameter as OParameter, ParameterSchemaOrContent, ReferenceOr, Schema, SchemaKind, Type as OType,
+};
 use serde_yaml;
 use specifications::common::{Function, Parameter, Property, Type};
 use specifications::package::PackageInfo;
@@ -26,6 +29,12 @@ pub fn handle(
     let package_info = create_package_info(&oas_document)?;
     let package_dir = packages::get_package_dir(&package_info.name, Some(&package_info.version))?;
     prepare_directory(&oas_document, &oas_file, &package_info, &package_dir)?;
+
+    println!(
+        "Successfully build OAS package ({}): {}",
+        &package_info.version,
+        style(&package_info.name).bold().cyan(),
+    );
 
     Ok(())
 }
@@ -117,16 +126,14 @@ fn build_oas_function(
         let optional = !parameter_data.required;
         let data_type = if let ParameterSchemaOrContent::Schema(ReferenceOr::Item(schema)) = &parameter_data.format {
             match &schema.schema_kind {
-                SchemaKind::Type(data_type) => {
-                    match data_type {
-                        OType::String(_) => String::from("string"),
-                        OType::Number(_) => String::from("real"),
-                        OType::Integer(_) => String::from("integer"),
-                        OType::Boolean { } => String::from("boolean"),
-                        _ => unimplemented!(),
-                    }
-                }
-                _ => bail!("Unsupported schema kind.")
+                SchemaKind::Type(data_type) => match data_type {
+                    OType::String(_) => String::from("string"),
+                    OType::Number(_) => String::from("real"),
+                    OType::Integer(_) => String::from("integer"),
+                    OType::Boolean {} => String::from("boolean"),
+                    _ => unimplemented!(),
+                },
+                _ => bail!("Unsupported schema kind."),
             }
         } else {
             bail!("Unsupported paramter format.");
@@ -157,11 +164,17 @@ fn build_oas_function(
     let common_type_name = uppercase_first_letter(&name.replace("-", ""));
 
     let input_data_type = format!("{}Input", common_type_name);
-    let input_type = Type { name: input_data_type.clone(), properties: input_properties };
+    let input_type = Type {
+        name: input_data_type.clone(),
+        properties: input_properties,
+    };
     types.insert(input_data_type.clone(), input_type);
 
     let output_data_type = format!("{}Output", common_type_name);
-    let output_type = Type { name: output_data_type.clone(), properties: output_properties };
+    let output_type = Type {
+        name: output_data_type.clone(),
+        properties: output_properties,
+    };
 
     types.insert(output_data_type.clone(), output_type);
 
@@ -186,37 +199,38 @@ fn uppercase_first_letter(s: &str) -> String {
 ///
 ///
 ///
-fn schema_to_properties(name: Option<String>, schema: &Schema) -> FResult<Vec<Property>> {
+fn schema_to_properties(
+    name: Option<String>,
+    schema: &Schema,
+) -> FResult<Vec<Property>> {
     let properties = match &schema.schema_kind {
-        SchemaKind::Type(data_type) => {
-            match data_type {
-                OType::Array(_) => unimplemented!(),
-                OType::Object(object) => {
-                    let mut properties = Vec::<Property>::new();
-                    for (name, p_schema) in object.properties.iter() {
-                        if let ReferenceOr::Item(p_schema) = p_schema {
-                            let props = schema_to_properties(Some(name.clone()), p_schema)?;
-                            properties.extend(props);
-                        }
+        SchemaKind::Type(data_type) => match data_type {
+            OType::Array(_) => unimplemented!(),
+            OType::Object(object) => {
+                let mut properties = Vec::<Property>::new();
+                for (name, p_schema) in object.properties.iter() {
+                    if let ReferenceOr::Item(p_schema) = p_schema {
+                        let props = schema_to_properties(Some(name.clone()), p_schema)?;
+                        properties.extend(props);
                     }
-
-                    properties
-                },
-                _ => {
-                    let name = name.expect("Invalid");
-                    let data_type = match data_type {
-                        OType::String(_) => String::from("string"),
-                        OType::Number(_) => String::from("real"),
-                        OType::Integer(_) => String::from("integer"),
-                        OType::Boolean { } => String::from("boolean"),
-                        _ => unimplemented!(),
-                    };
-
-                    vec![Property::new(name, data_type, None, None, None, None)]
                 }
+
+                properties
             }
-        }
-        _ => bail!("Unsupported schema kind.")
+            _ => {
+                let name = name.expect("Invalid");
+                let data_type = match data_type {
+                    OType::String(_) => String::from("string"),
+                    OType::Number(_) => String::from("real"),
+                    OType::Integer(_) => String::from("integer"),
+                    OType::Boolean {} => String::from("boolean"),
+                    _ => unimplemented!(),
+                };
+
+                vec![Property::new(name, data_type, None, None, None, None)]
+            }
+        },
+        _ => bail!("Unsupported schema kind."),
     };
 
     Ok(properties)

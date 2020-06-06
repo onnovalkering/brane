@@ -24,8 +24,8 @@ enum SubCommand {
         context: PathBuf,
         #[structopt(name = "FILE", help = "Path to the file to build, relative to the context")]
         file: PathBuf,
-        #[structopt(short, long, help = "Kind of package: api, cwl, ecu")]
-        kind: String,
+        #[structopt(short, long, help = "Kind of package: cwl, dsl, ecu or oas")]
+        kind: Option<String>,
     },
 
     #[structopt(name = "list", about = "List packages")]
@@ -117,13 +117,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     use SubCommand::*;
     match options.sub_command {
-        Build { context, file, kind } => match kind.to_lowercase().as_str() {
-            "cwl" => build_cwl::handle(context, file).unwrap(),
-            "dsl" => build_dsl::handle(context, file).await?,
-            "ecu" => build_ecu::handle(context, file).unwrap(),
-            "oas" => build_oas::handle(context, file).unwrap(),
-            _ => println!("Unsupported package kind: {}", kind),
-        },
+        Build { context, file, kind } => {
+            let kind = if let Some(kind) = kind {
+                kind.to_lowercase()
+            } else {
+                if let Ok(kind) = brane::determine_kind(&context, &file) {
+                    kind
+                } else {
+                    println!("Failed to infer the target package kind based on the provided file. Please use the --kind option.");
+                    process::exit(1);
+                }
+            };
+
+            match kind.as_str() {
+                "cwl" => build_cwl::handle(context, file).unwrap(),
+                "dsl" => build_dsl::handle(context, file).await?,
+                "ecu" => build_ecu::handle(context, file).unwrap(),
+                "oas" => build_oas::handle(context, file).unwrap(),
+                _ => println!("Unsupported package kind: {}", kind),
+            }
+        }
         List {} => {
             packages::list().unwrap();
         }

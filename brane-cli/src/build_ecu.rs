@@ -1,4 +1,5 @@
 use crate::packages;
+use console::style;
 use specifications::common::Function;
 use specifications::container::ContainerInfo;
 use specifications::package::PackageInfo;
@@ -33,6 +34,11 @@ pub fn handle(
     let tag = format!("{}:{}", container_info.name, container_info.version);
     build_ecu_image(&package_dir, tag)?;
 
+    println!(
+        "Successfully build ECU package ({}): {}",
+        &package_info.version,
+        style(&package_info.name).bold().cyan(),
+    );
     Ok(())
 }
 

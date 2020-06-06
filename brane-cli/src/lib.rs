@@ -16,6 +16,9 @@ pub mod test;
 pub mod utils;
 
 use semver::Version;
+use std::fs::File;
+use std::io::Read;
+use std::path::PathBuf;
 use std::process::Command;
 
 type FResult<T> = Result<T, failure::Error>;
@@ -33,4 +36,37 @@ pub fn check_dependencies() -> FResult<()> {
     ensure!(version >= Version::parse(MIN_DOCKER_VERSION)?);
 
     Ok(())
+}
+
+///
+///
+///
+pub fn determine_kind(
+    context: &PathBuf,
+    file: &PathBuf,
+) -> FResult<String> {
+    let file = String::from(file.as_os_str().to_string_lossy());
+
+    if file.starts_with("container.y") {
+        return Ok(String::from("ecu"));
+    }
+
+    if file.ends_with(".bk") {
+        return Ok(String::from("dsl"));
+    }
+
+    // For CWL and OAS we need to look inside the file
+    let mut file = File::open(context.join(file))?;
+    let mut file_content = String::new();
+    file.read_to_string(&mut file_content)?;
+
+    if file_content.contains("cwlVersion") {
+        return Ok(String::from("cwl"));
+    }
+
+    if file_content.contains("openapi") {
+        return Ok(String::from("oas"));
+    }
+
+    bail!("Cannot determine kind based on file.");
 }

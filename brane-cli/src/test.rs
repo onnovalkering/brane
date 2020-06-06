@@ -1,12 +1,12 @@
 use crate::packages;
 use brane_exec::openapi;
 use brane_vm::{environment::InMemoryEnvironment, machine::Machine};
+use console::style;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input as Prompt, Select};
 use fs_extra::{copy_items, dir::CopyOptions};
-use serde_json::Value as JValue;
 use openapiv3::OpenAPI;
-use console::style;
+use serde_json::Value as JValue;
 use serde_yaml;
 use specifications::common::{Function, Type, Value};
 use specifications::instructions::Instruction;
@@ -65,7 +65,11 @@ async fn test_oas(
     let output_type = types.get(&function.return_type).unwrap();
 
     for property in &output_type.properties {
-        println!("{}:\n{}\n", style(&property.name).bold().cyan(), json[&property.name].as_str().unwrap());
+        println!(
+            "{}:\n{}\n",
+            style(&property.name).bold().cyan(),
+            json[&property.name].as_str().unwrap()
+        );
     }
 
     Ok(())

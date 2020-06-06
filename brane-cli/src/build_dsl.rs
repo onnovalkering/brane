@@ -1,5 +1,6 @@
 use crate::{packages, registry};
 use brane_dsl::compiler::Compiler;
+use console::style;
 use specifications::common::Function;
 use specifications::instructions::Instruction;
 use specifications::package::PackageInfo;
@@ -29,6 +30,12 @@ pub async fn handle(
     let package_info = generate_package_info(&dsl_document, &instructions)?;
     let package_dir = packages::get_package_dir(&package_info.name, Some(&package_info.version))?;
     prepare_directory(&instructions, &dsl_file, &package_info, &package_dir)?;
+
+    println!(
+        "Successfully build DSL package ({}): {}",
+        &package_info.version,
+        style(&package_info.name).bold().cyan(),
+    );
 
     Ok(())
 }

@@ -1,4 +1,5 @@
 use crate::packages;
+use console::style;
 use cwl::v11_clt::{CommandInputParameter, CommandInputParameterType, CommandLineToolInput, CommandLineToolInputType};
 use cwl::v11_clt::{
     CommandLineToolOutput, CommandLineToolOutputType, CommandOutputParameter, CommandOutputParameterType,
@@ -32,6 +33,12 @@ pub fn handle(
     let package_info = create_package_info(&cwl_document)?;
     let package_dir = packages::get_package_dir(&package_info.name, Some(&package_info.version))?;
     prepare_directory(&cwl_document, &cwl_file, &package_info, &package_dir)?;
+
+    println!(
+        "Successfully build CWL package ({}): {}",
+        &package_info.version,
+        style(&package_info.name).bold().cyan(),
+    );
 
     Ok(())
 }
