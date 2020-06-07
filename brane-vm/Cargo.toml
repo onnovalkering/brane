@@ -5,8 +5,8 @@ authors = ["Onno Valkering"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0"
 brane-exec = { path = "../brane-exec" }
-failure = "0.1"
 futures = "0.3"
 log = "0.4"
 serde = "1.0"

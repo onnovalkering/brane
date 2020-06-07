@@ -22,7 +22,7 @@ pub trait Environment {
 
     fn remove(
         &mut self,
-        name: &str
+        name: &str,
     );
 
     fn child(&self) -> Box<dyn Environment>;

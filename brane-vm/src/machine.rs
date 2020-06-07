@@ -1,4 +1,5 @@
 use crate::environment::Environment;
+use anyhow::Result;
 use brane_exec::{docker, ExecuteInfo};
 use futures::executor::block_on;
 use serde_json::json;
@@ -6,7 +7,6 @@ use specifications::common::Value;
 use specifications::instructions::{Instruction, Instruction::*, Move, Move::*, Operator::*};
 use std::path::PathBuf;
 
-type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 ///
@@ -31,7 +31,7 @@ impl Machine {
     pub fn interpret(
         &mut self,
         instructions: Vec<Instruction>,
-    ) -> FResult<Option<Value>> {
+    ) -> Result<Option<Value>> {
         let cursor_max = instructions.len();
 
         self.cursor = 0;
@@ -69,7 +69,7 @@ impl Machine {
     fn handle_act(
         &mut self,
         instruction: Instruction,
-    ) -> FResult<Move> {
+    ) -> Result<Move> {
         let act = if let Act(act) = instruction {
             act
         } else {
@@ -120,7 +120,7 @@ impl Machine {
     fn handle_mov(
         &mut self,
         instruction: Instruction,
-    ) -> FResult<Move> {
+    ) -> Result<Move> {
         let mov = if let Mov(mov) = instruction {
             mov
         } else {
@@ -172,7 +172,7 @@ impl Machine {
     fn handle_sub(
         &mut self,
         instruction: Instruction,
-    ) -> FResult<Move> {
+    ) -> Result<Move> {
         let sub = if let Sub(sub) = instruction {
             sub
         } else {
@@ -201,7 +201,7 @@ impl Machine {
     fn handle_var(
         &mut self,
         instruction: Instruction,
-    ) -> FResult<Move> {
+    ) -> Result<Move> {
         let var = if let Var(var) = instruction {
             var
         } else {
