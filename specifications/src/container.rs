@@ -1,11 +1,11 @@
 use crate::common::{CallPattern, Parameter, Type};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::fs;
 use std::path::PathBuf;
 
 type Map<T> = std::collections::HashMap<String, T>;
-type FResult<T> = Result<T, failure::Error>;
 
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
@@ -29,13 +29,13 @@ pub struct ContainerInfo {
 
 #[allow(unused)]
 impl ContainerInfo {
-    pub fn from_path(path: PathBuf) -> FResult<ContainerInfo> {
+    pub fn from_path(path: PathBuf) -> Result<ContainerInfo> {
         let contents = fs::read_to_string(path)?;
 
         ContainerInfo::from_string(contents)
     }
 
-    pub fn from_string(contents: String) -> FResult<ContainerInfo> {
+    pub fn from_string(contents: String) -> Result<ContainerInfo> {
         let result = serde_yaml::from_str(&contents)?;
 
         Ok(result)
