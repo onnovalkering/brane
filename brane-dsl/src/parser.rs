@@ -1,3 +1,4 @@
+use anyhow::Result;
 use pest::iterators::Pair;
 use pest::Parser;
 use semver::Version;
@@ -7,7 +8,6 @@ use specifications::common::Value;
 #[grammar = "grammer/bakery.pest"]
 pub struct BakeryParser;
 
-type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 #[derive(Debug)]
@@ -76,7 +76,7 @@ impl AstTerm {
 ///
 ///
 ///
-pub fn parse(input: &str) -> FResult<Vec<AstNode>> {
+pub fn parse(input: &str) -> Result<Vec<AstNode>> {
     let mut ast = vec![];
 
     let pairs = BakeryParser::parse(Rule::program, &input)?;
@@ -99,7 +99,7 @@ pub fn parse(input: &str) -> FResult<Vec<AstNode>> {
 ///
 ///
 ///
-fn parse_array_rule(rule: Pair<Rule>) -> FResult<Vec<Value>> {
+fn parse_array_rule(rule: Pair<Rule>) -> Result<Vec<Value>> {
     let entries = rule.into_inner();
 
     let mut values = vec![];
@@ -113,7 +113,7 @@ fn parse_array_rule(rule: Pair<Rule>) -> FResult<Vec<Value>> {
 ///
 ///
 ///
-fn parse_assignment_rule(rule: Pair<Rule>) -> FResult<AstNode> {
+fn parse_assignment_rule(rule: Pair<Rule>) -> Result<AstNode> {
     let mut assignment = rule.into_inner();
 
     let name = assignment.next().unwrap().as_str().to_string();
@@ -130,7 +130,7 @@ fn parse_assignment_rule(rule: Pair<Rule>) -> FResult<AstNode> {
 ///
 ///
 ///
-fn parse_call_rule(rule: Pair<Rule>) -> FResult<AstNode> {
+fn parse_call_rule(rule: Pair<Rule>) -> Result<AstNode> {
     let call = rule.into_inner();
 
     let mut terms = vec![];
@@ -144,7 +144,7 @@ fn parse_call_rule(rule: Pair<Rule>) -> FResult<AstNode> {
 ///
 ///
 ///
-fn parse_condition_rule(rule: Pair<Rule>) -> FResult<AstNode> {
+fn parse_condition_rule(rule: Pair<Rule>) -> Result<AstNode> {
     let mut condition = rule.into_inner();
 
     let predicate = Box::new(parse_call_rule(condition.next().unwrap())?);
@@ -165,7 +165,7 @@ fn parse_condition_rule(rule: Pair<Rule>) -> FResult<AstNode> {
 ///
 ///
 ///
-fn parse_execution_rule(rule: Pair<Rule>) -> FResult<AstNode> {
+fn parse_execution_rule(rule: Pair<Rule>) -> Result<AstNode> {
     let execution = rule;
 
     match execution.as_rule() {
@@ -179,7 +179,7 @@ fn parse_execution_rule(rule: Pair<Rule>) -> FResult<AstNode> {
 ///
 ///
 ///
-fn parse_import_rule(rule: Pair<Rule>) -> FResult<AstNode> {
+fn parse_import_rule(rule: Pair<Rule>) -> Result<AstNode> {
     let mut import = rule.into_inner();
 
     let module = parse_string_rule(import.next().unwrap())?;
@@ -196,7 +196,7 @@ fn parse_import_rule(rule: Pair<Rule>) -> FResult<AstNode> {
 ///
 ///
 ///
-fn parse_literal_rule(rule: Pair<Rule>) -> FResult<Value> {
+fn parse_literal_rule(rule: Pair<Rule>) -> Result<Value> {
     let literal = rule.into_inner().next().unwrap();
 
     match literal.as_rule() {
@@ -211,14 +211,14 @@ fn parse_literal_rule(rule: Pair<Rule>) -> FResult<Value> {
 ///
 ///
 ///
-fn parse_name_rule(rule: Pair<Rule>) -> FResult<String> {
+fn parse_name_rule(rule: Pair<Rule>) -> Result<String> {
     Ok(rule.as_str().trim().to_string())
 }
 
 ///
 ///
 ///
-fn parse_object_rule(rule: Pair<Rule>) -> FResult<Map<Value>> {
+fn parse_object_rule(rule: Pair<Rule>) -> Result<Map<Value>> {
     let object = rule.into_inner();
 
     let mut properties = Map::<Value>::new();
@@ -237,7 +237,7 @@ fn parse_object_rule(rule: Pair<Rule>) -> FResult<Map<Value>> {
 ///
 ///
 ///
-fn parse_parameter_rule(rule: Pair<Rule>) -> FResult<AstNode> {
+fn parse_parameter_rule(rule: Pair<Rule>) -> Result<AstNode> {
     let mut parameter = rule.into_inner();
 
     let name = parameter.next().unwrap().as_str().to_string();
@@ -249,7 +249,7 @@ fn parse_parameter_rule(rule: Pair<Rule>) -> FResult<AstNode> {
 ///
 ///
 ///
-fn parse_repeat_rule(rule: Pair<Rule>) -> FResult<AstNode> {
+fn parse_repeat_rule(rule: Pair<Rule>) -> Result<AstNode> {
     let mut repeat = rule.into_inner();
 
     let predicate = Box::new(parse_call_rule(repeat.next().unwrap())?);
@@ -261,7 +261,7 @@ fn parse_repeat_rule(rule: Pair<Rule>) -> FResult<AstNode> {
 ///
 ///
 ///
-fn parse_string_rule(rule: Pair<Rule>) -> FResult<String> {
+fn parse_string_rule(rule: Pair<Rule>) -> Result<String> {
     let string = rule.into_inner().next().unwrap();
 
     match string.as_rule() {
@@ -274,14 +274,14 @@ fn parse_string_rule(rule: Pair<Rule>) -> FResult<String> {
 ///
 ///
 ///
-fn parse_symbol_rule(rule: Pair<Rule>) -> FResult<String> {
+fn parse_symbol_rule(rule: Pair<Rule>) -> Result<String> {
     Ok(rule.as_str().trim().to_string())
 }
 
 ///
 ///
 ///
-fn parse_term_rule(rule: Pair<Rule>) -> FResult<AstTerm> {
+fn parse_term_rule(rule: Pair<Rule>) -> Result<AstTerm> {
     let term = rule.into_inner().next().unwrap();
 
     match term.as_rule() {
@@ -295,7 +295,7 @@ fn parse_term_rule(rule: Pair<Rule>) -> FResult<AstTerm> {
 ///
 ///
 ///
-fn parse_terminate_rule(rule: Pair<Rule>) -> FResult<AstNode> {
+fn parse_terminate_rule(rule: Pair<Rule>) -> Result<AstNode> {
     let mut assignment = rule.into_inner();
 
     let terms = if let Some(call) = assignment.next() {
@@ -315,7 +315,7 @@ fn parse_terminate_rule(rule: Pair<Rule>) -> FResult<AstNode> {
 ///
 ///
 ///
-fn parse_value_rule(rule: Pair<Rule>) -> FResult<Value> {
+fn parse_value_rule(rule: Pair<Rule>) -> Result<Value> {
     let value = rule.into_inner().next().unwrap();
 
     match value.as_rule() {

@@ -5,8 +5,8 @@ authors = ["Onno Valkering"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0"
 appdirs = "0.2"
-failure = "0.1"
 itertools = "0.8"
 log = "0.4"
 pest = "2.0"

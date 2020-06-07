@@ -1,6 +1,7 @@
 use crate::functions::{self, FunctionPattern};
 use crate::indexes::PackageIndex;
 use crate::parser::{self, AstNode, AstTerm};
+use anyhow::Result;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use regex::Regex;
@@ -8,7 +9,6 @@ use semver::Version;
 use specifications::common::{Value, Variable};
 use specifications::instructions::*;
 
-type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 pub struct CompilerOptions {
@@ -20,18 +20,14 @@ impl CompilerOptions {
     ///
     ///
     pub fn default() -> Self {
-        CompilerOptions {
-            return_call: false,
-        }
+        CompilerOptions { return_call: false }
     }
 
     ///
     ///
     ///
     pub fn repl() -> Self {
-        CompilerOptions {
-            return_call: true,
-        }
+        CompilerOptions { return_call: true }
     }
 }
 
@@ -53,7 +49,7 @@ impl Compiler {
     pub fn new(
         options: CompilerOptions,
         package_index: PackageIndex,
-    ) -> FResult<Self> {
+    ) -> Result<Self> {
         let state = CompilerState {
             imports: vec![],
             variables: Map::<String>::new(),
@@ -72,7 +68,7 @@ impl Compiler {
     pub fn quick_compile(
         package_index: PackageIndex,
         input: &str,
-    ) -> FResult<Vec<Instruction>> {
+    ) -> Result<Vec<Instruction>> {
         let mut compiler = Compiler::new(CompilerOptions::default(), package_index)?;
         compiler.compile(input)
     }
@@ -83,7 +79,7 @@ impl Compiler {
     pub fn compile(
         &mut self,
         input: &str,
-    ) -> FResult<Vec<Instruction>> {
+    ) -> Result<Vec<Instruction>> {
         let ast = parser::parse(input)?;
         let mut instructions = vec![];
 
@@ -97,7 +93,7 @@ impl Compiler {
                     } else {
                         self.handle_call_node(terms)?
                     }
-                },
+                }
                 Parameter { name, complex } => self.handle_parameter_node(name, complex)?,
                 Repeat { predicate, exec } => self.handle_repeat_node(*predicate, *exec)?,
                 Terminate { terms } => self.handle_terminate_node(terms)?,
@@ -124,7 +120,7 @@ impl Compiler {
         &mut self,
         name: String,
         terms: Vec<AstTerm>,
-    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
+    ) -> Result<(Option<Variable>, Option<Instruction>)> {
         debug!("Handling assignment node: {:?}", terms);
 
         if terms.len() == 1 {
@@ -151,15 +147,18 @@ impl Compiler {
         &mut self,
         name: String,
         value: &AstTerm,
-    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
+    ) -> Result<(Option<Variable>, Option<Instruction>)> {
         let (value, data_type) = match value {
             AstTerm::Value(value) => (Some(value.clone()), value.data_type().to_string()),
             AstTerm::Name(variable) => {
                 let data_type = self.state.variables.get(variable).unwrap();
-                let value = Value::Pointer { variable: variable.clone(), data_type: data_type.clone() };
+                let value = Value::Pointer {
+                    variable: variable.clone(),
+                    data_type: data_type.clone(),
+                };
 
                 (Some(value.clone()), data_type.clone())
-            },
+            }
             _ => unreachable!(),
         };
 
@@ -176,7 +175,7 @@ impl Compiler {
         &mut self,
         name: String,
         terms: Vec<AstTerm>,
-    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
+    ) -> Result<(Option<Variable>, Option<Instruction>)> {
         let (instructions, data_type) = terms_to_instructions(terms, Some(name.clone()), &self.state)?;
         let subroutine = SubInstruction::new(instructions, Default::default());
 
@@ -191,7 +190,7 @@ impl Compiler {
     fn handle_call_node(
         &mut self,
         terms: Vec<AstTerm>,
-    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
+    ) -> Result<(Option<Variable>, Option<Instruction>)> {
         let (instructions, _) = terms_to_instructions(terms, None, &self.state)?;
         let subroutine = SubInstruction::new(instructions, Default::default());
 
@@ -205,7 +204,7 @@ impl Compiler {
         &mut self,
         module: String,
         version: Option<Version>,
-    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
+    ) -> Result<(Option<Variable>, Option<Instruction>)> {
         let package_info = self.package_index.get(&module, version.as_ref());
         if let Some(package_info) = package_info {
             let package_patterns = functions::get_module_patterns(package_info)?;
@@ -223,7 +222,7 @@ impl Compiler {
         &mut self,
         name: String,
         data_type: String,
-    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
+    ) -> Result<(Option<Variable>, Option<Instruction>)> {
         let data_type = match data_type.as_str() {
             "Boolean" => "boolean",
             "Integer" => "integer",
@@ -245,7 +244,7 @@ impl Compiler {
         &mut self,
         _predicate: AstNode,
         _exec: AstNode,
-    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
+    ) -> Result<(Option<Variable>, Option<Instruction>)> {
         unimplemented!();
     }
 
@@ -255,7 +254,7 @@ impl Compiler {
     fn handle_terminate_node(
         &mut self,
         terms: Option<Vec<AstTerm>>,
-    ) -> FResult<(Option<Variable>, Option<Instruction>)> {
+    ) -> Result<(Option<Variable>, Option<Instruction>)> {
         debug!("Terminate: {:?}", terms);
 
         // Always set a variable called 'terminate' in the local scope.
@@ -271,7 +270,7 @@ impl Compiler {
     fn set_terminate_variable_locally(
         &mut self,
         terms: Option<Vec<AstTerm>>,
-    ) -> FResult<(Vec<Instruction>, String)> {
+    ) -> Result<(Vec<Instruction>, String)> {
         let terminate = "terminate".to_string();
 
         if let Some(terms) = terms {
@@ -308,7 +307,7 @@ pub fn terms_to_instructions(
     terms: Vec<AstTerm>,
     result_var: Option<String>,
     state: &CompilerState,
-) -> FResult<(Vec<Instruction>, String)> {
+) -> Result<(Vec<Instruction>, String)> {
     let variables = state.variables.clone();
     let functions = state.imports.clone();
 
@@ -441,7 +440,7 @@ pub fn terms_to_instructions(
 fn build_terms_pattern(
     terms: Vec<AstTerm>,
     variables: &Map<String>,
-) -> FResult<String> {
+) -> Result<String> {
     let mut term_pattern_segments = vec![];
     for term in &terms {
         match term {

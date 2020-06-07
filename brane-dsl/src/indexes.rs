@@ -1,3 +1,4 @@
+use anyhow::Result;
 use semver::Version;
 use serde_json::Value as JValue;
 use specifications::package::PackageInfo;
@@ -5,7 +6,6 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 
-type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 #[derive(Debug)]
@@ -44,7 +44,7 @@ impl PackageIndex {
     ///
     ///
     ///
-    pub fn from_path(path: &PathBuf) -> FResult<Self> {
+    pub fn from_path(path: &PathBuf) -> Result<Self> {
         let file = File::open(path)?;
         let buf_reader = BufReader::new(file);
 
@@ -54,7 +54,7 @@ impl PackageIndex {
     ///
     ///
     ///
-    pub fn from_reader<R: Read>(r: R) -> FResult<Self> {
+    pub fn from_reader<R: Read>(r: R) -> Result<Self> {
         let v = serde_json::from_reader(r)?;
 
         PackageIndex::from_value(v)
@@ -63,7 +63,7 @@ impl PackageIndex {
     ///
     ///
     ///
-    pub fn from_value(v: JValue) -> FResult<Self> {
+    pub fn from_value(v: JValue) -> Result<Self> {
         let known_packages: Vec<PackageInfo> = serde_json::from_value(v)?;
 
         let mut packages = Map::<PackageInfo>::new();

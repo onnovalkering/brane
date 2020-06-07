@@ -1,8 +1,8 @@
+use anyhow::Result;
 use itertools::interleave;
 use specifications::common::{Function, Parameter};
 use specifications::package::PackageInfo;
 
-type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 #[derive(Clone, Debug)]
@@ -17,7 +17,7 @@ pub struct FunctionPattern {
 ///
 ///
 ///
-pub fn get_module_patterns(module: &PackageInfo) -> FResult<Vec<FunctionPattern>> {
+pub fn get_module_patterns(module: &PackageInfo) -> Result<Vec<FunctionPattern>> {
     let mut patterns = vec![];
 
     for (name, function) in module.functions.as_ref().unwrap().iter() {
@@ -46,11 +46,11 @@ pub fn get_module_patterns(module: &PackageInfo) -> FResult<Vec<FunctionPattern>
 ///
 ///
 ///
-fn build_pattern(function: &Function) -> FResult<String> {
+fn build_pattern(function: &Function) -> Result<String> {
     let mut pattern = vec![];
 
     if function.pattern.is_none() {
-        bail!("No function notation...");
+        return Err(anyhow!("Function doesn't have a call pattern."));
     }
 
     let notation = function.pattern.clone().unwrap();
