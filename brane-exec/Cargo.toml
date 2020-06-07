@@ -5,6 +5,7 @@ authors = ["Onno Valkering"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0"
 base64 = "0.12"
 bollard = "0.5"
 bytes = "0.5"

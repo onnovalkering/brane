@@ -1,5 +1,5 @@
 use crate::ExecuteRequest;
-use failure::Error;
+use anyhow::Result;
 use k8s_openapi::api::batch::v1::Job;
 use kube::api::{Api, PostParams};
 use kube::client::APIClient;
@@ -7,10 +7,11 @@ use kube::config;
 use serde_json::json;
 use std::env;
 
+
 ///
 ///
 ///
-pub async fn schedule(request: ExecuteRequest) -> Result<String, Error> {
+pub async fn schedule(request: ExecuteRequest) -> Result<String> {
     let identifier = request.identifier;
     let image = request.image;
     let options = request.options;

@@ -1,4 +1,5 @@
 use crate::ExecuteInfo;
+use anyhow::Result;
 use bollard::container::{
     Config, CreateContainerOptions, LogOutput, LogsOptions, RemoveContainerOptions, StartContainerOptions,
     WaitContainerOptions,
@@ -14,12 +15,10 @@ use tokio::stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use uuid::Uuid;
 
-type FResult<T> = Result<T, failure::Error>;
-
 ///
 ///
 ///
-pub async fn run_and_wait(exec: ExecuteInfo) -> FResult<(String, String)> {
+pub async fn run_and_wait(exec: ExecuteInfo) -> Result<(String, String)> {
     let docker = Docker::connect_with_local_defaults()?;
 
     // Import image if a image file was provided
@@ -71,7 +70,7 @@ pub async fn run_and_wait(exec: ExecuteInfo) -> FResult<(String, String)> {
 async fn create_and_start_container(
     docker: &Docker,
     exec: &ExecuteInfo,
-) -> FResult<String> {
+) -> Result<String> {
     // Generate unique (temporary) container name
     let name = Uuid::new_v4().to_string().chars().take(8).collect::<String>();
 
@@ -99,7 +98,7 @@ async fn create_and_start_container(
 async fn import_image(
     docker: &Docker,
     exec: &ExecuteInfo,
-) -> FResult<()> {
+) -> Result<()> {
     let image_file = &exec.image_file.clone().unwrap();
 
     // Abort, if image is already loaded

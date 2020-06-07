@@ -1,14 +1,14 @@
+use anyhow::Result;
 use openapiv3::{OpenAPI, Parameter, ReferenceOr};
 use serde_json::Value as JValue;
 
-type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 pub async fn execute(
     operation_id: String,
     arguments: Map<String>,
     oas_document: &OpenAPI,
-) -> FResult<JValue> {
+) -> Result<JValue> {
     let base_url = &oas_document
         .servers
         .first()
@@ -59,17 +59,10 @@ pub async fn execute(
         }
     }
 
-    let client = reqwest::Client::builder()
-        .user_agent("HTTPie/1.0.3")
-        .build()?;
-
+    let client = reqwest::Client::builder().user_agent("HTTPie/1.0.3").build()?;
 
     // Perform the requirest
-    let response = client.get(&operation_url)
-        .send()
-        .await?
-        .json::<JValue>()
-        .await?;
+    let response = client.get(&operation_url).send().await?.json::<JValue>().await?;
 
     Ok(response)
 }
