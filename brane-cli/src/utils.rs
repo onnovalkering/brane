@@ -1,14 +1,13 @@
+use anyhow::Result;
 use crc32fast::Hasher;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
-type FResult<T> = Result<T, failure::Error>;
-
 ///
 ///
 ///
-pub fn calculate_crc32(path: &PathBuf) -> FResult<u32> {
+pub fn calculate_crc32(path: &PathBuf) -> Result<u32> {
     let mut file = File::open(&path)?;
     let mut hasher = Hasher::new();
 
@@ -27,4 +26,15 @@ pub fn calculate_crc32(path: &PathBuf) -> FResult<u32> {
     }
 
     Ok(hasher.finalize())
+}
+
+///
+///
+///
+pub fn uppercase_first_letter(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().chain(c).collect(),
+    }
 }

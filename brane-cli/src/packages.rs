@@ -1,3 +1,4 @@
+use anyhow::Result;
 use chrono::Utc;
 use console::{pad_str, Alignment};
 use dialoguer::Confirm;
@@ -9,8 +10,6 @@ use specifications::package::PackageInfo;
 use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
-
-type FResult<T> = Result<T, failure::Error>;
 
 ///
 ///
@@ -27,7 +26,7 @@ pub fn get_packages_dir() -> PathBuf {
 pub fn get_package_dir(
     name: &str,
     version: Option<&str>,
-) -> FResult<PathBuf> {
+) -> Result<PathBuf> {
     let packages_dir = get_packages_dir();
     let package_dir = packages_dir.join(&name);
 
@@ -61,7 +60,7 @@ pub fn get_package_dir(
 ///
 ///
 ///
-pub fn list() -> FResult<()> {
+pub fn list() -> Result<()> {
     let packages_dir = get_packages_dir();
     if !packages_dir.exists() {
         println!("No packages found.");
@@ -125,7 +124,7 @@ pub fn remove(
     name: String,
     version: Option<String>,
     force: bool,
-) -> FResult<()> {
+) -> Result<()> {
     // Remove without confirmation if explicity stated package version.
     if let Some(version) = version {
         let package_dir = get_package_dir(&name, Some(&version))?;

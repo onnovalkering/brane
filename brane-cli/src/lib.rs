@@ -1,5 +1,5 @@
 #[macro_use]
-extern crate failure;
+extern crate anyhow;
 #[macro_use]
 extern crate log;
 #[macro_use]
@@ -15,25 +15,28 @@ pub mod repl;
 pub mod test;
 pub mod utils;
 
+use anyhow::Result;
 use semver::Version;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::Command;
 
-type FResult<T> = Result<T, failure::Error>;
-
 const MIN_DOCKER_VERSION: &str = "19.0.0";
 
 ///
 ///
 ///
-pub fn check_dependencies() -> FResult<()> {
+pub fn check_dependencies() -> Result<()> {
     let output = Command::new("docker").arg("--version").output()?;
     let version = String::from_utf8_lossy(&output.stdout[15..17]);
 
-    let version = Version::parse(&format!("{}.0.0", version)).unwrap();
-    ensure!(version >= Version::parse(MIN_DOCKER_VERSION)?);
+    let version = Version::parse(&format!("{}.0.0", version))?;
+    let minimum = Version::parse(MIN_DOCKER_VERSION)?;
+
+    if version < minimum {
+        return Err(anyhow!("Installed Docker doesn't meet the minimum requirement."));
+    }
 
     Ok(())
 }
@@ -44,7 +47,7 @@ pub fn check_dependencies() -> FResult<()> {
 pub fn determine_kind(
     context: &PathBuf,
     file: &PathBuf,
-) -> FResult<String> {
+) -> Result<String> {
     let file = String::from(file.as_os_str().to_string_lossy());
 
     if file.starts_with("container.y") {
@@ -68,5 +71,8 @@ pub fn determine_kind(
         return Ok(String::from("oas"));
     }
 
-    bail!("Cannot determine kind based on file.");
+    Err(anyhow!(
+        "Cannot determine target package kind based on: {:?}. Please use the --kind option.",
+        file
+    ))
 }

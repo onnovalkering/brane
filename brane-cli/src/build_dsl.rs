@@ -1,4 +1,5 @@
 use crate::{packages, registry};
+use anyhow::Result;
 use brane_dsl::compiler::Compiler;
 use console::style;
 use specifications::common::Function;
@@ -9,7 +10,6 @@ use std::io::prelude::*;
 use std::path::PathBuf;
 use yaml_rust::yaml::YamlLoader;
 
-type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 ///
@@ -18,7 +18,7 @@ type Map<T> = std::collections::HashMap<String, T>;
 pub async fn handle(
     context: PathBuf,
     file: PathBuf,
-) -> FResult<()> {
+) -> Result<()> {
     let dsl_file = context.join(file);
     let dsl_document = fs::read_to_string(&dsl_file)?;
 
@@ -46,7 +46,7 @@ pub async fn handle(
 fn generate_package_info(
     dsl_document: &str,
     _instructions: &[Instruction],
-) -> FResult<PackageInfo> {
+) -> Result<PackageInfo> {
     let yamls = YamlLoader::load_from_str(&dsl_document).unwrap();
     let info = yamls.first().expect("Document doesn't start with a info section");
 
@@ -87,7 +87,7 @@ fn prepare_directory(
     dsl_file: &PathBuf,
     package_info: &PackageInfo,
     package_dir: &PathBuf,
-) -> FResult<()> {
+) -> Result<()> {
     fs::create_dir_all(&package_dir)?;
 
     // Copy DSL document to package directory

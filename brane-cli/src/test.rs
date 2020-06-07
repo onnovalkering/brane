@@ -1,4 +1,5 @@
 use crate::packages;
+use anyhow::Result;
 use brane_exec::openapi;
 use brane_vm::{environment::InMemoryEnvironment, machine::Machine};
 use console::style;
@@ -21,7 +22,6 @@ use std::{
     str::FromStr,
 };
 
-type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 ///
@@ -30,7 +30,7 @@ type Map<T> = std::collections::HashMap<String, T>;
 pub async fn handle(
     name: String,
     version: Option<String>,
-) -> FResult<()> {
+) -> Result<()> {
     let version_or_latest = version.unwrap_or_else(|| String::from("latest"));
     let package_dir = packages::get_package_dir(&name, Some(&version_or_latest))?;
     ensure!(package_dir.exists(), "No package found.");
@@ -51,7 +51,7 @@ pub async fn handle(
 async fn test_oas(
     package_dir: PathBuf,
     package_info: PackageInfo,
-) -> FResult<()> {
+) -> Result<()> {
     let functions = package_info.functions.unwrap();
     let types = package_info.types.unwrap();
     let (function_name, arguments) = prompt_for_input(&functions, &types)?;
@@ -81,7 +81,7 @@ async fn test_oas(
 fn test_cwl(
     package_dir: PathBuf,
     package_info: PackageInfo,
-) -> FResult<()> {
+) -> Result<()> {
     let functions = package_info.functions.unwrap();
     let types = package_info.types.unwrap();
     let (_, arguments) = prompt_for_input(&functions, &types)?;
@@ -135,7 +135,7 @@ fn test_cwl(
 fn test_dsl(
     package_dir: PathBuf,
     _package_info: PackageInfo,
-) -> FResult<()> {
+) -> Result<()> {
     let instructions_file = package_dir.join("instructions.yml");
     ensure!(instructions_file.exists(), "No instructions found.");
 
@@ -168,7 +168,7 @@ fn test_dsl(
 fn test_dsl_preprocess_instructions(
     instructions: &mut Vec<Instruction>,
     arguments: &mut Map<Value>,
-) -> FResult<()> {
+) -> Result<()> {
     for instruction in instructions {
         match instruction {
             Instruction::Act(act) => {
@@ -211,7 +211,7 @@ fn test_dsl_preprocess_instructions(
 fn test_ecu(
     package_dir: PathBuf,
     package_info: PackageInfo,
-) -> FResult<()> {
+) -> Result<()> {
     let image_tag = format!("{}:{}", package_info.name, package_info.version);
     let image_file = package_dir.join("image.tar");
     ensure!(image_file.exists(), "No image found.");
@@ -257,7 +257,7 @@ fn test_ecu(
 fn prompt_for_input(
     functions: &Map<Function>,
     types: &Map<Type>,
-) -> FResult<(String, Map<String>)> {
+) -> Result<(String, Map<String>)> {
     let function_list: Vec<String> = functions.keys().map(|k| k.to_string()).collect();
     let index = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("The function the execute")

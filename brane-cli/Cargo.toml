@@ -5,6 +5,7 @@ authors = ["Onno Valkering"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0"
 appdirs = "0.2"
 brane-dsl = { path = "../brane-dsl" }
 brane-exec = { path = "../brane-exec" }
@@ -15,7 +16,6 @@ crc32fast = "1.2"
 cwl = { git = "https://github.com/onnovalkering/cwl-rs" }
 dialoguer = "0.6"
 env_logger = "0.7"
-failure = "0.1"
 flate2 = "1.0"
 fs_extra = "1.1"
 human-panic = "1.0"

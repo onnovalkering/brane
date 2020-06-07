@@ -1,4 +1,5 @@
-use crate::packages;
+use crate::{packages, utils};
+use anyhow::Result;
 use console::style;
 use openapiv3::OpenAPI;
 use openapiv3::{
@@ -11,7 +12,6 @@ use std::fs::{self, File};
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
 
-type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 ///
@@ -20,7 +20,7 @@ type Map<T> = std::collections::HashMap<String, T>;
 pub fn handle(
     context: PathBuf,
     file: PathBuf,
-) -> FResult<()> {
+) -> Result<()> {
     let oas_file = context.join(file);
     let oas_reader = BufReader::new(File::open(&oas_file)?);
     let oas_document: OpenAPI = serde_yaml::from_reader(oas_reader)?;
@@ -42,7 +42,7 @@ pub fn handle(
 ///
 ///
 ///
-fn create_package_info(oas_document: &OpenAPI) -> FResult<PackageInfo> {
+fn create_package_info(oas_document: &OpenAPI) -> Result<PackageInfo> {
     let name = oas_document.info.title.to_lowercase().replace(" ", "-");
     let version = oas_document.info.version.clone();
     let description = oas_document.info.description.clone();
@@ -64,7 +64,7 @@ fn create_package_info(oas_document: &OpenAPI) -> FResult<PackageInfo> {
 ///
 ///
 ///
-fn build_oas_functions(oas_document: &OpenAPI) -> FResult<(Map<Function>, Map<Type>)> {
+fn build_oas_functions(oas_document: &OpenAPI) -> Result<(Map<Function>, Map<Type>)> {
     let mut functions = Map::<Function>::new();
     let mut types = Map::<Type>::new();
 
@@ -100,7 +100,7 @@ fn build_oas_function(
     operation: &Operation,
     functions: &mut Map<Function>,
     types: &mut Map<Type>,
-) -> FResult<()> {
+) -> Result<()> {
     let name = if let Some(operation_id) = &operation.operation_id {
         operation_id.replace(" ", "-")
     } else {
@@ -161,7 +161,7 @@ fn build_oas_function(
         }
     }
 
-    let common_type_name = uppercase_first_letter(&name.replace("-", ""));
+    let common_type_name = utils::uppercase_first_letter(&name.replace("-", ""));
 
     let input_data_type = format!("{}Input", common_type_name);
     let input_type = Type {
@@ -188,21 +188,10 @@ fn build_oas_function(
 ///
 ///
 ///
-fn uppercase_first_letter(s: &str) -> String {
-    let mut c = s.chars();
-    match c.next() {
-        None => String::new(),
-        Some(f) => f.to_uppercase().chain(c).collect(),
-    }
-}
-
-///
-///
-///
 fn schema_to_properties(
     name: Option<String>,
     schema: &Schema,
-) -> FResult<Vec<Property>> {
+) -> Result<Vec<Property>> {
     let properties = match &schema.schema_kind {
         SchemaKind::Type(data_type) => match data_type {
             OType::Array(_) => unimplemented!(),
@@ -244,7 +233,7 @@ fn prepare_directory(
     oas_file: &PathBuf,
     package_info: &PackageInfo,
     package_dir: &PathBuf,
-) -> FResult<()> {
+) -> Result<()> {
     fs::create_dir_all(&package_dir)?;
 
     // Copy OAS document to package directory

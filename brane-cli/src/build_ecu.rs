@@ -1,4 +1,5 @@
 use crate::packages;
+use anyhow::Result;
 use console::style;
 use specifications::common::Function;
 use specifications::container::ContainerInfo;
@@ -10,7 +11,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
-type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 const INIT_URL: &str = "https://github.com/brane-ri/entrypoint/releases/download/v0.2.0/brane-init";
@@ -21,7 +21,7 @@ const INIT_URL: &str = "https://github.com/brane-ri/entrypoint/releases/download
 pub fn handle(
     context: PathBuf,
     file: PathBuf,
-) -> FResult<()> {
+) -> Result<()> {
     let container_info = ContainerInfo::from_path(context.join(file))?;
     let package_dir = packages::get_package_dir(&container_info.name, Some(&container_info.version))?;
 
@@ -45,7 +45,7 @@ pub fn handle(
 ///
 ///
 ///
-fn generate_package_info(container_info: &ContainerInfo) -> FResult<PackageInfo> {
+fn generate_package_info(container_info: &ContainerInfo) -> Result<PackageInfo> {
     // Construct function descriptions
     let mut functions = Map::<Function>::new();
     for (action_name, action) in &container_info.actions {
@@ -73,7 +73,7 @@ fn generate_package_info(container_info: &ContainerInfo) -> FResult<PackageInfo>
 ///
 ///
 ///
-fn generate_dockerfile(container_info: &ContainerInfo) -> FResult<String> {
+fn generate_dockerfile(container_info: &ContainerInfo) -> Result<String> {
     let mut contents = String::new();
     let base = container_info
         .base
@@ -134,7 +134,7 @@ fn prepare_directory(
     dockerfile: String,
     package_info: &PackageInfo,
     package_dir: &PathBuf,
-) -> FResult<()> {
+) -> Result<()> {
     fs::create_dir_all(&package_dir)?;
 
     // Write container.yml to package directory.
@@ -173,7 +173,9 @@ fn prepare_directory(
         .output()
         .expect("Couldn't run 'tar' command.");
 
-    ensure!(output.status.success(), "Failed to prepare workdir.");
+    if !output.status.success() {
+        return Err(anyhow!("Failed to prepare working directory archive."));
+    }
 
     let output = Command::new("rm")
         .arg("-rf")
@@ -182,7 +184,9 @@ fn prepare_directory(
         .output()
         .expect("Couldn't run 'rm' command.");
 
-    ensure!(output.status.success(), "Failed to prepare workdir.");
+    if !output.status.success() {
+        warn!("Failed to cleanup working directory.");
+    }
 
     Ok(())
 }
@@ -193,7 +197,7 @@ fn prepare_directory(
 fn build_ecu_image(
     package_dir: &PathBuf,
     tag: String,
-) -> FResult<()> {
+) -> Result<()> {
     let output = Command::new("docker")
         .arg("buildx")
         .arg("build")
@@ -206,7 +210,9 @@ fn build_ecu_image(
         .status()
         .expect("Couldn't run 'docker' command.");
 
-    ensure!(output.success(), "Failed to build ECU image.");
+    if !output.success() {
+        return Err(anyhow!("Failed to build ECU image."));
+    }
 
     Ok(())
 }

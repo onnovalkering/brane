@@ -1,5 +1,6 @@
 use crate::packages;
 use crate::utils;
+use anyhow::Result;
 use brane_dsl::indexes::PackageIndex;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
@@ -14,8 +15,6 @@ use std::io::prelude::*;
 use tar::Archive;
 use tokio::fs::File as TokioFile;
 use tokio_util::codec::{BytesCodec, FramedRead};
-
-type FResult<T> = Result<T, failure::Error>;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Package {
@@ -42,14 +41,14 @@ pub struct Package {
 pub fn login(
     _host: String,
     _username: String,
-) -> FResult<()> {
+) -> Result<()> {
     unimplemented!()
 }
 
 ///
 ///
 ///
-pub fn logout(_host: String) -> FResult<()> {
+pub fn logout(_host: String) -> Result<()> {
     unimplemented!()
 }
 
@@ -59,7 +58,7 @@ pub fn logout(_host: String) -> FResult<()> {
 pub async fn pull(
     name: String,
     version: Option<String>,
-) -> FResult<()> {
+) -> Result<()> {
     let version = version.expect("please provide version");
 
     let url = format!("http://127.0.0.1:8080/packages/{}/{}", name, version);
@@ -104,7 +103,7 @@ pub async fn pull(
 pub async fn push(
     name: String,
     version: String,
-) -> FResult<()> {
+) -> Result<()> {
     let package_dir = packages::get_package_dir(&name, Some(&version))?;
     let archive_filename = "archive.tar.gz";
     let archive_filepath = env::temp_dir().join(archive_filename);
@@ -143,7 +142,7 @@ pub async fn push(
 ///
 ///
 ///
-pub async fn search(term: String) -> FResult<()> {
+pub async fn search(term: String) -> Result<()> {
     let url = format!("http://127.0.0.1:8080/packages?t={}", term);
     let packages: Vec<Package> = reqwest::get(&url).await?.json().await?;
 
@@ -157,7 +156,7 @@ pub async fn search(term: String) -> FResult<()> {
 ///
 ///
 ///
-pub async fn get_package_index(online: bool) -> FResult<PackageIndex> {
+pub async fn get_package_index(online: bool) -> Result<PackageIndex> {
     let packages: JValue = if online {
         let url = "http://127.0.0.1:8080/packages";
         reqwest::get(url).await?.json().await?

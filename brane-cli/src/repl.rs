@@ -1,12 +1,11 @@
 use crate::registry;
+use anyhow::Result;
 use brane_dsl::compiler::{Compiler, CompilerOptions};
 use brane_vm::{environment::InMemoryEnvironment, machine::Machine};
 use linefeed::{Interface, ReadResult};
 use specifications::common::Value;
 
-type FResult<T> = Result<T, failure::Error>;
-
-pub async fn start() -> FResult<()> {
+pub async fn start() -> Result<()> {
     println!("Starting interactive session, press Ctrl+D to exit.\n");
 
     let interface = Interface::new("brane-repl")?;

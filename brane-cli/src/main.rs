@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate human_panic;
 
+use anyhow::Result;
 use brane::{build_cwl, build_dsl, build_ecu, build_oas, packages, registry, repl, test};
 use log::LevelFilter;
 use std::path::PathBuf;
@@ -90,7 +91,7 @@ enum SubCommand {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn main() -> Result<()> {
     let options = CLI::from_args();
 
     let mut logger = env_logger::builder();
@@ -115,36 +116,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         process::exit(1);
     }
 
+    match run(options).await {
+        Ok(_) => process::exit(0),
+        Err(error) => {
+            println!("An error occured."); // Anyhow
+            process::exit(1);
+        }
+    }
+}
+
+///
+///
+///
+async fn run(options: CLI) -> Result<()> {
     use SubCommand::*;
     match options.sub_command {
         Build { context, file, kind } => {
             let kind = if let Some(kind) = kind {
                 kind.to_lowercase()
             } else {
-                if let Ok(kind) = brane::determine_kind(&context, &file) {
-                    kind
-                } else {
-                    println!("Failed to infer the target package kind based on the provided file. Please use the --kind option.");
-                    process::exit(1);
-                }
+                brane::determine_kind(&context, &file)?
             };
 
             match kind.as_str() {
-                "cwl" => build_cwl::handle(context, file).unwrap(),
+                "cwl" => build_cwl::handle(context, file)?,
                 "dsl" => build_dsl::handle(context, file).await?,
-                "ecu" => build_ecu::handle(context, file).unwrap(),
-                "oas" => build_oas::handle(context, file).unwrap(),
+                "ecu" => build_ecu::handle(context, file)?,
+                "oas" => build_oas::handle(context, file)?,
                 _ => println!("Unsupported package kind: {}", kind),
             }
         }
         List {} => {
-            packages::list().unwrap();
+            packages::list()?;
         }
         Login { host, username } => {
-            registry::login(host, username).unwrap();
+            registry::login(host, username)?;
         }
         Logout { host } => {
-            registry::logout(host).unwrap();
+            registry::logout(host)?;
         }
         Pull { name, version } => {
             registry::pull(name, version).await?;
@@ -153,7 +162,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             registry::push(name, version).await?;
         }
         Remove { name, version, force } => {
-            packages::remove(name, version, force).unwrap();
+            packages::remove(name, version, force)?;
         }
         Repl {} => {
             repl::start().await?;
@@ -166,5 +175,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     }
 
-    process::exit(0);
+    Ok(())
 }

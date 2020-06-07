@@ -1,4 +1,5 @@
-use crate::packages;
+use crate::{packages, utils};
+use anyhow::Result;
 use console::style;
 use cwl::v11_clt::{CommandInputParameter, CommandInputParameterType, CommandLineToolInput, CommandLineToolInputType};
 use cwl::v11_clt::{
@@ -16,7 +17,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::{fs, fs::File};
 
-type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 ///
@@ -25,9 +25,9 @@ type Map<T> = std::collections::HashMap<String, T>;
 pub fn handle(
     context: PathBuf,
     file: PathBuf,
-) -> FResult<()> {
+) -> Result<()> {
     let cwl_file = context.join(file);
-    let cwl_document = CwlDocument::from_path(&cwl_file)?;
+    let cwl_document = CwlDocument::from_path(&cwl_file).unwrap();
 
     // Prepare package directory
     let package_info = create_package_info(&cwl_document)?;
@@ -46,7 +46,7 @@ pub fn handle(
 ///
 ///
 ///
-fn create_package_info(cwl_document: &CwlDocument) -> FResult<PackageInfo> {
+fn create_package_info(cwl_document: &CwlDocument) -> Result<PackageInfo> {
     let schema = cwl_document.get_schema_props();
     let name = schema.name.clone().expect("Please add s:name to your CWL document.");
     let version = schema
@@ -77,7 +77,7 @@ fn create_package_info(cwl_document: &CwlDocument) -> FResult<PackageInfo> {
 ///
 ///
 ///
-fn build_clt_function(clt: &CommandLineTool) -> FResult<(String, Function, Map<Type>)> {
+fn build_clt_function(clt: &CommandLineTool) -> Result<(String, Function, Map<Type>)> {
     let name = clt.label.clone().expect("Add label").to_lowercase();
 
     let inputs = if let CommandLineToolInput::ParameterMap(inputs) = &clt.inputs {
@@ -100,7 +100,7 @@ fn build_clt_function(clt: &CommandLineTool) -> FResult<(String, Function, Map<T
     }
 
     let input = Type {
-        name: format!("{}Input", uppercase_first_letter(name.as_str())),
+        name: format!("{}Input", utils::uppercase_first_letter(name.as_str())),
         properties: input_properties,
     };
 
@@ -112,7 +112,7 @@ fn build_clt_function(clt: &CommandLineTool) -> FResult<(String, Function, Map<T
     }
 
     let output = Type {
-        name: format!("{}Output", uppercase_first_letter(name.as_str())),
+        name: format!("{}Output", utils::uppercase_first_letter(name.as_str())),
         properties: output_properties,
     };
 
@@ -129,7 +129,7 @@ fn build_clt_function(clt: &CommandLineTool) -> FResult<(String, Function, Map<T
 ///
 ///
 ///
-fn build_wf_function(wf: &Workflow) -> FResult<(String, Function, Map<Type>)> {
+fn build_wf_function(wf: &Workflow) -> Result<(String, Function, Map<Type>)> {
     let name = wf.label.clone().expect("Add label").to_lowercase();
 
     let inputs = if let WorkflowInputs::ParameterMap(inputs) = &wf.inputs {
@@ -152,7 +152,7 @@ fn build_wf_function(wf: &Workflow) -> FResult<(String, Function, Map<Type>)> {
     }
 
     let input = Type {
-        name: format!("{}Input", uppercase_first_letter(name.as_str())),
+        name: format!("{}Input", utils::uppercase_first_letter(name.as_str())),
         properties: input_properties,
     };
 
@@ -164,7 +164,7 @@ fn build_wf_function(wf: &Workflow) -> FResult<(String, Function, Map<Type>)> {
     }
 
     let output = Type {
-        name: format!("{}Output", uppercase_first_letter(name.as_str())),
+        name: format!("{}Output", utils::uppercase_first_letter(name.as_str())),
         properties: output_properties,
     };
 
@@ -181,21 +181,10 @@ fn build_wf_function(wf: &Workflow) -> FResult<(String, Function, Map<Type>)> {
 ///
 ///
 ///
-fn uppercase_first_letter(s: &str) -> String {
-    let mut c = s.chars();
-    match c.next() {
-        None => String::new(),
-        Some(f) => f.to_uppercase().chain(c).collect(),
-    }
-}
-
-///
-///
-///
 fn construct_clt_input_prop(
     name: String,
     input_paramter: &CommandInputParameter,
-) -> FResult<Property> {
+) -> Result<Property> {
     let data_type = if let CommandInputParameterType::Type(r#type) = &input_paramter.r#type {
         if let CommandLineToolInputType::CwlType(cwl_type) = r#type {
             if let CwlType::Str(data_type) = cwl_type {
@@ -219,7 +208,7 @@ fn construct_clt_input_prop(
 fn construct_clt_output_prop(
     name: String,
     output_parameter: &CommandOutputParameter,
-) -> FResult<Property> {
+) -> Result<Property> {
     let data_type = if let CommandOutputParameterType::Type(r#type) = &output_parameter.r#type {
         if let CommandLineToolOutputType::CwlType(cwl_type) = r#type {
             if let CwlType::Str(data_type) = cwl_type {
@@ -243,7 +232,7 @@ fn construct_clt_output_prop(
 fn construct_wf_input_prop(
     name: String,
     input_paramter: &WorkflowInputParameter,
-) -> FResult<Property> {
+) -> Result<Property> {
     let data_type = if let WorkflowInputParameterType::Type(r#type) = &input_paramter.r#type {
         if let WorkflowInputType::CwlType(cwl_type) = r#type {
             if let CwlType::Str(data_type) = cwl_type {
@@ -267,7 +256,7 @@ fn construct_wf_input_prop(
 fn construct_wf_output_prop(
     name: String,
     output_parameter: &WorkflowOutputParameter,
-) -> FResult<Property> {
+) -> Result<Property> {
     let data_type = if let WorkflowOutputParameterType::Type(r#type) = &output_parameter.r#type {
         if let WorkflowOutputType::CwlType(cwl_type) = r#type {
             if let CwlType::Str(data_type) = cwl_type {
@@ -293,7 +282,7 @@ fn prepare_directory(
     cwl_file: &PathBuf,
     package_info: &PackageInfo,
     package_dir: &PathBuf,
-) -> FResult<()> {
+) -> Result<()> {
     fs::create_dir_all(&package_dir)?;
 
     // Copy CWL document(s) to package directory
