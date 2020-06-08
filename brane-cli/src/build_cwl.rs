@@ -1,23 +1,28 @@
 use crate::{packages, utils};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use console::style;
-use cwl::v11_clt::{CommandInputParameter, CommandInputParameterType, CommandLineToolInput, CommandLineToolInputType};
 use cwl::v11_clt::{
+    CommandInputParameter, CommandInputParameterType, CommandLineToolInput, CommandLineToolInputType,
     CommandLineToolOutput, CommandLineToolOutputType, CommandOutputParameter, CommandOutputParameterType,
 };
-use cwl::v11_cm::CwlType;
 use cwl::v11_wf::{
     WorkflowInputParameter, WorkflowInputParameterType, WorkflowInputType, WorkflowInputs, WorkflowOutputParameter,
     WorkflowOutputParameterType, WorkflowOutputType, WorkflowOutputs, WorkflowSteps,
 };
-use cwl::{v11::CwlDocument, v11_clt::CommandLineTool, v11_wf::Workflow};
-use specifications::common::{CallPattern, Function, Parameter, Property, Type};
+use cwl::{v11::CwlDocument, v11_clt::CommandLineTool, v11_cm::CwlType, v11_wf::Workflow, v11_cm::Any};
+use specifications::common::{CallPattern, Function, Parameter, Property, Value, Type};
 use specifications::package::PackageInfo;
-use std::io::Write;
+use std::fs::{self, File};
+use std::io::{BufReader, Write};
 use std::path::PathBuf;
-use std::{fs, fs::File};
 
 type Map<T> = std::collections::HashMap<String, T>;
+
+const CWL_ADD_NAME: &str = "Please add a name (s:name) to the CWL document.";
+const CWL_ADD_LABEL: &str = "Please add a function name (label) to the CWL document.";
+const CWL_ADD_VERSION: &str = "Please add a version (s:version) to the CWL document.";
+const CWL_ONLY_PMAP_INPUT: &str = "Only ParameterMap notation is supported for inputs.";
+const CWL_ONLY_PMAP_OUTPUT: &str = "Only ParameterMap notation is supported for outputs.";
 
 ///
 ///
@@ -27,7 +32,8 @@ pub fn handle(
     file: PathBuf,
 ) -> Result<()> {
     let cwl_file = context.join(file);
-    let cwl_document = CwlDocument::from_path(&cwl_file).unwrap();
+    let cwl_reader = BufReader::new(File::open(&cwl_file)?);
+    let cwl_document = CwlDocument::from_reader(cwl_reader).unwrap();
 
     // Prepare package directory
     let package_info = create_package_info(&cwl_document)?;
@@ -47,25 +53,14 @@ pub fn handle(
 ///
 ///
 fn create_package_info(cwl_document: &CwlDocument) -> Result<PackageInfo> {
-    let schema = cwl_document.get_schema_props();
-    let name = schema.name.clone().expect("Please add s:name to your CWL document.");
-    let version = schema
-        .version
-        .clone()
-        .expect("Please add s:version to your CWL document.");
+    let (name, version, description) = extract_metadata(&cwl_document)?;
 
-    let (function_name, function, types) = match cwl_document {
-        CwlDocument::CommandLineTool(clt) => build_clt_function(clt)?,
-        CwlDocument::Workflow(wf) => build_wf_function(wf)?,
-    };
-
-    let mut functions = Map::<Function>::new();
-    functions.insert(function_name, function);
+    let (functions, types) = build_cwl_functions(&cwl_document)?;
 
     let package_info = PackageInfo::new(
         name,
         version,
-        schema.description,
+        description,
         String::from("cwl"),
         Some(functions),
         Some(types),
@@ -77,106 +72,121 @@ fn create_package_info(cwl_document: &CwlDocument) -> Result<PackageInfo> {
 ///
 ///
 ///
-fn build_clt_function(clt: &CommandLineTool) -> Result<(String, Function, Map<Type>)> {
-    let name = clt.label.clone().expect("Add label").to_lowercase();
+fn extract_metadata(cwl_document: &CwlDocument) -> Result<(String, String, Option<String>)> {
+    let schema = cwl_document.get_schema_props();
 
-    let inputs = if let CommandLineToolInput::ParameterMap(inputs) = &clt.inputs {
-        inputs
+    let name = if let Some(name) = schema.name {
+        name
     } else {
-        bail!("Only ParameterMap notation is supported for inputs.");
+        return Err(anyhow!(CWL_ADD_NAME));
     };
 
-    let outputs = if let CommandLineToolOutput::ParameterMap(outputs) = &clt.outputs {
-        outputs
+    let version = if let Some(version) = schema.version {
+        version
     } else {
-        bail!("Only ParameterMap notation is supported for outputs.");
+        return Err(anyhow!(CWL_ADD_VERSION));
     };
 
-    // Construct custom input type
-    let mut input_properties = vec![];
-    for (key, value) in inputs.iter() {
-        let property = construct_clt_input_prop(key.to_string(), value)?;
-        input_properties.push(property);
-    }
+    let description = schema.description;
 
-    let input = Type {
-        name: format!("{}Input", utils::uppercase_first_letter(name.as_str())),
-        properties: input_properties,
-    };
+    Ok((name, version, description))
+}
 
-    // Construct custom output type
-    let mut output_properties = vec![];
-    for (key, value) in outputs.iter() {
-        let property = construct_clt_output_prop(key.to_string(), value)?;
-        output_properties.push(property);
-    }
-
-    let output = Type {
-        name: format!("{}Output", utils::uppercase_first_letter(name.as_str())),
-        properties: output_properties,
-    };
-
-    let parameter = Parameter::new(String::from("input"), input.name.clone(), Some(false), None);
-    let call_pattern = CallPattern::new(Some(name.to_lowercase()), None, None);
-    let function = Function::new(vec![parameter], Some(call_pattern), output.name.clone());
-
+fn build_cwl_functions(cwl_document: &CwlDocument) -> Result<(Map<Function>, Map<Type>)> {
+    let mut functions = Map::<Function>::new();
     let mut types = Map::<Type>::new();
-    types.insert(input.name.clone(), input);
-    types.insert(output.name.clone(), output);
 
-    Ok((name, function, types))
+    let (name, input_properties, output_properties) = match cwl_document {
+        CwlDocument::CommandLineTool(clt) => construct_clt_properties(clt)?,
+        CwlDocument::Workflow(wf) => construct_wf_properties(wf)?,
+    };
+
+    let type_name = utils::uppercase_first_letter(&name);
+
+    // Convert input properties to parameters
+    let input_parameters = if input_properties.len() > 3 {
+        let input_data_type = format!("{}Input", type_name);
+        let input_type = Type {
+            name: input_data_type.clone(),
+            properties: input_properties,
+        };
+        types.insert(input_data_type.clone(), input_type);
+
+        let input_parameter = Parameter::new(String::from("input"), input_data_type, None, None);
+        vec![input_parameter]
+    } else {
+        input_properties
+            .iter()
+            .map(|p| p.clone().into_parameter())
+            .collect::<Vec<Parameter>>()
+    };
+
+    // Convert output properties to return type
+    let return_type = if output_properties.len() > 1 {
+        let output_data_type = format!("{}Output", type_name);
+        let output_type = Type {
+            name: output_data_type.clone(),
+            properties: output_properties,
+        };
+
+        types.insert(output_data_type.clone(), output_type);
+        output_data_type
+    } else {
+        if let Some(output_property) = output_properties.first() {
+            output_property.data_type.clone()
+        } else {
+            String::from("unit")
+        }
+    };
+
+    // Construct function
+    let call_pattern = CallPattern::new(Some(name.to_lowercase()), None, None);
+    let function = Function::new(input_parameters, Some(call_pattern), return_type);
+    functions.insert(name.to_lowercase(), function);
+
+    Ok((functions, types))
 }
 
 ///
 ///
 ///
-fn build_wf_function(wf: &Workflow) -> Result<(String, Function, Map<Type>)> {
-    let name = wf.label.clone().expect("Add label").to_lowercase();
+fn construct_clt_properties(clt: &CommandLineTool) -> Result<(String, Vec<Property>, Vec<Property>)> {
+    let name = if let Some(label) = &clt.label {
+        utils::assert_valid_bakery_name(label).with_context(|| format!("Label '{}' is not valid.", label))?;
 
-    let inputs = if let WorkflowInputs::ParameterMap(inputs) = &wf.inputs {
+        label.clone()
+    } else {
+        return Err(anyhow!(CWL_ADD_LABEL));
+    };
+
+    let inputs = if let CommandLineToolInput::ParameterMap(inputs) = &clt.inputs {
         inputs
     } else {
-        bail!("Only ParameterMap notation is supported for workflow inputs.");
+        return Err(anyhow!(CWL_ONLY_PMAP_INPUT));
     };
 
-    let outputs = if let WorkflowOutputs::ParameterMap(outputs) = &wf.outputs {
+    let outputs = if let CommandLineToolOutput::ParameterMap(outputs) = &clt.outputs {
         outputs
     } else {
-        bail!("Only ParameterMap notation is supported for outputs.");
+        return Err(anyhow!(CWL_ONLY_PMAP_OUTPUT));
     };
 
-    // Construct custom input type
-    let mut input_properties = vec![];
-    for (key, value) in inputs.iter() {
-        let property = construct_wf_input_prop(key.to_string(), value)?;
+    let mut input_properties = Vec::<Property>::new();
+    let mut output_properties = Vec::<Property>::new();
+
+    // Construct input properties
+    for (p_name, p) in inputs.iter() {
+        let property = construct_clt_input_prop(p_name.to_string(), p)?;
         input_properties.push(property);
     }
 
-    let input = Type {
-        name: format!("{}Input", utils::uppercase_first_letter(name.as_str())),
-        properties: input_properties,
-    };
-
-    // Construct custom output type
-    let mut output_properties = vec![];
-    for (key, value) in outputs.iter() {
-        let property = construct_wf_output_prop(key.to_string(), value)?;
+    // Construct output properties
+    for (p_name, p) in outputs.iter() {
+        let property = construct_clt_output_prop(p_name.to_string(), p)?;
         output_properties.push(property);
     }
 
-    let output = Type {
-        name: format!("{}Output", utils::uppercase_first_letter(name.as_str())),
-        properties: output_properties,
-    };
-
-    let parameter = Parameter::new(String::from("input"), input.name.clone(), Some(false), None);
-    let function = Function::new(vec![parameter], None, output.name.clone());
-
-    let mut types = Map::<Type>::new();
-    types.insert(input.name.clone(), input);
-    types.insert(output.name.clone(), output);
-
-    Ok((name, function, types))
+    Ok((name, input_properties, output_properties))
 }
 
 ///
@@ -184,23 +194,23 @@ fn build_wf_function(wf: &Workflow) -> Result<(String, Function, Map<Type>)> {
 ///
 fn construct_clt_input_prop(
     name: String,
-    input_paramter: &CommandInputParameter,
+    input_parameter: &CommandInputParameter,
 ) -> Result<Property> {
-    let data_type = if let CommandInputParameterType::Type(r#type) = &input_paramter.r#type {
-        if let CommandLineToolInputType::CwlType(cwl_type) = r#type {
+    if let CommandInputParameterType::Type(p_type) = &input_parameter.r#type {
+        if let CommandLineToolInputType::CwlType(cwl_type) = p_type {
             if let CwlType::Str(data_type) = cwl_type {
-                data_type.to_owned()
-            } else {
-                bail!("Unsupported type for paramter: {}", name);
-            }
-        } else {
-            bail!("Unsupported type notation for paramter: {}", name);
-        }
-    } else {
-        bail!("Unsupported type notation for paramter: {}", name);
-    };
+                let default = if let Some(Any::Any(default)) = &input_parameter.default {
+                    default.as_str().map(|d| Value::Unicode(d.to_string()))
+                } else {
+                    None
+                };
 
-    Ok(Property::new(name, data_type, None, None, None, None))
+                return Ok(Property::new(name, data_type.to_string(), None, default, None, None));
+            }
+        }
+    }
+
+    Err(anyhow!("Unsupported type (notation) for parameter: {}", name))
 }
 
 ///
@@ -210,21 +220,56 @@ fn construct_clt_output_prop(
     name: String,
     output_parameter: &CommandOutputParameter,
 ) -> Result<Property> {
-    let data_type = if let CommandOutputParameterType::Type(r#type) = &output_parameter.r#type {
-        if let CommandLineToolOutputType::CwlType(cwl_type) = r#type {
+    if let CommandOutputParameterType::Type(p_type) = &output_parameter.r#type {
+        if let CommandLineToolOutputType::CwlType(cwl_type) = p_type {
             if let CwlType::Str(data_type) = cwl_type {
-                data_type.to_owned()
-            } else {
-                bail!("Unsupported type for paramter: {}", name);
+                return Ok(Property::new(name, data_type.to_string(), None, None, None, None));
             }
-        } else {
-            bail!("Unsupported type notation for paramter: {}", name);
         }
+    }
+
+    Err(anyhow!("Unsupported type (notation) for parameter: {}", name))
+}
+
+///
+///
+///
+fn construct_wf_properties(wf: &Workflow) -> Result<(String, Vec<Property>, Vec<Property>)> {
+    let name = if let Some(label) = &wf.label {
+        utils::assert_valid_bakery_name(label).with_context(|| format!("Label '{}' is not valid.", label))?;
+
+        label.clone()
     } else {
-        bail!("Unsupported type notation for paramter: {}", name);
+        return Err(anyhow!(CWL_ADD_LABEL));
     };
 
-    Ok(Property::new(name, data_type, None, None, None, None))
+    let inputs = if let WorkflowInputs::ParameterMap(inputs) = &wf.inputs {
+        inputs
+    } else {
+        return Err(anyhow!(CWL_ONLY_PMAP_INPUT));
+    };
+
+    let outputs = if let WorkflowOutputs::ParameterMap(outputs) = &wf.outputs {
+        outputs
+    } else {
+        return Err(anyhow!(CWL_ONLY_PMAP_OUTPUT));
+    };
+
+    // Construct input properties
+    let mut input_properties = vec![];
+    for (p_name, p) in inputs.iter() {
+        let property = construct_wf_input_prop(p_name.to_string(), p)?;
+        input_properties.push(property);
+    }
+
+    // Construct output properties
+    let mut output_properties = vec![];
+    for (p_name, p) in outputs.iter() {
+        let property = construct_wf_output_prop(p_name.to_string(), p)?;
+        output_properties.push(property);
+    }
+
+    Ok((name, input_properties, output_properties))
 }
 
 ///
@@ -234,21 +279,15 @@ fn construct_wf_input_prop(
     name: String,
     input_paramter: &WorkflowInputParameter,
 ) -> Result<Property> {
-    let data_type = if let WorkflowInputParameterType::Type(r#type) = &input_paramter.r#type {
-        if let WorkflowInputType::CwlType(cwl_type) = r#type {
+    if let WorkflowInputParameterType::Type(p_type) = &input_paramter.r#type {
+        if let WorkflowInputType::CwlType(cwl_type) = p_type {
             if let CwlType::Str(data_type) = cwl_type {
-                data_type.to_owned()
-            } else {
-                bail!("Unsupported type for paramter: {}", name);
+                return Ok(Property::new(name, data_type.to_string(), None, None, None, None));
             }
-        } else {
-            bail!("Unsupported type notation for paramter: {}", name);
         }
-    } else {
-        bail!("Unsupported type notation for paramter: {}", name);
-    };
+    }
 
-    Ok(Property::new(name, data_type, None, None, None, None))
+    Err(anyhow!("Unsupported type (notation) for parameter: {}", name))
 }
 
 ///
@@ -258,21 +297,15 @@ fn construct_wf_output_prop(
     name: String,
     output_parameter: &WorkflowOutputParameter,
 ) -> Result<Property> {
-    let data_type = if let WorkflowOutputParameterType::Type(r#type) = &output_parameter.r#type {
-        if let WorkflowOutputType::CwlType(cwl_type) = r#type {
+    if let WorkflowOutputParameterType::Type(p_type) = &output_parameter.r#type {
+        if let WorkflowOutputType::CwlType(cwl_type) = p_type {
             if let CwlType::Str(data_type) = cwl_type {
-                data_type.to_owned()
-            } else {
-                bail!("Unsupported type for paramter: {}", name);
+                return Ok(Property::new(name, data_type.to_string(), None, None, None, None));
             }
-        } else {
-            bail!("Unsupported type notation for paramter: {}", name);
         }
-    } else {
-        bail!("Unsupported type notation for paramter: {}", name);
-    };
+    }
 
-    Ok(Property::new(name, data_type, None, None, None, None))
+    Err(anyhow!("Unsupported type (notation) for parameter: {}", name))
 }
 
 ///
@@ -301,7 +334,7 @@ fn prepare_directory(
                     fs::copy(run_file, package_dir.join(run_file))?;
                 }
             } else {
-                bail!("Can't find workfow step file: {:?}", run_file);
+                return Err(anyhow!("Can't find workfow step file: {:?}", run_file));
             }
         }
     }
