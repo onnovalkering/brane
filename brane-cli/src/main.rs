@@ -29,6 +29,14 @@ enum SubCommand {
         kind: Option<String>,
     },
 
+    #[structopt(name = "inspect", about = "Inspect a package")]
+    Inspect {
+        #[structopt(name = "NAME", help = "Name of the package")]
+        name: String,
+        #[structopt(name = "VERSION", help = "Version of the package", default_value = "latest")]
+        version: String,
+    },
+
     #[structopt(name = "list", about = "List packages")]
     List {},
 
@@ -145,6 +153,9 @@ async fn run(options: CLI) -> Result<()> {
                 "oas" => build_oas::handle(context, file)?,
                 _ => println!("Unsupported package kind: {}", kind),
             }
+        }
+        Inspect { name, version } => {
+            packages::inspect(name, version)?;
         }
         List {} => {
             packages::list()?;

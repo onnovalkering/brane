@@ -36,7 +36,9 @@ pub fn get_package_dir(
 
     let version = version.unwrap();
     let version = if version == "latest" {
-        ensure!(package_dir.exists(), "Package does not exist.");
+        if !package_dir.exists() {
+            return Err(anyhow!("Package not found."));
+        }
 
         let versions = fs::read_dir(&package_dir)?;
         let mut versions: Vec<Version> = versions
@@ -55,6 +57,25 @@ pub fn get_package_dir(
     };
 
     Ok(package_dir.join(version))
+}
+
+///
+///
+///
+pub fn inspect(
+    name: String,
+    version: String,
+) -> Result<()> {
+    let package_dir = get_package_dir(&name, Some(version).as_deref())?;
+    let package_file = package_dir.join("package.yml");
+
+    if let Ok(package_info) = PackageInfo::from_path(package_file) {
+        println!("{:#?}", package_info);
+    } else {
+        return Err(anyhow!("Failed to read package information."));
+    }
+
+    Ok(())
 }
 
 ///

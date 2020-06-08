@@ -11,7 +11,7 @@ use cwl::v11_wf::{
     WorkflowOutputParameterType, WorkflowOutputType, WorkflowOutputs, WorkflowSteps,
 };
 use cwl::{v11::CwlDocument, v11_clt::CommandLineTool, v11_wf::Workflow};
-use specifications::common::{Function, CallPattern, Parameter, Property, Type};
+use specifications::common::{CallPattern, Function, Parameter, Property, Type};
 use specifications::package::PackageInfo;
 use std::io::Write;
 use std::path::PathBuf;

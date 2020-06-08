@@ -6,7 +6,7 @@ use openapiv3::{
     Operation, Parameter as OParameter, ParameterSchemaOrContent, ReferenceOr, Schema, SchemaKind, Type as OType,
 };
 use serde_yaml;
-use specifications::common::{Function, CallPattern, Parameter, Property, Type};
+use specifications::common::{CallPattern, Function, Parameter, Property, Type};
 use specifications::package::PackageInfo;
 use std::fs::{self, File};
 use std::io::{BufReader, Write};
@@ -177,7 +177,6 @@ fn build_oas_function(
     };
 
     types.insert(output_data_type.clone(), output_type);
-
 
     let input_parameter = Parameter::new(String::from("input"), input_data_type, None, None);
     let call_pattern = CallPattern::new(Some(name.to_lowercase()), None, None);
