@@ -9,7 +9,7 @@ servers:
 paths:
   '/repos/{owner}/{repo}/readme':
     get:
-      operationId: getReadme
+      operationId: getreadme
       parameters:
         - name: owner
           in: path

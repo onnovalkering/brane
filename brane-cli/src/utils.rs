@@ -38,3 +38,16 @@ pub fn uppercase_first_letter(s: &str) -> String {
         Some(f) => f.to_uppercase().chain(c).collect(),
     }
 }
+
+///
+///
+///
+pub fn assert_valid_bakery_name(s: &str) -> Result<()> {
+    if s.chars().all(|c| c.is_alphanumeric() || c == '_') {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "Invalid name. Must consist only of alphanumeric and/or _ characters."
+        ))
+    }
+}
