@@ -1,5 +1,5 @@
 [package]
-name = "brane"
+name = "brane-cli"
 version = "0.1.0"
 authors = ["Onno Valkering"]
 edition = "2018"

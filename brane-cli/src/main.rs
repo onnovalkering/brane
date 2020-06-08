@@ -2,7 +2,7 @@
 extern crate human_panic;
 
 use anyhow::Result;
-use brane::{build_cwl, build_dsl, build_ecu, build_oas, packages, registry, repl, test};
+use brane_cli::{build_cwl, build_dsl, build_ecu, build_oas, packages, registry, repl, test};
 use log::LevelFilter;
 use std::path::PathBuf;
 use std::process;
@@ -110,7 +110,7 @@ async fn main() -> Result<()> {
         });
     }
 
-    let deps_check = brane::check_dependencies();
+    let deps_check = brane_cli::check_dependencies();
     if deps_check.is_err() {
         println!("Dependency not found: Docker (version >= 19.0.0).");
         process::exit(1);
@@ -135,7 +135,7 @@ async fn run(options: CLI) -> Result<()> {
             let kind = if let Some(kind) = kind {
                 kind.to_lowercase()
             } else {
-                brane::determine_kind(&context, &file)?
+                brane_cli::determine_kind(&context, &file)?
             };
 
             match kind.as_str() {
