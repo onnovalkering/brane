@@ -11,7 +11,7 @@ use cwl::v11_wf::{
     WorkflowOutputParameterType, WorkflowOutputType, WorkflowOutputs, WorkflowSteps,
 };
 use cwl::{v11::CwlDocument, v11_clt::CommandLineTool, v11_wf::Workflow};
-use specifications::common::{Function, Parameter, Property, Type};
+use specifications::common::{Function, CallPattern, Parameter, Property, Type};
 use specifications::package::PackageInfo;
 use std::io::Write;
 use std::path::PathBuf;
@@ -117,7 +117,8 @@ fn build_clt_function(clt: &CommandLineTool) -> Result<(String, Function, Map<Ty
     };
 
     let parameter = Parameter::new(String::from("input"), input.name.clone(), Some(false), None);
-    let function = Function::new(vec![parameter], None, output.name.clone());
+    let call_pattern = CallPattern::new(Some(name.to_lowercase()), None, None);
+    let function = Function::new(vec![parameter], Some(call_pattern), output.name.clone());
 
     let mut types = Map::<Type>::new();
     types.insert(input.name.clone(), input);

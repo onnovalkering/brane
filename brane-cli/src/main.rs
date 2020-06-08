@@ -119,7 +119,7 @@ async fn main() -> Result<()> {
     match run(options).await {
         Ok(_) => process::exit(0),
         Err(error) => {
-            println!("An error occured."); // Anyhow
+            println!("{:?}", error); // Anyhow
             process::exit(1);
         }
     }
