@@ -1,11 +1,11 @@
 ---
 layout: default
-title: 1. Creating packages
-parent: Tutorial
+title: 1. Packages
+parent: Guide
 nav_order: 1
 ---
 
-# 1.    Creating packages
+# 1. Packages
 For now, you only need to have the [Brane CLI](/brane/installation#cli) installed.
 
 In this part of the tutorial we'll create and test packages, one of each supported kind. In the next part we'll use these packages to develop a workflow. Please note that the functionality of these packages is already provided by Brane's [standard library](/brane/references/standard-library). The kind of packages that are supported:
