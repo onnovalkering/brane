@@ -104,6 +104,9 @@ pub struct Property {
 }
 
 impl Property {
+    ///
+    ///
+    ///
     pub fn new(
         name: String,
         data_type: String,
@@ -120,6 +123,13 @@ impl Property {
             properties,
             secret,
         }
+    }
+
+    ///
+    ///
+    ///
+    pub fn into_parameter(self) -> Parameter {
+        Parameter::new(self.name, self.data_type, self.optional, self.default)
     }
 }
 
