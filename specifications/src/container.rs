@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::fs;
 use std::path::PathBuf;
+use std::io::Read;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -35,9 +36,13 @@ impl ContainerInfo {
         ContainerInfo::from_string(contents)
     }
 
+    pub fn from_reader<R: Read>(r: R) -> Result<ContainerInfo> {
+        let result = serde_yaml::from_reader(r)?;
+        Ok(result)
+    }
+
     pub fn from_string(contents: String) -> Result<ContainerInfo> {
         let result = serde_yaml::from_str(&contents)?;
-
         Ok(result)
     }
 }
