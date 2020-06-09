@@ -7,13 +7,17 @@ use specifications::package::PackageInfo;
 use std::fmt::Write as FmtWrite;
 use std::fs;
 use std::fs::File;
-use std::io::Write;
+use std::io::{BufReader, Write};
 use std::path::PathBuf;
 use std::process::Command;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
-const INIT_URL: &str = "https://github.com/brane-ri/entrypoint/releases/download/v0.2.0/brane-init";
+const INIT_URL: &str = concat!(
+    "https://github.com/onnovalkering/brane/releases/download/",
+    concat!("v", env!("CARGO_PKG_VERSION")),
+    "/brane-init"
+);
 
 ///
 ///
@@ -22,16 +26,18 @@ pub fn handle(
     context: PathBuf,
     file: PathBuf,
 ) -> Result<()> {
-    let container_info = ContainerInfo::from_path(context.join(file))?;
-    let package_dir = packages::get_package_dir(&container_info.name, Some(&container_info.version))?;
+    let ecu_file = context.join(file);
+    let ecu_reader = BufReader::new(File::open(&ecu_file)?);
+    let ecu_document = ContainerInfo::from_reader(ecu_reader)?;
 
     // Prepare package directory
-    let dockerfile = generate_dockerfile(&container_info)?;
-    let package_info = generate_package_info(&container_info)?;
-    prepare_directory(&container_info, dockerfile, &package_info, &package_dir)?;
+    let dockerfile = generate_dockerfile(&ecu_document)?;
+    let package_info = generate_package_info(&ecu_document)?;
+    let package_dir = packages::get_package_dir(&package_info.name, Some(&package_info.version))?;
+    prepare_directory(&ecu_document, dockerfile, &package_info, &package_dir)?;
 
     // Build ECU image
-    let tag = format!("{}:{}", container_info.name, container_info.version);
+    let tag = format!("{}:{}", ecu_document.name, ecu_document.version);
     build_ecu_image(&package_dir, tag)?;
 
     println!(
@@ -73,9 +79,9 @@ fn generate_package_info(container_info: &ContainerInfo) -> Result<PackageInfo> 
 ///
 ///
 ///
-fn generate_dockerfile(container_info: &ContainerInfo) -> Result<String> {
+fn generate_dockerfile(ecu_document: &ContainerInfo) -> Result<String> {
     let mut contents = String::new();
-    let base = container_info
+    let base = ecu_document
         .base
         .clone()
         .unwrap_or_else(|| String::from("ubuntu:20.04"));
@@ -85,7 +91,7 @@ fn generate_dockerfile(container_info: &ContainerInfo) -> Result<String> {
     writeln!(contents, "FROM {}", base)?;
 
     // Add environemt variables
-    if let Some(environment) = &container_info.environment {
+    if let Some(environment) = &ecu_document.environment {
         for (key, value) in environment {
             writeln!(contents, "ENV {}={}", key, value)?;
         }
@@ -102,7 +108,7 @@ fn generate_dockerfile(container_info: &ContainerInfo) -> Result<String> {
     } else {
         write!(contents, "RUN apt-get update && apt-get install -y ")?;
     }
-    if let Some(dependencies) = &container_info.dependencies {
+    if let Some(dependencies) = &ecu_document.dependencies {
         for dependency in dependencies {
             write!(contents, "{} ", dependency)?;
         }
@@ -115,7 +121,7 @@ fn generate_dockerfile(container_info: &ContainerInfo) -> Result<String> {
     writeln!(contents, "WORKDIR /opt/wd")?;
 
     // Add installation
-    if let Some(install) = &container_info.install {
+    if let Some(install) = &ecu_document.install {
         for line in install {
             writeln!(contents, "RUN {}", line)?;
         }
@@ -130,7 +136,7 @@ fn generate_dockerfile(container_info: &ContainerInfo) -> Result<String> {
 ///
 ///
 fn prepare_directory(
-    container_info: &ContainerInfo,
+    ecu_document: &ContainerInfo,
     dockerfile: String,
     package_info: &PackageInfo,
     package_dir: &PathBuf,
@@ -139,7 +145,7 @@ fn prepare_directory(
 
     // Write container.yml to package directory.
     let mut buffer = File::create(&package_dir.join("container.yml"))?;
-    write!(buffer, "{}", serde_yaml::to_string(&container_info)?)?;
+    write!(buffer, "{}", serde_yaml::to_string(&ecu_document)?)?;
 
     // Write Dockerfile to package directory
     let mut buffer = File::create(package_dir.join("Dockerfile"))?;
@@ -151,7 +157,7 @@ fn prepare_directory(
 
     // Create the working directory and copy required files.
     let wd = package_dir.join("wd");
-    if let Some(files) = &container_info.files {
+    if let Some(files) = &ecu_document.files {
         for file in files {
             let wd_path = wd.join(file);
             if let Some(parent) = wd_path.parent() {
