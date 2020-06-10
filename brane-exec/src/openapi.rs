@@ -1,12 +1,13 @@
 use anyhow::Result;
 use openapiv3::{OpenAPI, Parameter, ReferenceOr};
 use serde_json::Value as JValue;
+use specifications::common::Value;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
 pub async fn execute(
     operation_id: String,
-    arguments: Map<String>,
+    arguments: Map<Value>,
     oas_document: &OpenAPI,
 ) -> Result<JValue> {
     let base_url = &oas_document
@@ -50,7 +51,12 @@ pub async fn execute(
                 Parameter::Path { parameter_data, .. } => {
                     let name = &parameter_data.name;
                     let value = arguments.get(name).expect("Missing argument.");
-                    operation_url = operation_url.replace(&format!("{{{}}}", name), &value);
+                    match value {
+                        Value::Unicode(value) => {
+                            operation_url = operation_url.replace(&format!("{{{}}}", name), &value);
+                        },
+                        _ => unimplemented!()
+                    }
                 }
                 _ => unimplemented!(),
             }

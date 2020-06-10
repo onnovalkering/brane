@@ -2,7 +2,7 @@ use crate::ExecuteInfo;
 use anyhow::Result;
 use bollard::container::{
     Config, CreateContainerOptions, LogOutput, LogsOptions, RemoveContainerOptions, StartContainerOptions,
-    WaitContainerOptions,
+    WaitContainerOptions, HostConfig
 };
 use bollard::errors::Error;
 use bollard::image::ImportImageOptions;
@@ -47,8 +47,8 @@ pub async fn run_and_wait(exec: ExecuteInfo) -> Result<(String, String)> {
 
     for log_output in log_outputs {
         match log_output {
-            LogOutput::StdErr { message } => stderr = message.clone(),
-            LogOutput::StdOut { message } => stdout = message.clone(),
+            LogOutput::StdErr { message } => stderr.push_str(&format!("{}\n", message)),
+            LogOutput::StdOut { message } => stdout.push_str(&format!("{}\n", message)),
             _ => unreachable!(),
         }
     }
@@ -73,14 +73,18 @@ async fn create_and_start_container(
 ) -> Result<String> {
     // Generate unique (temporary) container name
     let name = Uuid::new_v4().to_string().chars().take(8).collect::<String>();
-
     let create_options = CreateContainerOptions { name: &name };
-    let payload = base64::encode(serde_json::to_string(&exec.payload)?);
-    let command = vec![String::from("exec"), payload];
+
+    let host_config = HostConfig {
+        binds: exec.mounts.clone(),
+        ..Default::default()
+    };
 
     let create_config = Config {
         image: Some(exec.image.clone()),
-        cmd: Some(command),
+        cmd: exec.command.clone(),
+        working_dir: exec.working_dir.clone(),
+        host_config: Some(host_config),
         ..Default::default()
     };
 

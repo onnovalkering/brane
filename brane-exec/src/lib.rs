@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JValue;
 use std::path::PathBuf;
 
 pub mod docker;
@@ -10,9 +9,11 @@ pub mod openapi;
 ///
 #[derive(Deserialize, Serialize)]
 pub struct ExecuteInfo {
+    pub command: Option<Vec<String>>,
     pub image: String,
     pub image_file: Option<PathBuf>,
-    pub payload: JValue,
+    pub mounts: Option<Vec<String>>,
+    pub working_dir: Option<String>,
 }
 
 impl ExecuteInfo {
@@ -22,12 +23,16 @@ impl ExecuteInfo {
     pub fn new(
         image: String,
         image_file: Option<PathBuf>,
-        payload: JValue,
+        mounts: Option<Vec<String>>,
+        working_dir: Option<String>,
+        command: Option<Vec<String>>,
     ) -> Self {
         ExecuteInfo {
+            command,
             image,
             image_file,
-            payload,
+            mounts,
+            working_dir,
         }
     }
 }
