@@ -94,7 +94,16 @@ impl Machine {
             "arguments": arguments,
         });
 
-        let exec = ExecuteInfo::new(image.clone(), image_file, payload);
+        let command = vec![base64::encode(serde_json::to_string(&payload)?)];
+
+        let exec = ExecuteInfo::new(
+            image.clone(),
+            image_file,
+            None,
+            None,
+            Some(command),
+        );
+
         let (stdout, stderr) = block_on(docker::run_and_wait(exec))?;
         if stderr.len() > 0 {
             error!("{}", stderr);

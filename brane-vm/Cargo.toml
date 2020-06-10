@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
+base64 = "0.12"
 brane-exec = { path = "../brane-exec" }
 futures = "0.3"
 log = "0.4"
