@@ -174,7 +174,7 @@ impl Value {
             Pointer { data_type, .. } => data_type.as_str(),
             Real(_) => "real",
             Struct { data_type, .. } => data_type.as_str(),
-            Unicode(_) => "unicode",
+            Unicode(_) => "string",
             Unit => "unit",
         }
     }
