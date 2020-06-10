@@ -6,7 +6,6 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
-base64 = "0.12"
 bollard = "0.5"
 bytes = "0.5"
 env_logger = "0.7"
@@ -25,3 +24,6 @@ specifications = { path = "../specifications" }
 tokio = { version = "0.2", features = ["full"] }
 tokio-util = "0.3"
 uuid = { version = "0.4", features = ["v4"] }
+
+[dev-dependencies]
+base64 = "0.12"
