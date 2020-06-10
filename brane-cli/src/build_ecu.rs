@@ -1,12 +1,11 @@
 use crate::packages;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use console::style;
 use specifications::common::Function;
 use specifications::container::ContainerInfo;
 use specifications::package::PackageInfo;
 use std::fmt::Write as FmtWrite;
-use std::fs;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
 use std::process::Command;
@@ -26,6 +25,9 @@ pub fn handle(
     context: PathBuf,
     file: PathBuf,
 ) -> Result<()> {
+    let context = fs::canonicalize(context)?;
+    debug!("Using {:?} as build context", context);
+
     let ecu_file = context.join(file);
     let ecu_reader = BufReader::new(File::open(&ecu_file)?);
     let ecu_document = ContainerInfo::from_reader(ecu_reader)?;
@@ -34,17 +36,20 @@ pub fn handle(
     let dockerfile = generate_dockerfile(&ecu_document)?;
     let package_info = generate_package_info(&ecu_document)?;
     let package_dir = packages::get_package_dir(&package_info.name, Some(&package_info.version))?;
-    prepare_directory(&ecu_document, dockerfile, &package_info, &package_dir)?;
+    prepare_directory(&ecu_document, dockerfile, &context, &package_info, &package_dir)?;
+
+    debug!("Successfully prepared package directory.");
 
     // Build ECU image
     let tag = format!("{}:{}", ecu_document.name, ecu_document.version);
     build_ecu_image(&package_dir, tag)?;
 
     println!(
-        "Successfully build ECU package ({}): {}",
-        &package_info.version,
+        "Successfully built version {} of ECU package {}.",
+        style(&package_info.version).bold().cyan(),
         style(&package_info.name).bold().cyan(),
     );
+
     Ok(())
 }
 
@@ -138,10 +143,12 @@ fn generate_dockerfile(ecu_document: &ContainerInfo) -> Result<String> {
 fn prepare_directory(
     ecu_document: &ContainerInfo,
     dockerfile: String,
+    context: &PathBuf,
     package_info: &PackageInfo,
     package_dir: &PathBuf,
 ) -> Result<()> {
     fs::create_dir_all(&package_dir)?;
+    debug!("Created {:?} as package directory", package_dir);
 
     // Write container.yml to package directory.
     let mut buffer = File::create(&package_dir.join("container.yml"))?;
@@ -166,7 +173,10 @@ fn prepare_directory(
                 }
             }
 
-            fs::copy(file, &wd_path)?;
+            let file_path = context.join(file);
+            fs::copy(&file_path, &wd_path)
+                .with_context(|| format!("Couldn't find {:?} within the build context.", file_path))?;
+            debug!("Copied {:?} to working directory", file_path);
         }
     }
 
