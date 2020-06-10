@@ -1,6 +1,9 @@
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value as JValue};
 use serde_with::skip_serializing_none;
 use std::cmp::{Ordering, PartialEq, PartialOrd};
+use std::fmt::{self, Display, Formatter};
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -173,6 +176,83 @@ impl Value {
             Struct { data_type, .. } => data_type.as_str(),
             Unicode(_) => "unicode",
             Unit => "unit",
+        }
+    }
+
+    ///
+    ///
+    ///
+    pub fn as_bool(&self) -> Result<bool> {
+        if let Value::Boolean(b) = self {
+            Ok(b.clone())
+        } else {
+            Err(anyhow!("Value does not contain a boolean."))
+        }
+    }
+
+    ///
+    ///
+    ///
+    pub fn as_f64(&self) -> Result<f64> {
+        if let Value::Real(f) = self {
+            Ok(f.clone())
+        } else {
+            Err(anyhow!("Value does not contain a real (float)."))
+        }
+    }
+
+    ///
+    ///
+    ///
+    pub fn as_i64(&self) -> Result<i64> {
+        if let Value::Integer(i) = self {
+            Ok(i.clone())
+        } else {
+            Err(anyhow!("Value does not contain an integer."))
+        }
+    }
+
+    ///
+    ///
+    ///
+    pub fn as_string(&self) -> Result<String> {
+        if let Value::Unicode(s) = self {
+            Ok(s.clone())
+        } else {
+            Err(anyhow!("Value does not contain a string."))
+        }
+    }
+
+    ///
+    ///
+    ///
+    pub fn as_json(&self) -> JValue {
+        use Value::*;
+        match self {
+            Array { .. } => unimplemented!(),
+            Boolean(b) => json!(b),
+            Integer(i) => json!(i),
+            Pointer { .. } => unimplemented!(),
+            Real(r) => json!(r),
+            Struct { .. } => unimplemented!(),
+            Unicode(s) => json!(s),
+            Unit => json!(null),
+        }
+    }
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        use Value::*;
+        match self {
+            Array { .. } => unimplemented!(),
+            Boolean(value) => write!(f, "{}", value),
+            Integer(value) => write!(f, "{}", value),
+            Pointer { .. } => unimplemented!(),
+            Real(value) => write!(f, "{}", value),
+            Struct { .. } => unimplemented!(),
+            Unicode(value) => write!(f, "{}", value),
+            Unit => write!(f, "()"),
         }
     }
 }
