@@ -1,11 +1,9 @@
 use crate::environment::Environment;
+use brane_exec::delegate;
 use anyhow::Result;
-use brane_exec::{docker, ExecuteInfo};
-use futures::executor::block_on;
-use serde_json::json;
 use specifications::common::Value;
+use futures::executor::block_on;
 use specifications::instructions::{Instruction, Instruction::*, Move, Move::*, Operator::*};
-use std::path::PathBuf;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -80,44 +78,53 @@ impl Machine {
 
         // Prepare arguments
         let mut arguments = Map::<Value>::new();
-        for (name, _) in act.input {
-            let value = self.environment.get(&name);
-            arguments.insert(name, value);
+        for (name, value) in &act.input {
+            match &value {
+                Value::Pointer { variable, .. } => {
+                    if variable.contains(".") {
+                        let segments: Vec<_> = variable.split(".").collect();
+                        let arch_value = self.environment.get(segments[0]);
+
+                        if let Value::Struct { properties, .. } = arch_value {
+                            if let Some(value) = properties.get(segments[1]) {
+                                arguments.insert(name.clone(), value.clone());
+                            } else {
+                                panic!("Trying to access undeclared variable.");
+                            }
+                        }
+                    } else {
+                        let value = self.environment.get(variable);
+                        arguments.insert(name.clone(), value);
+                    }
+                },
+                _ => unimplemented!()
+            }
         }
 
-        // Prepare payload
-        let image = act.meta.get("image").expect("Missing `image` metadata property");
-        let image_file = act.meta.get("image_file").map(PathBuf::from);
-        let payload = json!({
-            "identifier": "1+1",
-            "action": act.name,
-            "arguments": arguments,
-        });
-
-        let command = vec![base64::encode(serde_json::to_string(&payload)?)];
-
-        let exec = ExecuteInfo::new(
-            image.clone(),
-            image_file,
-            None,
-            None,
-            Some(command),
-        );
-
-        let (stdout, stderr) = block_on(docker::run_and_wait(exec))?;
-        if stderr.len() > 0 {
-            error!("{}", stderr);
-        }
+        let kind = act.meta.get("kind").expect("Missing `kind` metadata property.");
+        let output = match kind.as_str() {
+            "cwl" => delegate::exec_cwl(&act, arguments)?,
+            "ecu" => block_on(delegate::exec_ecu(&act, arguments))?,
+            "oas" => block_on(delegate::exec_oas(&act, arguments))?,
+            _ => unreachable!(),
+        };
 
         if let Some(ref assignment) = act.assignment {
-            let output: Map<Value> = serde_json::from_str(&stdout).unwrap();
-            let value = output.get("c").unwrap();
+            let output = output.expect("Missing output.");
 
-            if value.data_type() != act.data_type.unwrap() {
-                bail!("Data types don't match!");
+            // Assert that types match
+            let actual_type = output.data_type();
+            let expected_type = act.data_type.expect("Missing `data_type` property.");
+
+            if actual_type != expected_type {
+                return Err(anyhow!(
+                    "Type assertion failed. Expected '{}', but was '{}'.",
+                    expected_type,
+                    actual_type
+                ));
             }
 
-            self.environment.set(assignment, value);
+            self.environment.set(assignment, &output);
         }
 
         Ok(Forward)
