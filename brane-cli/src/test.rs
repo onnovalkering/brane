@@ -1,6 +1,6 @@
 use crate::packages;
 use anyhow::Result;
-use brane_exec::{docker, ExecuteInfo, openapi};
+use brane_exec::{docker, openapi, ExecuteInfo};
 use brane_vm::{environment::InMemoryEnvironment, machine::Machine};
 use console::style;
 use dialoguer::theme::ColorfulTheme;
@@ -89,21 +89,15 @@ async fn test_cwl(
     let mounts = vec![
         String::from("/var/run/docker.sock:/var/run/docker.sock"),
         String::from("/tmp:/tmp"),
-        format!("{}:{}", working_dir_str, working_dir_str)
+        format!("{}:{}", working_dir_str, working_dir_str),
     ];
     let command = vec![
         String::from("--quiet"),
         String::from("document.cwl"),
-        String::from("input.json")
+        String::from("input.json"),
     ];
 
-    let exec = ExecuteInfo::new(
-        image,
-        None,
-        Some(mounts),
-        Some(working_dir_str),
-        Some(command),
-    );
+    let exec = ExecuteInfo::new(image, None, Some(mounts), Some(working_dir_str), Some(command));
 
     let (stdout, stderr) = docker::run_and_wait(exec).await?;
     if stderr.len() > 0 {
@@ -143,13 +137,17 @@ fn test_dsl(
     let mut machine = Machine::new(Box::new(environment));
     let output = machine.interpret(instructions)?;
 
-    if let Some(value) = output {
-        if let Value::Pointer { variable, .. } = value {
-            let value = machine.environment.get(&variable);
-            println!("\n{:?}", value);
+    let output = output.map(|o| if let Value::Pointer { variable, .. } = o {
+            machine.environment.get(&variable)
         } else {
-            println!("\n{:?}", value);
+            o
         }
+    );
+
+
+    if let Some(value) = output {
+        println!();
+        println!("{}:\n{}\n", style("output").bold().cyan(), value);
     }
 
     Ok(())
@@ -167,12 +165,25 @@ fn test_dsl_preprocess_instructions(
             Instruction::Act(act) => {
                 let name = act.meta.get("name").expect("No `name` property in metadata.");
                 let version = act.meta.get("version").expect("No `version` property in metadata.");
+                let kind = act.meta.get("kind").expect("No `kind` property in metadata.");
 
                 let package_dir = packages::get_package_dir(&name, Some(version))?;
-                let image_file = package_dir.join("image.tar");
-                if image_file.exists() {
-                    act.meta
-                        .insert(String::from("image_file"), String::from(image_file.to_string_lossy()));
+                match kind.as_str() {
+                    "ecu" => {
+                        let image_file = package_dir.join("image.tar");
+                        if image_file.exists() {
+                            act.meta
+                                .insert(String::from("image_file"), String::from(image_file.to_string_lossy()));
+                        }
+                    },
+                    "oas" => {
+                        let oas_file = package_dir.join("document.yml");
+                        if oas_file.exists() {
+                            act.meta
+                                .insert(String::from("oas_file"), String::from(oas_file.to_string_lossy()));
+                        }
+                    },
+                    _ => {}
                 }
             }
             Instruction::Sub(sub) => {
@@ -184,7 +195,7 @@ fn test_dsl_preprocess_instructions(
                         "boolean" => Value::Boolean(prompt_var(&get.name, &get.data_type)?),
                         "integer" => Value::Integer(prompt_var(&get.name, &get.data_type)?),
                         "real" => Value::Real(prompt_var(&get.name, &get.data_type)?),
-                        "unicode" => Value::Unicode(prompt_var(&get.name, &get.data_type)?),
+                        "string" => Value::Unicode(prompt_var(&get.name, &get.data_type)?),
                         _ => unimplemented!(),
                     };
 
@@ -217,6 +228,8 @@ async fn test_ecu(
         "arguments": arguments,
     });
     let command = vec![String::from("exec"), base64::encode(serde_json::to_string(&payload)?)];
+    debug!("{:?}", command);
+
     let exec = ExecuteInfo::new(image, image_file, None, None, Some(command));
 
     let (stdout, stderr) = docker::run_and_wait(exec).await?;
@@ -232,7 +245,6 @@ async fn test_ecu(
     Ok(())
 }
 
-
 ///
 ///
 ///
@@ -247,7 +259,7 @@ async fn test_oas(
     let oas_reader = BufReader::new(File::open(&package_dir.join("document.yml"))?);
     let oas_document: OpenAPI = serde_yaml::from_reader(oas_reader)?;
 
-    let json = openapi::execute(function_name.clone(), arguments, &oas_document).await?;
+    let json = openapi::execute(&function_name, arguments, &oas_document).await?;
 
     let function = functions.get(&function_name).unwrap();
     let output_type = types.get(&function.return_type).unwrap();
@@ -328,7 +340,7 @@ fn prompt_for_input(
                             }
                             _ => {
                                 return Err(anyhow!(NESTED_OBJ_NOT_SUPPORTED));
-                            },
+                            }
                         };
 
                         properties.insert(p.name.clone(), value);
@@ -336,12 +348,12 @@ fn prompt_for_input(
 
                     Value::Struct {
                         data_type: input_type.name.clone(),
-                        properties
+                        properties,
                     }
                 } else {
                     return Err(anyhow!("Unsupported parameter type: {}", data_type));
                 }
-            },
+            }
         };
 
         arguments.insert(p.name.clone(), value);
