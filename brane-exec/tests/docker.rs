@@ -9,14 +9,20 @@ async fn name() {
     let image_file = PathBuf::from("./resources/arithmetic.tar");
     let mounts = None;
     let working_dir = None;
-    let command = vec![String::from("exec"), base64::encode(serde_json::to_string(&json!({
-        "identifier": "test",
-        "action": "add",
-        "arguments": {
-            "a": 1,
-            "b": 1,
-        },
-    })).unwrap())];
+    let command = vec![
+        String::from("exec"),
+        base64::encode(
+            serde_json::to_string(&json!({
+                "identifier": "test",
+                "action": "add",
+                "arguments": {
+                    "a": 1,
+                    "b": 1,
+                },
+            }))
+            .unwrap(),
+        ),
+    ];
 
     let exec_info = ExecuteInfo::new(image, Some(image_file), mounts, working_dir, Some(command));
     let (stdout, _) = run_and_wait(exec_info).await.unwrap();

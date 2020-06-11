@@ -1,8 +1,8 @@
 use crate::ExecuteInfo;
 use anyhow::Result;
 use bollard::container::{
-    Config, CreateContainerOptions, LogOutput, LogsOptions, RemoveContainerOptions, StartContainerOptions,
-    WaitContainerOptions, HostConfig
+    Config, CreateContainerOptions, HostConfig, LogOutput, LogsOptions, RemoveContainerOptions, StartContainerOptions,
+    WaitContainerOptions,
 };
 use bollard::errors::Error;
 use bollard::image::ImportImageOptions;
