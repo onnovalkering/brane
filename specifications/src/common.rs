@@ -165,6 +165,46 @@ impl Value {
     ///
     ///
     ///
+    pub fn from_json(value: &JValue) -> Self {
+        match value {
+            JValue::Null => Value::Unit,
+            JValue::Bool(b) => Value::Boolean(b.clone()),
+            JValue::Number(n) => {
+                if n.is_i64() {
+                    Value::Integer(n.as_i64().unwrap())
+                } else {
+                    Value::Real(n.as_f64().unwrap())
+                }
+            },
+            JValue::String(s) => Value::Unicode(s.clone()),
+            JValue::Array(a) => {
+                let entries: Vec<Value> = a.iter().map(|v| Value::from_json(v)).collect();
+                let data_type = format!("{}[]", entries.first().unwrap().data_type());
+
+                Value::Array {
+                    data_type,
+                    entries
+                }
+            },
+            JValue::Object(o) => {
+                let mut properties = Map::<Value>::new();
+                let data_type = String::from("anonymous");
+
+                for (name, jvalue) in o.iter() {
+                    properties.insert(name.clone(), Value::from_json(jvalue));
+                }
+
+                Value::Struct {
+                    data_type,
+                    properties
+                }
+            }
+        }
+    }
+
+    ///
+    ///
+    ///
     pub fn data_type(&self) -> &str {
         use Value::*;
         match self {
@@ -239,10 +279,15 @@ impl Value {
             Unit => json!(null),
         }
     }
+
+
 }
 
 impl Display for Value {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut Formatter,
+    ) -> fmt::Result {
         use Value::*;
         match self {
             Array { .. } => unimplemented!(),
