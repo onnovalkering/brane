@@ -6,7 +6,7 @@ use rand::distributions::Alphanumeric;
 use rand::Rng;
 use regex::Regex;
 use semver::Version;
-use specifications::common::{Value, Variable};
+use specifications::common::{Value, Variable, Type, Property};
 use specifications::instructions::*;
 
 type Map<T> = std::collections::HashMap<String, T>;
@@ -34,6 +34,7 @@ impl CompilerOptions {
 pub struct CompilerState {
     pub imports: Vec<FunctionPattern>,
     pub variables: Map<String>,
+    pub types: Map<Type>,
 }
 
 pub struct Compiler {
@@ -53,6 +54,7 @@ impl Compiler {
         let state = CompilerState {
             imports: vec![],
             variables: Map::<String>::new(),
+            types: Map::<Type>::new(),
         };
 
         Ok(Compiler {
@@ -206,10 +208,18 @@ impl Compiler {
         version: Option<Version>,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
         let package_info = self.package_index.get(&module, version.as_ref());
+
         if let Some(package_info) = package_info {
             let package_patterns = functions::get_module_patterns(package_info)?;
             self.state.imports.extend(package_patterns);
+
+            if let Some(types) = &package_info.types {
+                for (n, t) in types.iter() {
+                    self.state.types.insert(n.clone(), t.clone());
+                }
+            }
         } else {
+            unreachable!();
         }
 
         Ok((None, None))
@@ -313,15 +323,15 @@ pub fn terms_to_instructions(
 
     debug!("Variables: {:?}", &variables);
 
-    let mut term_pattern = build_terms_pattern(terms, &variables)?;
+    let mut term_pattern = build_terms_pattern(terms, &variables, &state.types)?;
 
     // This regex will match consecutive value placeholders (e.g. <integer>), if
     // the start and end of the regex capture group corresponds to the start and
     // end of the target pattern, then all unknown terms are eliminated.
-    let placeholders_regex = Regex::new(r"(?:(?:<(?:\w+):(?:[a-zA-Z]+(?:\[\])*)>))+").unwrap();
+    let placeholders_regex = Regex::new(r"(?:(?:<(?:[\.\w]+):(?:[a-zA-Z]+(?:\[\])*)>))+").unwrap();
 
     // Same as above, but just match one, so we can iterate over placeholders.
-    let placeholder_regex = Regex::new(r"<(?:(\w+)):([a-zA-Z]+(?:\[\])*)>").unwrap();
+    let placeholder_regex = Regex::new(r"<(?:([\.\w]+)):([a-zA-Z]+(?:\[\])*)>").unwrap();
 
     // We use temporary variables to hold values between function calls. If we
     // consume a temporary variable, we can directly reuse it again.
@@ -440,17 +450,43 @@ pub fn terms_to_instructions(
 fn build_terms_pattern(
     terms: Vec<AstTerm>,
     variables: &Map<String>,
+    types: &Map<Type>,
 ) -> Result<String> {
     let mut term_pattern_segments = vec![];
     for term in &terms {
         match term {
             AstTerm::Name(name) => {
-                if let Some(complex) = variables.get(name) {
-                    let segment = format!("<{}:{}>", name, complex);
-                    term_pattern_segments.push(segment);
+                if name.contains(".") {
+                    let segments: Vec<_> = name.split(".").collect();
+                    if let Some(arch_type) = variables.get(segments[0]) {
+                        debug!("Resolving {} within type {}", name, arch_type);
+
+                        if let Some(arch_type) = types.get(arch_type) {
+                            // TODO: use hashmap in Type struct
+                            let mut properties = Map::<Property>::new();
+                            for p in &arch_type.properties {
+                                properties.insert(p.name.clone(), p.clone());
+                            }
+
+                            if let Some(p) = properties.get(segments[1]) {
+                                let segment = format!("<{}:{}>", name, p.data_type);
+                                term_pattern_segments.push(segment);
+
+                                continue;
+                            }
+                        }
+                    }
                 } else {
-                    term_pattern_segments.push(name.to_string());
+                    if let Some(data_type) = variables.get(name) {
+                        let segment = format!("<{}:{}>", name, data_type);
+                        term_pattern_segments.push(segment);
+
+                        continue;
+                    }
                 }
+
+                // If the above attempt(s) faile, just add the name.
+                term_pattern_segments.push(name.to_string());
             }
             AstTerm::Symbol(symbol) => {
                 term_pattern_segments.push(symbol.to_string());

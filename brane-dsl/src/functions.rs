@@ -71,7 +71,7 @@ fn build_pattern(function: &Function) -> Result<String> {
                 data_type
             };
 
-            format!("<\\w+:({})>", data_type)
+            format!("<[\\.\\w]+:({})>", data_type)
         })
         .collect();
 
