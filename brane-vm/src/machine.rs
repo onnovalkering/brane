@@ -97,7 +97,9 @@ impl Machine {
                         arguments.insert(name.clone(), value);
                     }
                 },
-                _ => unimplemented!()
+                _ => {
+                    arguments.insert(name.clone(), value.clone());
+                }
             }
         }
 
