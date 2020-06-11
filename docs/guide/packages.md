@@ -6,9 +6,9 @@ nav_order: 1
 ---
 
 # 1. Packages
-For now, you only need to have the [Brane CLI](/brane/installation#cli) installed.
+To create packages, you (only) need to have the [Brane CLI](/brane/installation#cli) installed.
 
-In this part of the tutorial we'll create and test packages, one of each supported kind. In the next part we'll use these packages to develop a workflow. Please note that the functionality of these packages is already provided by Brane's [standard library](/brane/references/standard-library). The kind of packages that are supported:
+In this part of the guide we'll create and test packages, one of each supported kind. In the next part we'll use these packages as workflow building blocks. Note that the functionality of the packages created here is already provided by Brane's [standard library](/brane/references/standard-library). The supported kind of packages are:
 
 | Kind  | Description                                     | 
 |:------|:------------------------------------------------|
@@ -19,8 +19,10 @@ In this part of the tutorial we'll create and test packages, one of each support
 
 For more information about the concepts behind packages, please see the [architecture](/brane/#architecture) section.
 
+The source code of the packages can be found in the [examples](https://github.com/onnovalkering/brane/tree/master/examples/wordcount) directory of the GitHub repository.
+
 ## Download a README file
-The first package we'll create is an OAS package exposing a single function that retreives a README file from a GitHub repository. We build this package based on the following description (OpenAPI):
+The first package we'll create is an OAS package exposing a single function that retreives a README file from a GitHub repository. This package is build based on the following description (OpenAPI):
 
 ```yaml
 openapi: 3.0.0
@@ -67,49 +69,81 @@ Assuming the API description is saved as `github.yml`, the package can be build 
 $ brane build github.yml
 ```
 
-Packages can be tested locally, by using the `test` command:
+Packages can be tested locally using the `test` command:
 
 ![test](/brane/assets/img/test.gif)
 
 ## Perform Base64 decoding
-As you can see, the README file in the created package is returned as a Base64-encoded string. We need a package that can perform Base64 decoding. We'll use the following CWL document:
-
+The retreived README files are Base64-encoded. We need a package than can perform Base64 decoding so we can read them. We'll make an ECU package based on the following two files:
 ```yaml
-$base: "https://w3id.org/cwl/cwl#"
+name: base64
+version: 1.0.0
+kind: compute
 
-$namespaces:
-  s: "http://schema.org/"
+dependencies:
+  - python3
+  - python3-yaml
 
-s:name: 'base64'
-s:description: 'Simple Base64 decoding tool.'
-s:version: '1.0.0'
+files:
+  - run.py
 
-cwlVersion: v1.0
-class: CommandLineTool
-label: base64
-baseCommand: "echo"
-requirements:
-  - class: ShellCommandRequirement
+entrypoint:
+  kind: task
+  exec: run.py
 
-inputs:
-  input:
-    type: string
-    inputBinding:
-      position: 1
-  pipe:
-    type: string
-    default: '| base64 -d'
-    inputBinding:
-      shellQuote: false
-      position: 2
+actions:
+  'b64decode':
+    command:
+      args:
+        - decode
+    pattern:
+      prefix: b64decode
+    input:
+      - type: string
+        name: input
+    output:
+      - type: string
+        name: output
 
-outputs:
-  output:
-    type: stdout
+  'b64encode':
+    command:
+      args:
+        - encode
+    pattern:
+      prefix: b64encode
+    input:
+      - type: string
+        name: input
+    output:
+      - type: string
+        name: output
 ```
-Assuming the workflow description is saved as `base64.cwl`, the package can be build using:
+```python
+#!/usr/bin/env python3
+import base64
+import os
+import sys
+import yaml
+
+command = sys.argv[1]
+argument = os.environ['INPUT']
+
+
+functions = {
+    "encode": lambda x: base64.b64encode(x.encode("UTF-8")).decode("UTF-8"),
+    "decode": lambda x: base64.b64decode(x).decode("UTF-8"),
+}
+
+if __name__ == "__main__":
+    argument = argument.replace("\n", "")
+    output = functions[command](argument)
+
+    print(yaml.dump({"output": output}))
+```
+
+Conventionally, ECU descriptions are saved as `container.yml`. Thus we build the package using:
 ```shell
-$ brane build base64.cwl
+$ brane build container.yml
 ```
 
 ## Combine download and decoding
@@ -121,12 +155,12 @@ name: getreadme
 version: 1.0.0
 ---
 import "github"
-import "b64decode"
+import "base64"
 
 owner := ?? as String
 repo := ?? as String
 
-readme = getreadme owner repo
+readme := getreadme owner repo
 return b64decode readme.content
 ```
 Assuming the DSL script is saved as `readme.bk`, the package can be build using:
@@ -134,5 +168,37 @@ Assuming the DSL script is saved as `readme.bk`, the package can be build using:
 $ brane build readme.bk
 ```
 
-## Split text and count words
-... ECU
+## Cowsay
+The last package is a simple CWL package that calls `cowsay`:
+
+```yaml
+$base: "https://w3id.org/cwl/cwl#"
+
+$namespaces:
+  s: "http://schema.org/"
+
+s:name: 'cowsay'
+s:version: '1.0.0'
+
+cwlVersion: v1.0
+class: CommandLineTool
+label: cowsay
+baseCommand: /usr/games/cowsay
+hints:
+  DockerRequirement:
+    dockerPull: chuanwen/cowsay
+
+inputs:
+  input:
+    type: string
+    inputBinding:
+      position: 1
+
+outputs:
+  output:
+    type: stdout
+```
+We build this package with:
+```shell
+$ brane build cowsay.cwl
+```
