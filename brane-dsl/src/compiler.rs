@@ -204,10 +204,10 @@ impl Compiler {
     ///
     fn handle_import_node(
         &mut self,
-        module: String,
+        package: String,
         version: Option<Version>,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
-        let package_info = self.package_index.get(&module, version.as_ref());
+        let package_info = self.package_index.get(&package, version.as_ref());
 
         if let Some(package_info) = package_info {
             let package_patterns = functions::get_module_patterns(package_info)?;
@@ -219,7 +219,7 @@ impl Compiler {
                 }
             }
         } else {
-            unreachable!();
+            return Err(anyhow!("No package named '{}'", package));
         }
 
         Ok((None, None))
@@ -318,12 +318,33 @@ pub fn terms_to_instructions(
     result_var: Option<String>,
     state: &CompilerState,
 ) -> Result<(Vec<Instruction>, String)> {
-    let variables = state.variables.clone();
+    let mut variables = state.variables.clone();
     let functions = state.imports.clone();
 
-    debug!("Variables: {:?}", &variables);
+    debug!("Terms: {:?}", terms);
 
-    let mut term_pattern = build_terms_pattern(terms, &variables, &state.types)?;
+    // Replace literals in terms with names
+    let mut literals = Map::<Value>::new();
+    let terms = terms
+        .iter()
+        .map(|t| {
+            match t {
+                AstTerm::Value(value) => {
+                    let temp_var = create_temp_var(true);
+                    literals.insert(temp_var.clone(), value.clone());
+                    variables.insert(temp_var.clone(), value.data_type().to_string());
+
+                    AstTerm::Name(temp_var)
+                },
+                AstTerm::Name(n) => AstTerm::Name(n.clone()),
+                AstTerm::Symbol(s) => AstTerm::Symbol(s.clone()),
+            }
+        })
+        .collect();
+
+    debug!("Terms: {:?}", terms);
+    debug!("Variables: {:?}", variables);
+    debug!("Literals: {:?}", literals);
 
     // This regex will match consecutive value placeholders (e.g. <integer>), if
     // the start and end of the regex capture group corresponds to the start and
@@ -336,6 +357,8 @@ pub fn terms_to_instructions(
     // We use temporary variables to hold values between function calls. If we
     // consume a temporary variable, we can directly reuse it again.
     let mut temp_vars: Vec<String> = vec![];
+
+    let mut term_pattern = build_terms_pattern(terms, &variables, &state.types)?;
 
     let mut instructions: Vec<Instruction> = vec![];
     let mut return_data_type = String::from("unit");
@@ -362,12 +385,16 @@ pub fn terms_to_instructions(
                 let range = find_location.start()..find_location.end();
                 let coverage = term_pattern_clone.get(range.clone()).unwrap();
 
+                debug!("Parameters: {:?}", function.parameters);
+
                 let mut input = Map::<Value>::new();
                 let mut parameters = function.parameters.iter();
                 let mut consumed_temp: Option<String> = None;
 
                 // Map each placeholder to function parameters
                 for ph in placeholder_regex.captures_iter(coverage) {
+                    debug!("Placeholder: {:?}", ph);
+
                     if let Some(group) = ph.get(1) {
                         let arg = group.as_str().to_string();
                         if temp_vars.contains(&arg) {
@@ -375,13 +402,20 @@ pub fn terms_to_instructions(
                         }
 
                         if let Some(parameter) = parameters.next() {
-                            debug!("Input: {:?} <- {:?}", &parameter.name, &arg);
-                            input.insert(
-                                parameter.name.clone(),
+                            let value = if let Some(value) = literals.get(&arg) {
+                                value.clone()
+                            } else {
                                 Value::Pointer {
                                     variable: arg,
                                     data_type: parameter.data_type.clone(),
-                                },
+                                }
+                            };
+
+                            debug!("Input: {:?} <- {:?}", &parameter.name, value);
+
+                            input.insert(
+                                parameter.name.clone(),
+                                value
                             );
                         } else {
                             unreachable!();
@@ -393,7 +427,7 @@ pub fn terms_to_instructions(
                 let temp_var = if let Some(temp_var) = consumed_temp {
                     temp_var
                 } else {
-                    let new_temp_var = create_temp_var();
+                    let new_temp_var = create_temp_var(false);
                     temp_vars.push(new_temp_var.clone());
 
                     new_temp_var
@@ -492,6 +526,7 @@ fn build_terms_pattern(
                 term_pattern_segments.push(symbol.to_string());
             }
             AstTerm::Value(value) => {
+
                 let segment = format!("<{}>", value.data_type());
                 term_pattern_segments.push(segment);
             }
@@ -505,12 +540,16 @@ fn build_terms_pattern(
 ///
 ///
 ///
-fn create_temp_var() -> String {
+fn create_temp_var(literal: bool) -> String {
     let random_name = rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(5)
         .collect::<String>()
         .to_lowercase();
 
-    format!("_{}", random_name)
+    if literal {
+        random_name
+    } else {
+        format!("_{}", random_name)
+    }
 }

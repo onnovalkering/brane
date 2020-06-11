@@ -91,7 +91,16 @@ impl PackageIndex {
         name: &str,
         version: Option<&Version>,
     ) -> Option<&PackageInfo> {
-        let version = version.unwrap_or_else(|| self.get_latest_version(name).unwrap());
+        let version = if let None = version {
+            if let Some(version) = self.get_latest_version(name) {
+                version
+            } else {
+                return None
+            }
+        } else {
+            version.unwrap()
+        };
+
         self.packages.get(&format!("{}-{}", name, version))
     }
 
