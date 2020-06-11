@@ -1,0 +1,41 @@
+name: base64
+version: 1.0.0
+kind: compute
+
+dependencies:
+  - python3
+  - python3-yaml
+
+files:
+  - run.py
+
+entrypoint:
+  kind: task
+  exec: run.py
+
+actions:
+  'b64decode':
+    command:
+      args:
+        - decode
+    pattern:
+      prefix: b64decode
+    input:
+      - type: string
+        name: input
+    output:
+      - type: string
+        name: output
+
+  'b64encode':
+    command:
+      args:
+        - encode
+    pattern:
+      prefix: b64encode
+    input:
+      - type: string
+        name: input
+    output:
+      - type: string
+        name: output
