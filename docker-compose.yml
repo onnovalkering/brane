@@ -25,11 +25,11 @@ services:
 
   jupyterlab:
     build: ./brane-ide/jupyterlab
-    command: ["jupyter", "lab", "--LabApp.token=''"]
+    command: ["jupyter", "lab", "--allow-root", "--LabApp.token=''"]
     ports:
       - 8888:8888
     volumes:
-      - /tmp:/tmp*/
+      - /tmp:/tmp
       - /var/run/docker.sock:/var/run/docker.sock
 
   kafka:
