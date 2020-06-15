@@ -493,8 +493,13 @@ fn build_terms_pattern(
                 if name.contains(".") {
                     let segments: Vec<_> = name.split(".").collect();
                     if let Some(arch_type) = variables.get(segments[0]) {
-                        debug!("Resolving {} within type {}", name, arch_type);
+                        if arch_type.ends_with("[]") && segments[1] == "length" {
+                            let segment = format!("<{}:{}>", name, String::from("integer"));
+                            term_pattern_segments.push(segment);
+                            continue;
+                        }
 
+                        debug!("Resolving {} within type {}", name, arch_type);
                         if let Some(arch_type) = types.get(arch_type) {
                             // TODO: use hashmap in Type struct
                             let mut properties = Map::<Property>::new();

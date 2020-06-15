@@ -11,6 +11,7 @@ type Map<T> = std::collections::HashMap<String, T>;
 #[derive(Debug)]
 pub struct PackageIndex {
     pub packages: Map<PackageInfo>,
+    pub standard: Map<PackageInfo>,
     pub versions: Map<Vec<Version>>,
 }
 
@@ -38,7 +39,8 @@ impl PackageIndex {
             p_versions.reverse();
         }
 
-        PackageIndex { packages, versions }
+        let standard = brane_std::PACKAGES.clone();
+        PackageIndex { packages, standard, versions }
     }
 
     ///
@@ -91,6 +93,11 @@ impl PackageIndex {
         name: &str,
         version: Option<&Version>,
     ) -> Option<&PackageInfo> {
+        let standard_package = self.standard.get(name);
+        if standard_package.is_some() {
+            return standard_package;
+        }
+
         let version = if let None = version {
             if let Some(version) = self.get_latest_version(name) {
                 version

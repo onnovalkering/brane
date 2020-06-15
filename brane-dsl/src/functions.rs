@@ -19,15 +19,20 @@ pub struct FunctionPattern {
 ///
 pub fn get_module_patterns(module: &PackageInfo) -> Result<Vec<FunctionPattern>> {
     let mut patterns = vec![];
+    if module.functions.is_none() {
+        return Ok(patterns);
+    }
 
     for (name, function) in module.functions.as_ref().unwrap().iter() {
         let pattern = build_pattern(function)?;
         let mut meta = Map::<String>::new();
 
-        meta.insert("kind".to_string(), module.kind.clone());
-        meta.insert("name".to_string(), module.name.clone());
-        meta.insert("version".to_string(), module.version.clone());
-        meta.insert(String::from("image"), format!("{}:{}", module.name, module.version));
+        meta.insert(String::from("kind"), module.kind.clone());
+        meta.insert(String::from("name"), module.name.clone());
+        meta.insert(String::from("version"), module.version.clone());
+        if module.kind == "ecu" {
+            meta.insert(String::from("image"), format!("{}:{}", module.name, module.version));
+        }
 
         let function_pattern = FunctionPattern {
             parameters: function.parameters.clone(),
