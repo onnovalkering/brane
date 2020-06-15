@@ -13,6 +13,8 @@ use structopt::StructOpt;
 struct CLI {
     #[structopt(short, long, help = "Enable debug mode")]
     debug: bool,
+    #[structopt(short, long, help = "Skip dependencies check")]
+    skip_check: bool,
     #[structopt(subcommand)]
     sub_command: SubCommand,
 }
@@ -118,10 +120,12 @@ async fn main() -> Result<()> {
         });
     }
 
-    let deps_check = brane_cli::check_dependencies();
-    if deps_check.is_err() {
-        println!("Dependency not found: Docker (version >= 19.0.0).");
-        process::exit(1);
+    if !options.skip_check {
+        let deps_check = brane_cli::check_dependencies();
+        if deps_check.is_err() {
+            println!("Dependency not found: Docker (version >= 19.0.0).");
+            process::exit(1);
+        }
     }
 
     match run(options).await {
