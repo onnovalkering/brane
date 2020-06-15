@@ -3,7 +3,11 @@ use brane_exec::delegate;
 use anyhow::Result;
 use specifications::common::Value;
 use futures::executor::block_on;
+use std::io::BufReader;
+use specifications::instructions::ActInstruction;
 use specifications::instructions::{Instruction, Instruction::*, Move, Move::*, Operator::*};
+use std::path::PathBuf;
+use std::fs::File;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -13,14 +17,18 @@ type Map<T> = std::collections::HashMap<String, T>;
 pub struct Machine {
     cursor: usize,
     pub environment: Box<dyn Environment>,
+    packages_dir: Option<PathBuf>,
 }
 
 impl Machine {
     ///
     ///
     ///
-    pub fn new(environment: Box<dyn Environment>) -> Self {
-        Machine { cursor: 0, environment }
+    pub fn new(
+        environment: Box<dyn Environment>,
+        packages_dir: Option<PathBuf>
+    ) -> Self {
+        Machine { cursor: 0, environment, packages_dir }
     }
 
     ///
@@ -85,13 +93,23 @@ impl Machine {
                         let segments: Vec<_> = variable.split(".").collect();
                         let arch_value = self.environment.get(segments[0]);
 
-                        if let Value::Struct { properties, .. } = arch_value {
-                            if let Some(value) = properties.get(segments[1]) {
-                                arguments.insert(name.clone(), value.clone());
-                            } else {
-                                panic!("Trying to access undeclared variable.");
-                            }
-                        }
+                        match arch_value {
+                            Value::Array { entries, .. } => {
+                                if segments[1] == "length" {
+                                    arguments.insert(name.clone(), Value::Integer(entries.len() as i64));
+                                } else {
+                                    panic!("Trying to access undeclared variable.");
+                                }
+                            },
+                            Value::Struct { properties, .. } => {
+                                if let Some(value) = properties.get(segments[1]) {
+                                    arguments.insert(name.clone(), value.clone());
+                                } else {
+                                    panic!("Trying to access undeclared variable.");
+                                }
+                            },
+                            _ => unreachable!()
+                        };
                     } else {
                         let value = self.environment.get(variable);
                         arguments.insert(name.clone(), value);
@@ -105,9 +123,11 @@ impl Machine {
 
         let kind = act.meta.get("kind").expect("Missing `kind` metadata property.");
         let output = match kind.as_str() {
-            "cwl" => delegate::exec_cwl(&act, arguments)?,
+            "cwl" => block_on(delegate::exec_cwl(&act, arguments))?,
+            "dsl" => self.exec_dsl(&act, arguments)?,
             "ecu" => block_on(delegate::exec_ecu(&act, arguments))?,
             "oas" => block_on(delegate::exec_oas(&act, arguments))?,
+            "std" => delegate::exec_std(&act, arguments)?,
             _ => unreachable!(),
         };
 
@@ -130,6 +150,36 @@ impl Machine {
         }
 
         Ok(Forward)
+    }
+
+    ///
+    ///
+    ///
+    pub fn exec_dsl(
+        &mut self,
+        act: &ActInstruction,
+        arguments: Map<Value>,
+    ) -> Result<Option<Value>> {
+        let instructions = if let Some(instr_file) = act.meta.get("instr_file").map(PathBuf::from) {
+            let instr_reader = BufReader::new(File::open(&instr_file)?);
+            serde_yaml::from_reader(instr_reader)?
+        } else {
+            unimplemented!()
+        };
+
+        let mut sub_environment = self.environment.child();
+        for (name, value) in arguments {
+            sub_environment.set(&name, &value);
+        }
+        let mut sub_machine = Machine::new(sub_environment, self.packages_dir.clone());
+
+        let instructions = if let Some(ref packages_dir) = self.packages_dir {
+            preprocess_instructions(&instructions, packages_dir)?
+        } else {
+            instructions
+        };
+
+        sub_machine.interpret(instructions)
     }
 
     ///
@@ -197,7 +247,7 @@ impl Machine {
             bail!("Not a SUB instruction.");
         };
 
-        let mut sub_machine = Machine::new(self.environment.child());
+        let mut sub_machine = Machine::new(self.environment.child(), self.packages_dir.clone());
         sub_machine.interpret(sub.instructions)?;
 
         // Commit variables to parent (this) machine
@@ -237,4 +287,77 @@ impl Machine {
 
         Ok(Forward)
     }
+}
+
+
+///
+///
+///
+fn preprocess_instructions(
+    instructions: &Vec<Instruction>,
+    packages_dir: &PathBuf,
+) -> Result<Vec<Instruction>> {
+    let mut instructions = instructions.clone();
+
+    for instruction in &mut instructions {
+        match instruction {
+            Instruction::Act(act) => {
+                let name = act.meta.get("name").expect("No `name` property in metadata.");
+                let version = act.meta.get("version").expect("No `version` property in metadata.");
+                let kind = act.meta.get("kind").expect("No `kind` property in metadata.");
+
+                let package_dir = packages_dir.join(name).join(version);
+                match kind.as_str() {
+                    "cwl" => {
+                        let cwl_file = package_dir.join("document.cwl");
+                        if cwl_file.exists() {
+                            act.meta
+                                .insert(String::from("cwl_file"), String::from(cwl_file.to_string_lossy()));
+                        }
+                    },
+                    "dsl" => {
+                        let instr_file = package_dir.join("instructions.yml");
+                        if instr_file.exists() {
+                            act.meta
+                                .insert(String::from("instr_file"), String::from(instr_file.to_string_lossy()));
+                        }
+                    },
+                    "ecu" => {
+                        let image_file = package_dir.join("image.tar");
+                        if image_file.exists() {
+                            act.meta
+                                .insert(String::from("image_file"), String::from(image_file.to_string_lossy()));
+                        }
+                    },
+                    "oas" => {
+                        let oas_file = package_dir.join("document.yml");
+                        if oas_file.exists() {
+                            act.meta
+                                .insert(String::from("oas_file"), String::from(oas_file.to_string_lossy()));
+                        }
+                    },
+                    _ => {}
+                }
+            },
+            Instruction::Sub(sub) => {
+                if let Some(_) = sub.meta.get("kind") {
+                    let name = sub.meta.get("name").expect("No `name` property in metadata.");
+                    let version = sub.meta.get("version").expect("No `version` property in metadata.");
+
+                    let package_dir = packages_dir.join(name).join(version);
+                    let instructions_file = package_dir.join("instructions.yml");
+                    let instructions_reader = BufReader::new(File::open(&instructions_file)?);
+
+                    sub.instructions = serde_yaml::from_reader(instructions_reader)?;
+                }
+
+                sub.instructions = preprocess_instructions(&sub.instructions, &packages_dir)?;
+            }
+            _ => continue
+        }
+    }
+
+    debug!("{:#?}", instructions);
+
+    Ok(instructions)
 }
