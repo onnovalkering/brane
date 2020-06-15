@@ -13,26 +13,14 @@ use std::env;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use tar::Archive;
+use std::path::PathBuf;
 use tokio::fs::File as TokioFile;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Package {
-    pub id: i32,
-    // Metadata
-    pub created: String,
-    pub kind: String,
-    pub name: String,
-    pub uploaded: String,
-    pub uuid: String,
-    pub version: String,
-    // Content
-    pub description: Option<String>,
-    pub functions_json: Option<String>,
-    pub types_json: Option<String>,
-    // File
-    pub checksum: i64,
-    pub filename: String,
+lazy_static! {
+    static ref API_HOST: String = {
+        env::var("API_HOST").unwrap_or_else(|_| String::from("brane-api:8080"))
+    };
 }
 
 ///
@@ -56,43 +44,45 @@ pub fn logout(_host: String) -> Result<()> {
 ///
 ///
 pub async fn pull(
-    name: String,
-    version: Option<String>,
+    _name: String,
+    _version: Option<String>,
 ) -> Result<()> {
-    let version = version.expect("please provide version");
+    // let version = version.expect("please provide version");
 
-    let url = format!("http://127.0.0.1:8080/packages/{}/{}", name, version);
-    let package: Result<Package, _> = reqwest::get(&url).await?.json().await;
-    if package.is_err() {
-        println!("Cannot find version '{}' of package '{}'", version, name);
-        return Ok(());
-    }
+    // let url = format!("http://{}/packages/{}/{}", API_HOST.as_str(), name, version);
+    // let package: Result<PackageInfo, _> = reqwest::get(&url).await?.json().await;
+    // if package.is_err() {
+    //     println!("Cannot find version '{}' of package '{}'", version, name);
+    //     return Ok(());
+    // }
 
-    let url = format!("http://127.0.0.1:8080/packages/{}/{}/archive", name, version);
-    let mut package_archive = reqwest::get(&url).await?;
-    let package = package.unwrap();
+    // let url = format!("http://{}/packages/{}/{}/archive", API_HOST.as_str(), name, version);
+    // let mut package_archive = reqwest::get(&url).await?;
+    // let package = package.unwrap();
 
-    // Write package archive to temporary file
-    let temp_filepath = env::temp_dir().join(package.filename);
-    let mut temp_file = File::create(&temp_filepath)?;
-    while let Some(chunk) = package_archive.chunk().await? {
-        temp_file.write_all(&chunk)?; // If causes bug, use .write(&chunk)
-    }
+    // // Write package archive to temporary file
+    // let temp_filepath = env::temp_dir().join(package.filename);
+    // let mut temp_file = File::create(&temp_filepath)?;
+    // while let Some(chunk) = package_archive.chunk().await? {
+    //     temp_file.write_all(&chunk)?; // If causes bug, use .write(&chunk)
+    // }
 
-    // Verify checksum
-    let checksum = utils::calculate_crc32(&temp_filepath)?;
-    if checksum != package.checksum as u32 {
-        println!("Download failed, checksums don't match!");
-        return Ok(());
-    }
+    // // Verify checksum
+    // let checksum = utils::calculate_crc32(&temp_filepath)?;
+    // if checksum != package.checksum as u32 {
+    //     println!("Download failed, checksums don't match!");
+    //     return Ok(());
+    // }
 
-    // Unpack temporary file to target location
-    let archive_file = File::open(temp_filepath)?;
-    let package_dir = packages::get_package_dir(&name, Some(&version))?;
-    fs::create_dir_all(&package_dir)?;
+    // // Unpack temporary file to target location
+    // let archive_file = File::open(temp_filepath)?;
+    // let package_dir = packages::get_package_dir(&name, Some(&version))?;
+    // fs::create_dir_all(&package_dir)?;
 
-    let mut archive = Archive::new(GzDecoder::new(archive_file));
-    archive.unpack(&package_dir)?;
+    // let mut archive = Archive::new(GzDecoder::new(archive_file));
+    // archive.unpack(&package_dir)?;
+
+    println!("Unimplemented");
 
     Ok(())
 }
@@ -120,8 +110,8 @@ pub async fn push(
 
     // Upload file
     let url = format!(
-        "http://127.0.0.1:8080/packages/{}/{}?checksum={}",
-        name, version, checksum
+        "http://{}/packages/{}/{}?checksum={}",
+        API_HOST.as_str(), name, version, checksum
     );
     let request = Client::new().request(Method::POST, &url);
 
@@ -143,8 +133,8 @@ pub async fn push(
 ///
 ///
 pub async fn search(term: String) -> Result<()> {
-    let url = format!("http://127.0.0.1:8080/packages?t={}", term);
-    let packages: Vec<Package> = reqwest::get(&url).await?.json().await?;
+    let url = format!("http://{}/packages?t={}", API_HOST.as_str(), term);
+    let packages: Vec<PackageInfo> = reqwest::get(&url).await?.json().await?;
 
     for package in packages {
         println!("{}", package.name);
@@ -156,11 +146,10 @@ pub async fn search(term: String) -> Result<()> {
 ///
 ///
 ///
-pub async fn get_package_index(online: bool) -> Result<PackageIndex> {
-    let packages: JValue = if online {
-        let url = "http://127.0.0.1:8080/packages";
-        reqwest::get(url).await?.json().await?
-    } else {
+pub async fn get_package_index() -> Result<PackageIndex> {
+    let packages_dir = packages::get_packages_dir();
+
+    let packages: JValue = if packages_dir.exists() {
         let packages_dir = packages::get_packages_dir();
         if !packages_dir.exists() {
             return Ok(PackageIndex::empty());
@@ -187,7 +176,118 @@ pub async fn get_package_index(online: bool) -> Result<PackageIndex> {
         }
 
         json!(package_infos)
+    } else {
+        let url = format!("http://{}/packages", API_HOST.as_str());
+        reqwest::get(url.as_str()).await?.json().await?
     };
 
     PackageIndex::from_value(packages)
+}
+
+
+///
+///
+///
+pub async fn get_package_source(
+    name: &String,
+    version: &String,
+    kind: &String
+) -> Result<PathBuf> {
+    let package_dir = packages::get_package_dir(name, Some(version))?;
+    let temp_dir = PathBuf::from("/tmp"); // TODO: get from OS
+
+    let path = match kind.as_str() {
+        "cwl" => {
+            let cwl_file = package_dir.join("document.cwl");
+            if cwl_file.exists() {
+                cwl_file
+            } else {
+                let cwl_file = temp_dir.join(format!("{}-{}-document.cwl", name, version));
+                if !cwl_file.exists() {
+                    let url = format!("http://{}/packages/{}/{}/source", API_HOST.as_str(), name, version);
+                    let mut source = reqwest::get(&url).await?;
+
+                    // Write package archive to temporary file
+                    let mut source_file = File::create(&cwl_file)?;
+                    while let Some(chunk) = source.chunk().await? {
+                        source_file.write_all(&chunk)?;
+                    }
+                }
+
+                cwl_file
+            }
+        },
+        "dsl" => {
+            let instructions = package_dir.join("instructions.yml");
+            if instructions.exists() {
+                instructions
+            } else {
+                let instructions = temp_dir.join(format!("{}-{}-instructions.yml", name, version));
+                if !instructions.exists() {
+                    let url = format!("http://{}/packages/{}/{}/source", API_HOST.as_str(), name, version);
+                    let mut source = reqwest::get(&url).await?;
+
+                    // Write package archive to temporary file
+                    let mut source_file = File::create(&instructions)?;
+                    while let Some(chunk) = source.chunk().await? {
+                        source_file.write_all(&chunk)?;
+                    }
+                }
+
+                instructions
+            }
+        },
+        "ecu" => {
+            let image_file = package_dir.join("image.tar");
+            if false && image_file.exists() {
+                image_file
+            } else {
+                let archive_dir = temp_dir.join(format!("{}-{}-archive", name, version));
+                fs::create_dir_all(&archive_dir)?;
+
+                let image_file = archive_dir.join("image.tar");
+                if !image_file.exists() {
+                    let url = format!("http://{}/packages/{}/{}/archive", API_HOST.as_str(), name, version);
+                    let mut archive = reqwest::get(&url).await?;
+
+                    // Write package archive to temporary file
+                    let archive_path = temp_dir.join(format!("{}-{}-archive.tar.gz", name, version));
+                    let mut archive_file = File::create(&archive_path)?;
+                    while let Some(chunk) = archive.chunk().await? {
+                        archive_file.write_all(&chunk)?;
+                    }
+
+                    // Unpack
+                    let archive_file = File::open(archive_path)?;
+                    let mut archive = Archive::new(GzDecoder::new(archive_file));
+                    archive.unpack(&archive_dir)?;
+                }
+
+                image_file
+            }
+        },
+        "oas" => {
+            let oas_file = package_dir.join("document.yml");
+            if oas_file.exists() {
+                oas_file
+            } else {
+                let oas_file = temp_dir.join(format!("{}-{}-document.yml", name, version));
+                if !oas_file.exists() {
+                    let url = format!("http://{}/packages/{}/{}/source", API_HOST.as_str(), name, version);
+                    let mut source = reqwest::get(&url).await?;
+
+                    // Write package archive to temporary file
+                    let mut source_file = File::create(&oas_file)?;
+                    while let Some(chunk) = source.chunk().await? {
+                        source_file.write_all(&chunk)?;
+                    }
+                }
+
+                oas_file
+            }
+        },
+        _ => unreachable!()
+    };
+
+    Ok(path)
 }

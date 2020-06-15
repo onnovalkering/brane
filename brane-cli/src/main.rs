@@ -3,6 +3,7 @@ extern crate human_panic;
 
 use anyhow::Result;
 use brane_cli::{build_cwl, build_dsl, build_ecu, build_oas, packages, registry, repl, test};
+use dotenv::dotenv;
 use log::LevelFilter;
 use std::path::PathBuf;
 use std::process;
@@ -102,6 +103,7 @@ enum SubCommand {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    dotenv().ok();
     let options = CLI::from_args();
 
     let mut logger = env_logger::builder();

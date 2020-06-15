@@ -3,6 +3,7 @@ use anyhow::Result;
 use brane_dsl::compiler::{Compiler, CompilerOptions};
 use brane_vm::{environment::InMemoryEnvironment, machine::Machine};
 use linefeed::{Interface, ReadResult};
+use futures::executor::block_on;
 use std::fs::File;
 use std::io::BufReader;
 use specifications::common::Value;
@@ -15,7 +16,7 @@ pub async fn start() -> Result<()> {
     interface.set_prompt("brane> ")?;
 
     // Prepare DSL compiler
-    let package_index = registry::get_package_index(false).await?;
+    let package_index = registry::get_package_index().await?;
     let mut compiler = Compiler::new(CompilerOptions::repl(), package_index)?;
 
     // Prepare machine
@@ -31,7 +32,7 @@ pub async fn start() -> Result<()> {
 
         match instructions {
             Ok(instructions) => {
-                let instructions = preprocess_instructions(&instructions)?;
+                let instructions = preprocess_instructions(&instructions).await?;
                 let output = machine.interpret(instructions)?;
 
                 if let Some(value) = output {
@@ -57,7 +58,7 @@ pub async fn start() -> Result<()> {
 ///
 ///
 ///
-fn preprocess_instructions(
+async fn preprocess_instructions(
     instructions: &Vec<Instruction>,
 ) -> Result<Vec<Instruction>> {
     let mut instructions = instructions.clone();
@@ -72,28 +73,28 @@ fn preprocess_instructions(
                 let package_dir = packages::get_package_dir(&name, Some(version))?;
                 match kind.as_str() {
                     "cwl" => {
-                        let cwl_file = package_dir.join("document.cwl");
+                        let cwl_file = registry::get_package_source(&name, &version, &kind).await?;
                         if cwl_file.exists() {
                             act.meta
                                 .insert(String::from("cwl_file"), String::from(cwl_file.to_string_lossy()));
                         }
                     },
                     "dsl" => {
-                        let instr_file = package_dir.join("instructions.yml");
+                        let instr_file = registry::get_package_source(&name, &version, &kind).await?;
                         if instr_file.exists() {
                             act.meta
                                 .insert(String::from("instr_file"), String::from(instr_file.to_string_lossy()));
                         }
                     },
                     "ecu" => {
-                        let image_file = package_dir.join("image.tar");
+                        let image_file = registry::get_package_source(&name, &version, &kind).await?;
                         if image_file.exists() {
                             act.meta
                                 .insert(String::from("image_file"), String::from(image_file.to_string_lossy()));
                         }
                     },
                     "oas" => {
-                        let oas_file = package_dir.join("document.yml");
+                        let oas_file = registry::get_package_source(&name, &version, &kind).await?;
                         if oas_file.exists() {
                             act.meta
                                 .insert(String::from("oas_file"), String::from(oas_file.to_string_lossy()));
@@ -114,7 +115,7 @@ fn preprocess_instructions(
                     sub.instructions = serde_yaml::from_reader(instructions_reader)?;
                 }
 
-                sub.instructions = preprocess_instructions(&sub.instructions)?;
+                sub.instructions = block_on(preprocess_instructions(&sub.instructions))?;
             }
             _ => continue
         }
