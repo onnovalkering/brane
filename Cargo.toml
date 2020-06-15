@@ -1,5 +1,4 @@
 [workspace]
-
 members = [
     "brane-api",
     "brane-cli",
@@ -7,6 +6,7 @@ members = [
     "brane-exec",
     "brane-init",
     "brane-loop",
+    "brane-std",
     "brane-vm",
     "specifications",
 ]

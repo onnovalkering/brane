@@ -1,0 +1,11 @@
+[package]
+name = "brane-std"
+version = "0.1.0"
+authors = ["Onno Valkering"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0"
+lazy_static = "1.4"
+log = "0.4"
+specifications = { path = "../specifications" }
