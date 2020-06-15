@@ -27,8 +27,17 @@ RUN cargo build --release
 FROM ubuntu:20.04
 
 RUN apt-get update && apt-get install -y \
+    gnupg2 \
     libpq-dev \
-    libssl-dev\
+    libssl-dev \
+    wget \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN . /etc/os-release \
+ && sh -c "echo 'deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/x${NAME}_${VERSION_ID}/ /' > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list" \
+ && wget -nv https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable/x${NAME}_${VERSION_ID}/Release.key -O- | apt-key add - \
+ && apt-get update \
+ && apt-get install -y skopeo \
  && rm -rf /var/lib/apt/lists/*
 
 # Copy the release binary from the build stage
