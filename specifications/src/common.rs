@@ -266,6 +266,29 @@ impl Value {
     ///
     ///
     ///
+    pub fn to_string(&self) -> String {
+        use Value::*;
+        match self {
+            Array { entries, .. } => {
+                let entries = entries.iter().map(|e| e.to_string()).collect::<Vec<String>>().join(", ");
+                format!("[{}]", entries)
+            },
+            Boolean(b) => b.to_string(),
+            Integer(i) => i.to_string(),
+            Pointer { variable, .. } => format!("@{}", variable),
+            Real(r) => r.to_string(),
+            Struct { properties, .. } => {
+                let properties = properties.iter().map(|(n, p)| format!("{}: {}", n, p.to_string())).collect::<Vec<String>>().join(", ");
+                format!("{{{}}}", properties)
+            },
+            Unicode(s) => s.to_string(),
+            Unit => String::from("unit"),
+        }
+    }
+
+    ///
+    ///
+    ///
     pub fn as_json(&self) -> JValue {
         use Value::*;
         match self {
@@ -279,8 +302,6 @@ impl Value {
             Unit => json!(null),
         }
     }
-
-
 }
 
 impl Display for Value {
