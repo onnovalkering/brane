@@ -202,3 +202,13 @@ We build this package with:
 ```shell
 $ brane build cowsay.cwl
 ```
+
+## Publishing packages
+We can publish packages by pushing them to our (local) registry:
+```shell
+$ brane push github 1.0.0
+$ brane push base64 1.0.0
+$ brane push getreadme 1.0.0
+$ brane push cowsay 1.0.0
+```
+Now we can use these packages in our [workflows](/brane/guide/workflows).
