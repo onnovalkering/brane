@@ -4,7 +4,7 @@ services:
   adminer:
     image: adminer
     ports:
-      - 8888:8080
+      - 8070:8080
 
   brane-api:
     build: ./brane-api
@@ -22,6 +22,15 @@ services:
     depends_on:
       - kafka
       - postgres
+
+  jupyterlab:
+    build: ./brane-ide/jupyterlab
+    command: ["jupyter", "lab", "--LabApp.token=''"]
+    ports:
+      - 8888:8888
+    volumes:
+      - /tmp:/tmp*/
+      - /var/run/docker.sock:/var/run/docker.sock
 
   kafka:
     image: confluentinc/cp-kafka:5.5.0
