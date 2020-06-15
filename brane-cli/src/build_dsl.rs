@@ -2,7 +2,7 @@ use crate::{packages, registry};
 use anyhow::Result;
 use brane_dsl::compiler::Compiler;
 use console::style;
-use specifications::common::Function;
+use specifications::common::{Function, CallPattern, Parameter};
 use specifications::instructions::Instruction;
 use specifications::package::PackageInfo;
 use std::fs::{self, File};
@@ -32,8 +32,8 @@ pub async fn handle(
     prepare_directory(&instructions, &dsl_file, &package_info, &package_dir)?;
 
     println!(
-        "Successfully build DSL package ({}): {}",
-        &package_info.version,
+        "Successfully built version {} of DSL package {}.",
+        style(&package_info.version).bold().cyan(),
         style(&package_info.name).bold().cyan(),
     );
 
@@ -45,7 +45,7 @@ pub async fn handle(
 ///
 fn generate_package_info(
     dsl_document: &str,
-    _instructions: &[Instruction],
+    instructions: &[Instruction],
 ) -> Result<PackageInfo> {
     let yamls = YamlLoader::load_from_str(&dsl_document).unwrap();
     let info = yamls.first().expect("Document doesn't start with a info section");
@@ -63,20 +63,70 @@ fn generate_package_info(
     let description = info["description"].as_str().map(String::from);
 
     // Construct function descriptions
-    let functions = Map::<Function>::new();
-    // for (action_name, action) in &container_info.actions {
-    //     let arguments = action.input.clone();
-    //     let notation = action.notation.clone();
-    //     let return_type = action.output[0].data_type.to_string();
+    let mut input_parameters = Vec::<Parameter>::new();
+    let call_pattern = CallPattern::new(Some(name.to_lowercase()), None, None);
 
-    //     let function = Function::new(arguments, notation, return_type);
-    //     functions.insert(action_name.clone(), function);
-    // }
+    for instruction in instructions {
+        match instruction {
+            Instruction::Var(var) => {
+                for get in &var.get {
+                    let parameter = Parameter::new(get.name.clone(), get.data_type.clone(), None, None);
+                    input_parameters.push(parameter);
+                }
+            },
+            _ => continue
+        }
+    }
 
-    // Create and write a package.yml file.
+    let return_type = if let Some(data_type) = determine_return_type(instructions) {
+        data_type
+    } else {
+        String::from("unit")
+    };
+
+    let mut functions = Map::<Function>::new();
+    functions.insert(name.clone(), Function::new(input_parameters, Some(call_pattern), return_type.clone()));
+
     let package_info = PackageInfo::new(name, version, description, String::from("dsl"), Some(functions), None);
 
     Ok(package_info)
+}
+
+///
+///
+///
+fn determine_return_type(instructions: &[Instruction]) -> Option<String> {
+    for instruction in instructions {
+        match instruction {
+            Instruction::Var(var) => {
+                for set in &var.set {
+                    if let Some(scope) = &set.scope {
+                        if scope == "output" {
+                            return Some(set.data_type.clone());
+                        }
+                    }
+                }
+            },
+            Instruction::Act(ref act) => {
+                if let Some(assignment) = &act.assignment {
+                    if assignment == "terminate" {
+                        if let Some(ref data_type) = &act.data_type {
+                            return Some(data_type.clone());
+                        }
+                    }
+                }
+            },
+            Instruction::Sub(sub) => {
+                let data_type = determine_return_type(&sub.instructions);
+                if data_type.is_some() {
+                    return data_type;
+                }
+            }
+            _ => continue
+        }
+    }
+
+    None
 }
 
 ///

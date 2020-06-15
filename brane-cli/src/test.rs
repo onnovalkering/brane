@@ -134,7 +134,7 @@ fn test_dsl(
     test_dsl_preprocess_instructions(&mut instructions, &mut arguments)?;
 
     let environment = InMemoryEnvironment::new(Some(arguments), None);
-    let mut machine = Machine::new(Box::new(environment));
+    let mut machine = Machine::new(Box::new(environment), Some(packages::get_packages_dir()));
     let output = machine.interpret(instructions)?;
 
     let output = output.map(|o| if let Value::Pointer { variable, .. } = o {
@@ -143,7 +143,6 @@ fn test_dsl(
             o
         }
     );
-
 
     if let Some(value) = output {
         println!();
@@ -169,6 +168,13 @@ fn test_dsl_preprocess_instructions(
 
                 let package_dir = packages::get_package_dir(&name, Some(version))?;
                 match kind.as_str() {
+                    "cwl" => {
+                        let cwl_file = package_dir.join("document.cwl");
+                        if cwl_file.exists() {
+                            act.meta
+                                .insert(String::from("cwl_file"), String::from(cwl_file.to_string_lossy()));
+                        }
+                    }
                     "ecu" => {
                         let image_file = package_dir.join("image.tar");
                         if image_file.exists() {

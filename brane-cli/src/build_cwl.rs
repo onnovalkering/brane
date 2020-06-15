@@ -41,8 +41,8 @@ pub fn handle(
     prepare_directory(&cwl_document, &cwl_file, &package_info, &package_dir)?;
 
     println!(
-        "Successfully build CWL package ({}): {}",
-        &package_info.version,
+        "Successfully built version {} of CWL package {}.",
+        style(&package_info.version).bold().cyan(),
         style(&package_info.name).bold().cyan(),
     );
 
@@ -133,7 +133,10 @@ fn build_cwl_functions(cwl_document: &CwlDocument) -> Result<(Map<Function>, Map
         output_data_type
     } else {
         if let Some(output_property) = output_properties.first() {
-            output_property.data_type.clone()
+            match output_property.data_type.as_str() {
+                "stdout" => String::from("string"),
+                _ => output_property.data_type.clone()
+            }
         } else {
             String::from("unit")
         }
