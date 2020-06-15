@@ -1,5 +1,6 @@
 from ipykernel.kernelbase import Kernel
 from pexpect.replwrap import REPLWrapper
+from os import environ
 
 class BakeryKernel(Kernel):
     implementation = 'Bakery'
@@ -11,14 +12,15 @@ class BakeryKernel(Kernel):
         'mimetype': 'text/plain',
         'file_extension': '.bk',
     }
-    banner = "Bakery kernel"
+    banner = 'Bakery kernel'
     prompt = 'brane> '
 
     def __init__(self, **kwargs):
         Kernel.__init__(self, **kwargs)
 
         # Start a new Bakery REPL session
-        self.repl = REPLWrapper('bash -c "/kernel/brane -s repl"', 'brane> ', None)
+        environ['TERM'] = 'xterm-256color'
+        self.repl = REPLWrapper('/kernel/brane -s repl', self.prompt, None)
 
     def do_execute(self, command, silent, store_history=True, user_expressions=None, allow_stdin=False):
         output = self.repl.run_command(command)
