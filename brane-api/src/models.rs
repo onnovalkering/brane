@@ -72,6 +72,7 @@ pub struct Package {
     // Content
     pub description: Option<String>,
     pub functions_json: Option<String>,
+    pub source: Option<String>,
     pub types_json: Option<String>,
     // File
     pub checksum: i64,
@@ -91,6 +92,7 @@ pub struct NewPackage {
     // Content
     pub description: Option<String>,
     pub functions_json: Option<String>,
+    pub source: Option<String>,
     pub types_json: Option<String>,
     // File
     pub checksum: i64,
@@ -125,6 +127,7 @@ impl NewPackage {
             functions_json,
             kind: info.kind,
             name: info.name,
+            source: None,
             types_json,
             uploaded: Utc::now().naive_utc(),
             uuid: info.id.to_string(),

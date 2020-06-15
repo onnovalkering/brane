@@ -12,6 +12,7 @@ CREATE TABLE "packages" (
   -- content
   , "description" VARCHAR
   , "functions_json" TEXT
+  , "source" TEXT
   , "types_json" TEXT
 
   -- file

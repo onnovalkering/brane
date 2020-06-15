@@ -21,10 +21,14 @@ table! {
         version -> Varchar,
         description -> Nullable<Varchar>,
         functions_json -> Nullable<Text>,
+        source -> Nullable<Text>,
         types_json -> Nullable<Text>,
         checksum -> Int8,
         filename -> Varchar,
     }
 }
 
-allow_tables_to_appear_in_same_query!(invocations, packages,);
+allow_tables_to_appear_in_same_query!(
+    invocations,
+    packages,
+);

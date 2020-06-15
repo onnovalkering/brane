@@ -42,6 +42,7 @@ pub fn scope() -> Scope {
         .route("/{name}/{version}", web::get().to(get_package_version))
         .route("/{name}/{version}", web::delete().to(delete_package_version))
         .route("/{name}/{version}/archive", web::get().to(download_package_archive))
+        .route("/{name}/{version}/source", web::get().to(get_package_source))
 }
 
 impl Package {
@@ -163,7 +164,7 @@ async fn upload_package(
 
     // Parse package information
     let package_info_file = temp_workdir.join("package.yml");
-    let new_package = if let Ok(info) = PackageInfo::from_path(package_info_file) {
+    let mut new_package = if let Ok(info) = PackageInfo::from_path(package_info_file) {
         NewPackage::from_info(info, upload_checksum, temp_filename.clone())
     } else {
         return upload_badrequest(MSG_NO_PACKAGE_INFO, temporary_dir, Some(upload_id));
@@ -173,26 +174,51 @@ async fn upload_package(
         return upload_badrequest(MSG_INFO_MISMATCH, temporary_dir, Some(upload_id));
     }
 
-    // In the case of a container package, store image in Docker registry
-    let image_tar = temp_workdir.join("image.tar");
-    if image_tar.exists() {
-        let image_tar = image_tar.into_os_string().into_string().unwrap();
-        let image_label = format!("{}:{}", name, version);
+    match new_package.kind.as_str() {
+        "cwl" => {
+            let cwl_document = temp_workdir.join("document.cwl");
+            if cwl_document.exists() {
+                new_package.source = Some(fs::read_to_string(cwl_document).unwrap());
+            }
+        },
+        "ecu" => {
+            // In the case of a container package, store image in Docker registry
+            // TODO: make seperate function
+            let image_tar = temp_workdir.join("image.tar");
+            if image_tar.exists() {
+                let image_tar = image_tar.into_os_string().into_string().unwrap();
+                let image_label = format!("{}:{}", name, version);
 
-        let push = web::block(move || {
-            Command::new("skopeo")
-                .arg("copy")
-                .arg("--dest-tls-verify=false")
-                .arg(format!("tarball:{}", image_tar))
-                .arg(format!("docker://{}/library/{}", docker_host, image_label))
-                .status()
-        })
-        .await;
+                let push = web::block(move || {
+                    Command::new("skopeo")
+                        .arg("copy")
+                        .arg("--dest-tls-verify=false")
+                        .arg(format!("tarball:{}", image_tar))
+                        .arg(format!("docker://{}/library/{}", docker_host, image_label))
+                        .status()
+                })
+                .await;
 
-        if push.is_err() {
-            return HttpResponse::InternalServerError().body(MSG_FAILED_TO_PUSH);
-        }
+                if push.is_err() {
+                    return HttpResponse::InternalServerError().body(MSG_FAILED_TO_PUSH);
+                }
+            }
+        },
+        "dsl" => {
+            let instructions = temp_workdir.join("instructions.yml");
+            if instructions.exists() {
+                new_package.source = Some(fs::read_to_string(instructions).unwrap());
+            }
+        },
+        "oas" => {
+            let oas_document = temp_workdir.join("document.yml");
+            if oas_document.exists() {
+                new_package.source = Some(fs::read_to_string(oas_document).unwrap());
+            }
+        },
+        _ => unreachable!(),
     }
+
 
     // Store package information in database and the archive in the packages dir
     let result = web::block(move || {
@@ -368,4 +394,30 @@ async fn download_package_archive(
     }
 
     NamedFile::open(package_file).unwrap().into_response(&req).unwrap()
+}
+
+///
+///
+///
+async fn get_package_source(
+    _req: HttpRequest,
+    pool: web::Data<DbPool>,
+    path: web::Path<(String, String)>,
+) -> HttpResponse {
+    let conn = pool.get().expect("Couldn't get connection from db pool.");
+    let name = &path.0;
+    let version = &path.1;
+
+    let package = db::packages
+        .filter(db::name.eq(name))
+        .filter(db::version.eq(version))
+        .first::<Package>(&conn)
+        .optional()
+        .unwrap();
+
+    if let Some(Some(source)) = package.map(|p| p.source) {
+        return HttpResponse::Ok().content_type("application/yaml").body(source);
+    } else {
+        return HttpResponse::NotFound().body("");
+    }
 }
