@@ -4,10 +4,17 @@ use anyhow::Result;
 use specifications::common::Value;
 use futures::executor::block_on;
 use std::io::BufReader;
+use std::fs::{self, File};
+use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
+use std::io::prelude::*;
 use specifications::instructions::ActInstruction;
 use specifications::instructions::{Instruction, Instruction::*, Move, Move::*, Operator::*};
 use std::path::PathBuf;
-use std::fs::File;
+use std::env;
+use tar::Archive;
+use semver::Version;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -309,28 +316,28 @@ fn preprocess_instructions(
                 let package_dir = packages_dir.join(name).join(version);
                 match kind.as_str() {
                     "cwl" => {
-                        let cwl_file = package_dir.join("document.cwl");
+                        let cwl_file = get_package_source(&name, &version, &kind)?;
                         if cwl_file.exists() {
                             act.meta
                                 .insert(String::from("cwl_file"), String::from(cwl_file.to_string_lossy()));
                         }
                     },
                     "dsl" => {
-                        let instr_file = package_dir.join("instructions.yml");
+                        let instr_file = get_package_source(&name, &version, &kind)?;
                         if instr_file.exists() {
                             act.meta
                                 .insert(String::from("instr_file"), String::from(instr_file.to_string_lossy()));
                         }
                     },
                     "ecu" => {
-                        let image_file = package_dir.join("image.tar");
+                        let image_file = get_package_source(&name, &version, &kind)?;
                         if image_file.exists() {
                             act.meta
                                 .insert(String::from("image_file"), String::from(image_file.to_string_lossy()));
                         }
                     },
                     "oas" => {
-                        let oas_file = package_dir.join("document.yml");
+                        let oas_file = get_package_source(&name, &version, &kind)?;
                         if oas_file.exists() {
                             act.meta
                                 .insert(String::from("oas_file"), String::from(oas_file.to_string_lossy()));
@@ -360,4 +367,158 @@ fn preprocess_instructions(
     debug!("{:#?}", instructions);
 
     Ok(instructions)
+}
+
+lazy_static! {
+    static ref API_HOST: String = {
+        env::var("API_HOST").unwrap_or_else(|_| String::from("brane-api:8080"))
+    };
+}
+
+
+///
+///
+///
+pub fn get_packages_dir() -> PathBuf {
+    appdirs::user_data_dir(Some("brane"), None, false)
+        .expect("Couldn't determine Brane data directory.")
+        .join("packages")
+}
+
+///
+///
+///
+pub fn get_package_dir(
+    name: &str,
+    version: Option<&str>,
+) -> Result<PathBuf> {
+    let packages_dir = get_packages_dir();
+    let package_dir = packages_dir.join(&name);
+
+    if version.is_none() {
+        return Ok(package_dir);
+    }
+
+    let version = version.unwrap();
+    let version = if version == "latest" {
+        if !package_dir.exists() {
+            return Err(anyhow!("Package not found."));
+        }
+
+        let versions = fs::read_dir(&package_dir)?;
+        let mut versions: Vec<Version> = versions
+            .map(|v| v.unwrap().file_name())
+            .map(|v| Version::parse(&v.into_string().unwrap()).unwrap())
+            .collect();
+
+        versions.sort();
+        versions.reverse();
+
+        versions[0].to_string()
+    } else {
+        Version::parse(&version)
+            .expect("Not a valid semantic version.")
+            .to_string()
+    };
+
+    Ok(package_dir.join(version))
+}
+
+///
+///
+///
+pub fn get_package_source(
+    name: &String,
+    version: &String,
+    kind: &String
+) -> Result<PathBuf> {
+    let package_dir = get_package_dir(name, Some(version))?;
+    let temp_dir = PathBuf::from("/tmp"); // TODO: get from OS
+
+    let path = match kind.as_str() {
+        "cwl" => {
+            let cwl_file = package_dir.join("document.cwl");
+            if cwl_file.exists() {
+                cwl_file
+            } else {
+                let cwl_file = temp_dir.join(format!("{}-{}-document.cwl", name, version));
+                if !cwl_file.exists() {
+                    let url = format!("http://{}/packages/{}/{}/source", API_HOST.as_str(), name, version);
+                    let source = reqwest::blocking::get(&url)?;
+
+                    // Write package archive to temporary file
+                    let mut source_file = File::create(&cwl_file)?;
+                    source_file.write_all(&source.bytes()?)?;
+                }
+
+                cwl_file
+            }
+        },
+        "dsl" => {
+            let instructions = package_dir.join("instructions.yml");
+            if instructions.exists() {
+                instructions
+            } else {
+                let instructions = temp_dir.join(format!("{}-{}-instructions.yml", name, version));
+                if !instructions.exists() {
+                    let url = format!("http://{}/packages/{}/{}/source", API_HOST.as_str(), name, version);
+                    let source = reqwest::blocking::get(&url)?;
+
+                    // Write package archive to temporary file
+                    let mut source_file = File::create(&instructions)?;
+                    source_file.write_all(&source.bytes()?)?;
+                }
+
+                instructions
+            }
+        },
+        "ecu" => {
+            let image_file = package_dir.join("image.tar");
+            if false && image_file.exists() {
+                image_file
+            } else {
+                let archive_dir = temp_dir.join(format!("{}-{}-archive", name, version));
+                fs::create_dir_all(&archive_dir)?;
+
+                let image_file = archive_dir.join("image.tar");
+                if !image_file.exists() {
+                    let url = format!("http://{}/packages/{}/{}/archive", API_HOST.as_str(), name, version);
+                    let archive = reqwest::blocking::get(&url)?;
+
+                    // Write package archive to temporary file
+                    let archive_path = temp_dir.join(format!("{}-{}-archive.tar.gz", name, version));
+                    let mut archive_file = File::create(&archive_path)?;
+                    archive_file.write_all(&archive.bytes()?)?;
+
+                    // Unpack
+                    let archive_file = File::open(archive_path)?;
+                    let mut archive = Archive::new(GzDecoder::new(archive_file));
+                    archive.unpack(&archive_dir)?;
+                }
+
+                image_file
+            }
+        },
+        "oas" => {
+            let oas_file = package_dir.join("document.yml");
+            if oas_file.exists() {
+                oas_file
+            } else {
+                let oas_file = temp_dir.join(format!("{}-{}-document.yml", name, version));
+                if !oas_file.exists() {
+                    let url = format!("http://{}/packages/{}/{}/source", API_HOST.as_str(), name, version);
+                    let source = reqwest::blocking::get(&url)?;
+
+                    // Write package archive to temporary file
+                    let mut source_file = File::create(&oas_file)?;
+                    source_file.write_all(&source.bytes()?)?;
+                }
+
+                oas_file
+            }
+        },
+        _ => unreachable!()
+    };
+
+    Ok(path)
 }
