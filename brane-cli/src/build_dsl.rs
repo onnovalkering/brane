@@ -2,7 +2,7 @@ use crate::{packages, registry};
 use anyhow::Result;
 use brane_dsl::compiler::Compiler;
 use console::style;
-use specifications::common::{Function, CallPattern, Parameter};
+use specifications::common::{CallPattern, Function, Parameter};
 use specifications::instructions::Instruction;
 use specifications::package::PackageInfo;
 use std::fs::{self, File};
@@ -73,8 +73,8 @@ fn generate_package_info(
                     let parameter = Parameter::new(get.name.clone(), get.data_type.clone(), None, None);
                     input_parameters.push(parameter);
                 }
-            },
-            _ => continue
+            }
+            _ => continue,
         }
     }
 
@@ -85,7 +85,10 @@ fn generate_package_info(
     };
 
     let mut functions = Map::<Function>::new();
-    functions.insert(name.clone(), Function::new(input_parameters, Some(call_pattern), return_type.clone()));
+    functions.insert(
+        name.clone(),
+        Function::new(input_parameters, Some(call_pattern), return_type.clone()),
+    );
 
     let package_info = PackageInfo::new(name, version, description, String::from("dsl"), Some(functions), None);
 
@@ -106,7 +109,7 @@ fn determine_return_type(instructions: &[Instruction]) -> Option<String> {
                         }
                     }
                 }
-            },
+            }
             Instruction::Act(ref act) => {
                 if let Some(assignment) = &act.assignment {
                     if assignment == "terminate" {
@@ -115,14 +118,14 @@ fn determine_return_type(instructions: &[Instruction]) -> Option<String> {
                         }
                     }
                 }
-            },
+            }
             Instruction::Sub(sub) => {
                 let data_type = determine_return_type(&sub.instructions);
                 if data_type.is_some() {
                     return data_type;
                 }
             }
-            _ => continue
+            _ => continue,
         }
     }
 

@@ -1,20 +1,18 @@
 use crate::environment::Environment;
-use brane_exec::delegate;
 use anyhow::Result;
-use specifications::common::Value;
-use futures::executor::block_on;
-use std::io::BufReader;
-use std::fs::{self, File};
+use brane_exec::delegate;
 use flate2::read::GzDecoder;
-use flate2::write::GzEncoder;
-use flate2::Compression;
-use std::io::prelude::*;
+use futures::executor::block_on;
+use semver::Version;
+use specifications::common::Value;
 use specifications::instructions::ActInstruction;
 use specifications::instructions::{Instruction, Instruction::*, Move, Move::*, Operator::*};
-use std::path::PathBuf;
 use std::env;
+use std::fs::{self, File};
+use std::io::prelude::*;
+use std::io::BufReader;
+use std::path::PathBuf;
 use tar::Archive;
-use semver::Version;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -33,9 +31,13 @@ impl Machine {
     ///
     pub fn new(
         environment: Box<dyn Environment>,
-        packages_dir: Option<PathBuf>
+        packages_dir: Option<PathBuf>,
     ) -> Self {
-        Machine { cursor: 0, environment, packages_dir }
+        Machine {
+            cursor: 0,
+            environment,
+            packages_dir,
+        }
     }
 
     ///
@@ -107,21 +109,21 @@ impl Machine {
                                 } else {
                                     panic!("Trying to access undeclared variable.");
                                 }
-                            },
+                            }
                             Value::Struct { properties, .. } => {
                                 if let Some(value) = properties.get(segments[1]) {
                                     arguments.insert(name.clone(), value.clone());
                                 } else {
                                     panic!("Trying to access undeclared variable.");
                                 }
-                            },
-                            _ => unreachable!()
+                            }
+                            _ => unreachable!(),
                         };
                     } else {
                         let value = self.environment.get(variable);
                         arguments.insert(name.clone(), value);
                     }
-                },
+                }
                 _ => {
                     arguments.insert(name.clone(), value.clone());
                 }
@@ -167,7 +169,7 @@ impl Machine {
         act: &ActInstruction,
         arguments: Map<Value>,
     ) -> Result<Option<Value>> {
-        let instructions = if let Some(instr_file) = act.meta.get("instr_file").map(PathBuf::from) {
+        let instructions: Vec<Instruction> = if let Some(instr_file) = act.meta.get("instr_file").map(PathBuf::from) {
             let instr_reader = BufReader::new(File::open(&instr_file)?);
             serde_yaml::from_reader(instr_reader)?
         } else {
@@ -296,7 +298,6 @@ impl Machine {
     }
 }
 
-
 ///
 ///
 ///
@@ -313,7 +314,6 @@ fn preprocess_instructions(
                 let version = act.meta.get("version").expect("No `version` property in metadata.");
                 let kind = act.meta.get("kind").expect("No `kind` property in metadata.");
 
-                let package_dir = packages_dir.join(name).join(version);
                 match kind.as_str() {
                     "cwl" => {
                         let cwl_file = get_package_source(&name, &version, &kind)?;
@@ -321,31 +321,31 @@ fn preprocess_instructions(
                             act.meta
                                 .insert(String::from("cwl_file"), String::from(cwl_file.to_string_lossy()));
                         }
-                    },
+                    }
                     "dsl" => {
                         let instr_file = get_package_source(&name, &version, &kind)?;
                         if instr_file.exists() {
                             act.meta
                                 .insert(String::from("instr_file"), String::from(instr_file.to_string_lossy()));
                         }
-                    },
+                    }
                     "ecu" => {
                         let image_file = get_package_source(&name, &version, &kind)?;
                         if image_file.exists() {
                             act.meta
                                 .insert(String::from("image_file"), String::from(image_file.to_string_lossy()));
                         }
-                    },
+                    }
                     "oas" => {
                         let oas_file = get_package_source(&name, &version, &kind)?;
                         if oas_file.exists() {
                             act.meta
                                 .insert(String::from("oas_file"), String::from(oas_file.to_string_lossy()));
                         }
-                    },
+                    }
                     _ => {}
                 }
-            },
+            }
             Instruction::Sub(sub) => {
                 if let Some(_) = sub.meta.get("kind") {
                     let name = sub.meta.get("name").expect("No `name` property in metadata.");
@@ -360,7 +360,7 @@ fn preprocess_instructions(
 
                 sub.instructions = preprocess_instructions(&sub.instructions, &packages_dir)?;
             }
-            _ => continue
+            _ => continue,
         }
     }
 
@@ -368,13 +368,6 @@ fn preprocess_instructions(
 
     Ok(instructions)
 }
-
-lazy_static! {
-    static ref API_HOST: String = {
-        env::var("API_HOST").unwrap_or_else(|_| String::from("brane-api:8080"))
-    };
-}
-
 
 ///
 ///
@@ -424,13 +417,17 @@ pub fn get_package_dir(
     Ok(package_dir.join(version))
 }
 
+lazy_static! {
+    static ref API_HOST: String = { env::var("API_HOST").unwrap_or_else(|_| String::from("brane-api:8080")) };
+}
+
 ///
 ///
 ///
 pub fn get_package_source(
     name: &String,
     version: &String,
-    kind: &String
+    kind: &String,
 ) -> Result<PathBuf> {
     let package_dir = get_package_dir(name, Some(version))?;
     let temp_dir = PathBuf::from("/tmp"); // TODO: get from OS
@@ -453,7 +450,7 @@ pub fn get_package_source(
 
                 cwl_file
             }
-        },
+        }
         "dsl" => {
             let instructions = package_dir.join("instructions.yml");
             if instructions.exists() {
@@ -471,7 +468,7 @@ pub fn get_package_source(
 
                 instructions
             }
-        },
+        }
         "ecu" => {
             let image_file = package_dir.join("image.tar");
             if false && image_file.exists() {
@@ -498,7 +495,7 @@ pub fn get_package_source(
 
                 image_file
             }
-        },
+        }
         "oas" => {
             let oas_file = package_dir.join("document.yml");
             if oas_file.exists() {
@@ -516,8 +513,8 @@ pub fn get_package_source(
 
                 oas_file
             }
-        },
-        _ => unreachable!()
+        }
+        _ => unreachable!(),
     };
 
     Ok(path)

@@ -1,6 +1,4 @@
 #[macro_use]
-extern crate anyhow;
-#[macro_use]
 extern crate log;
 
 use serde::{Deserialize, Serialize};
@@ -9,7 +7,6 @@ use std::path::PathBuf;
 pub mod delegate;
 pub mod docker;
 pub mod openapi;
-
 
 ///
 ///

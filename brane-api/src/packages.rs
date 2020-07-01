@@ -180,7 +180,7 @@ async fn upload_package(
             if cwl_document.exists() {
                 new_package.source = Some(fs::read_to_string(cwl_document).unwrap());
             }
-        },
+        }
         "ecu" => {
             // In the case of a container package, store image in Docker registry
             // TODO: make seperate function
@@ -203,22 +203,21 @@ async fn upload_package(
                     return HttpResponse::InternalServerError().body(MSG_FAILED_TO_PUSH);
                 }
             }
-        },
+        }
         "dsl" => {
             let instructions = temp_workdir.join("instructions.yml");
             if instructions.exists() {
                 new_package.source = Some(fs::read_to_string(instructions).unwrap());
             }
-        },
+        }
         "oas" => {
             let oas_document = temp_workdir.join("document.yml");
             if oas_document.exists() {
                 new_package.source = Some(fs::read_to_string(oas_document).unwrap());
             }
-        },
+        }
         _ => unreachable!(),
     }
-
 
     // Store package information in database and the archive in the packages dir
     let result = web::block(move || {
@@ -416,8 +415,8 @@ async fn get_package_source(
         .unwrap();
 
     if let Some(Some(source)) = package.map(|p| p.source) {
-        return HttpResponse::Ok().content_type("application/yaml").body(source);
+        HttpResponse::Ok().content_type("application/yaml").body(source)
     } else {
-        return HttpResponse::NotFound().body("");
+        HttpResponse::NotFound().body("")
     }
 }

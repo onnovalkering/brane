@@ -6,21 +6,18 @@ use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use reqwest::{self, multipart::Form, multipart::Part, Body, Client, Method};
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JValue};
 use specifications::package::PackageInfo;
 use std::env;
 use std::fs::{self, File};
 use std::io::prelude::*;
-use tar::Archive;
 use std::path::PathBuf;
+use tar::Archive;
 use tokio::fs::File as TokioFile;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 lazy_static! {
-    static ref API_HOST: String = {
-        env::var("API_HOST").unwrap_or_else(|_| String::from("brane-api:8080"))
-    };
+    static ref API_HOST: String = { env::var("API_HOST").unwrap_or_else(|_| String::from("brane-api:8080")) };
 }
 
 ///
@@ -111,7 +108,10 @@ pub async fn push(
     // Upload file
     let url = format!(
         "http://{}/packages/{}/{}?checksum={}",
-        API_HOST.as_str(), name, version, checksum
+        API_HOST.as_str(),
+        name,
+        version,
+        checksum
     );
     let request = Client::new().request(Method::POST, &url);
 
@@ -184,14 +184,13 @@ pub async fn get_package_index() -> Result<PackageIndex> {
     PackageIndex::from_value(packages)
 }
 
-
 ///
 ///
 ///
 pub async fn get_package_source(
     name: &String,
     version: &String,
-    kind: &String
+    kind: &String,
 ) -> Result<PathBuf> {
     let package_dir = packages::get_package_dir(name, Some(version))?;
     let temp_dir = PathBuf::from("/tmp"); // TODO: get from OS
@@ -216,7 +215,7 @@ pub async fn get_package_source(
 
                 cwl_file
             }
-        },
+        }
         "dsl" => {
             let instructions = package_dir.join("instructions.yml");
             if instructions.exists() {
@@ -236,7 +235,7 @@ pub async fn get_package_source(
 
                 instructions
             }
-        },
+        }
         "ecu" => {
             let image_file = package_dir.join("image.tar");
             if false && image_file.exists() {
@@ -265,7 +264,7 @@ pub async fn get_package_source(
 
                 image_file
             }
-        },
+        }
         "oas" => {
             let oas_file = package_dir.join("document.yml");
             if oas_file.exists() {
@@ -285,8 +284,8 @@ pub async fn get_package_source(
 
                 oas_file
             }
-        },
-        _ => unreachable!()
+        }
+        _ => unreachable!(),
     };
 
     Ok(path)

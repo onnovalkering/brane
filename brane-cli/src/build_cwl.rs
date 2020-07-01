@@ -9,8 +9,8 @@ use cwl::v11_wf::{
     WorkflowInputParameter, WorkflowInputParameterType, WorkflowInputType, WorkflowInputs, WorkflowOutputParameter,
     WorkflowOutputParameterType, WorkflowOutputType, WorkflowOutputs, WorkflowSteps,
 };
-use cwl::{v11::CwlDocument, v11_clt::CommandLineTool, v11_cm::CwlType, v11_wf::Workflow, v11_cm::Any};
-use specifications::common::{CallPattern, Function, Parameter, Property, Value, Type};
+use cwl::{v11::CwlDocument, v11_clt::CommandLineTool, v11_cm::Any, v11_cm::CwlType, v11_wf::Workflow};
+use specifications::common::{CallPattern, Function, Parameter, Property, Type, Value};
 use specifications::package::PackageInfo;
 use std::fs::{self, File};
 use std::io::{BufReader, Write};
@@ -135,7 +135,7 @@ fn build_cwl_functions(cwl_document: &CwlDocument) -> Result<(Map<Function>, Map
         if let Some(output_property) = output_properties.first() {
             match output_property.data_type.as_str() {
                 "stdout" => String::from("string"),
-                _ => output_property.data_type.clone()
+                _ => output_property.data_type.clone(),
             }
         } else {
             String::from("unit")

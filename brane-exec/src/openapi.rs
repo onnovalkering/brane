@@ -9,7 +9,7 @@ type Map<T> = std::collections::HashMap<String, T>;
 ///
 ///
 pub async fn execute(
-    operation_id: &String,
+    operation_id: &str,
     arguments: Map<Value>,
     oas_document: &OpenAPI,
 ) -> Result<JValue> {
@@ -54,13 +54,13 @@ pub async fn execute(
 ///
 ///
 pub fn get_operation(
-    operation_id: &String,
-    oas_document: &OpenAPI
+    operation_id: &str,
+    oas_document: &OpenAPI,
 ) -> Result<(String, Operation)> {
     let (path, path_item) = oas_document
         .paths
         .iter()
-        .filter(|(_, path)| {
+        .find(|(_, path)| {
             if let ReferenceOr::Item(path) = path {
                 if let Some(get_operation) = &path.get {
                     if let Some(id) = &get_operation.operation_id {
@@ -73,7 +73,6 @@ pub fn get_operation(
 
             unreachable!();
         })
-        .next()
         .expect("Mismatch in operation id");
 
     let operation = if let ReferenceOr::Item(path_item) = path_item {

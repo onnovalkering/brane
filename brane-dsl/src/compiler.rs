@@ -6,7 +6,7 @@ use rand::distributions::Alphanumeric;
 use rand::Rng;
 use regex::Regex;
 use semver::Version;
-use specifications::common::{Value, Variable, Type, Property};
+use specifications::common::{Property, Type, Value, Variable};
 use specifications::instructions::*;
 
 type Map<T> = std::collections::HashMap<String, T>;
@@ -159,7 +159,7 @@ impl Compiler {
                     data_type: data_type.clone(),
                 };
 
-                (Some(value.clone()), data_type.clone())
+                (Some(value), data_type.clone())
             }
             _ => unreachable!(),
         };
@@ -327,18 +327,16 @@ pub fn terms_to_instructions(
     let mut literals = Map::<Value>::new();
     let terms = terms
         .iter()
-        .map(|t| {
-            match t {
-                AstTerm::Value(value) => {
-                    let temp_var = create_temp_var(true);
-                    literals.insert(temp_var.clone(), value.clone());
-                    variables.insert(temp_var.clone(), value.data_type().to_string());
+        .map(|t| match t {
+            AstTerm::Value(value) => {
+                let temp_var = create_temp_var(true);
+                literals.insert(temp_var.clone(), value.clone());
+                variables.insert(temp_var.clone(), value.data_type().to_string());
 
-                    AstTerm::Name(temp_var)
-                },
-                AstTerm::Name(n) => AstTerm::Name(n.clone()),
-                AstTerm::Symbol(s) => AstTerm::Symbol(s.clone()),
+                AstTerm::Name(temp_var)
             }
+            AstTerm::Name(n) => AstTerm::Name(n.clone()),
+            AstTerm::Symbol(s) => AstTerm::Symbol(s.clone()),
         })
         .collect();
 
@@ -413,10 +411,7 @@ pub fn terms_to_instructions(
 
                             debug!("Input: {:?} <- {:?}", &parameter.name, value);
 
-                            input.insert(
-                                parameter.name.clone(),
-                                value
-                            );
+                            input.insert(parameter.name.clone(), value);
                         } else {
                             unreachable!();
                         }
@@ -490,8 +485,8 @@ fn build_terms_pattern(
     for term in &terms {
         match term {
             AstTerm::Name(name) => {
-                if name.contains(".") {
-                    let segments: Vec<_> = name.split(".").collect();
+                if name.contains('.') {
+                    let segments: Vec<_> = name.split('.').collect();
                     if let Some(arch_type) = variables.get(segments[0]) {
                         if arch_type.ends_with("[]") && segments[1] == "length" {
                             let segment = format!("<{}:{}>", name, String::from("integer"));
@@ -515,13 +510,11 @@ fn build_terms_pattern(
                             }
                         }
                     }
-                } else {
-                    if let Some(data_type) = variables.get(name) {
-                        let segment = format!("<{}:{}>", name, data_type);
-                        term_pattern_segments.push(segment);
+                } else if let Some(data_type) = variables.get(name) {
+                    let segment = format!("<{}:{}>", name, data_type);
+                    term_pattern_segments.push(segment);
 
-                        continue;
-                    }
+                    continue;
                 }
 
                 // If the above attempt(s) faile, just add the name.
@@ -531,7 +524,6 @@ fn build_terms_pattern(
                 term_pattern_segments.push(symbol.to_string());
             }
             AstTerm::Value(value) => {
-
                 let segment = format!("<{}>", value.data_type());
                 term_pattern_segments.push(segment);
             }

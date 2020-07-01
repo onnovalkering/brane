@@ -137,12 +137,13 @@ fn test_dsl(
     let mut machine = Machine::new(Box::new(environment), Some(packages::get_packages_dir()));
     let output = machine.interpret(instructions)?;
 
-    let output = output.map(|o| if let Value::Pointer { variable, .. } = o {
+    let output = output.map(|o| {
+        if let Value::Pointer { variable, .. } = o {
             machine.environment.get(&variable)
         } else {
             o
         }
-    );
+    });
 
     if let Some(value) = output {
         println!();
@@ -181,14 +182,14 @@ fn test_dsl_preprocess_instructions(
                             act.meta
                                 .insert(String::from("image_file"), String::from(image_file.to_string_lossy()));
                         }
-                    },
+                    }
                     "oas" => {
                         let oas_file = package_dir.join("document.yml");
                         if oas_file.exists() {
                             act.meta
                                 .insert(String::from("oas_file"), String::from(oas_file.to_string_lossy()));
                         }
-                    },
+                    }
                     _ => {}
                 }
             }

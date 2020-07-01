@@ -40,7 +40,11 @@ impl PackageIndex {
         }
 
         let standard = brane_std::PACKAGES.clone();
-        PackageIndex { packages, standard, versions }
+        PackageIndex {
+            packages,
+            standard,
+            versions,
+        }
     }
 
     ///
@@ -98,14 +102,10 @@ impl PackageIndex {
             return standard_package;
         }
 
-        let version = if let None = version {
-            if let Some(version) = self.get_latest_version(name) {
-                version
-            } else {
-                return None
-            }
+        let version = if version.is_none() {
+            self.get_latest_version(name)?
         } else {
-            version.unwrap()
+            version?
         };
 
         self.packages.get(&format!("{}-{}", name, version))

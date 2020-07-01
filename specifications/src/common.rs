@@ -168,24 +168,21 @@ impl Value {
     pub fn from_json(value: &JValue) -> Self {
         match value {
             JValue::Null => Value::Unit,
-            JValue::Bool(b) => Value::Boolean(b.clone()),
+            JValue::Bool(b) => Value::Boolean(*b),
             JValue::Number(n) => {
                 if n.is_i64() {
                     Value::Integer(n.as_i64().unwrap())
                 } else {
                     Value::Real(n.as_f64().unwrap())
                 }
-            },
+            }
             JValue::String(s) => Value::Unicode(s.clone()),
             JValue::Array(a) => {
                 let entries: Vec<Value> = a.iter().map(|v| Value::from_json(v)).collect();
                 let data_type = format!("{}[]", entries.first().unwrap().data_type());
 
-                Value::Array {
-                    data_type,
-                    entries
-                }
-            },
+                Value::Array { data_type, entries }
+            }
             JValue::Object(o) => {
                 let mut properties = Map::<Value>::new();
                 let data_type = String::from("anonymous");
@@ -194,10 +191,7 @@ impl Value {
                     properties.insert(name.clone(), Value::from_json(jvalue));
                 }
 
-                Value::Struct {
-                    data_type,
-                    properties
-                }
+                Value::Struct { data_type, properties }
             }
         }
     }
@@ -224,7 +218,7 @@ impl Value {
     ///
     pub fn as_bool(&self) -> Result<bool> {
         if let Value::Boolean(b) = self {
-            Ok(b.clone())
+            Ok(*b)
         } else {
             Err(anyhow!("Value does not contain a boolean."))
         }
@@ -235,7 +229,7 @@ impl Value {
     ///
     pub fn as_f64(&self) -> Result<f64> {
         if let Value::Real(f) = self {
-            Ok(f.clone())
+            Ok(*f)
         } else {
             Err(anyhow!("Value does not contain a real (float)."))
         }
@@ -246,7 +240,7 @@ impl Value {
     ///
     pub fn as_i64(&self) -> Result<i64> {
         if let Value::Integer(i) = self {
-            Ok(i.clone())
+            Ok(*i)
         } else {
             Err(anyhow!("Value does not contain an integer."))
         }
@@ -260,29 +254,6 @@ impl Value {
             Ok(s.clone())
         } else {
             Err(anyhow!("Value does not contain a string."))
-        }
-    }
-
-    ///
-    ///
-    ///
-    pub fn to_string(&self) -> String {
-        use Value::*;
-        match self {
-            Array { entries, .. } => {
-                let entries = entries.iter().map(|e| e.to_string()).collect::<Vec<String>>().join(", ");
-                format!("[{}]", entries)
-            },
-            Boolean(b) => b.to_string(),
-            Integer(i) => i.to_string(),
-            Pointer { variable, .. } => format!("@{}", variable),
-            Real(r) => r.to_string(),
-            Struct { properties, .. } => {
-                let properties = properties.iter().map(|(n, p)| format!("{}: {}", n, p.to_string())).collect::<Vec<String>>().join(", ");
-                format!("{{{}}}", properties)
-            },
-            Unicode(s) => s.to_string(),
-            Unit => String::from("unit"),
         }
     }
 
@@ -310,16 +281,32 @@ impl Display for Value {
         f: &mut Formatter,
     ) -> fmt::Result {
         use Value::*;
-        match self {
-            Array { .. } => unimplemented!(),
-            Boolean(value) => write!(f, "{}", value),
-            Integer(value) => write!(f, "{}", value),
-            Pointer { .. } => unimplemented!(),
-            Real(value) => write!(f, "{}", value),
-            Struct { .. } => unimplemented!(),
-            Unicode(value) => write!(f, "{}", value),
-            Unit => write!(f, "()"),
-        }
+        let value = match self {
+            Array { entries, .. } => {
+                let entries = entries
+                    .iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                format!("[{}]", entries)
+            }
+            Boolean(b) => b.to_string(),
+            Integer(i) => i.to_string(),
+            Pointer { variable, .. } => format!("@{}", variable),
+            Real(r) => r.to_string(),
+            Struct { properties, .. } => {
+                let properties = properties
+                    .iter()
+                    .map(|(n, p)| format!("{}: {}", n, p.to_string()))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                format!("{{{}}}", properties)
+            }
+            Unicode(s) => s.to_string(),
+            Unit => String::from("unit"),
+        };
+
+        write!(f, "{}", value)
     }
 }
 

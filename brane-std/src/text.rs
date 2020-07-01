@@ -79,7 +79,7 @@ pub fn split(arguments: &Map<Value>) -> Result<Value> {
     let input = arguments.get("input").expect("Missing `input` argument.");
     if let Value::Unicode(text) = input {
         let data_type = String::from("string[]");
-        let entries: Vec<Value> = text.split(" ").map(|e| Value::Unicode(e.to_string())).collect();
+        let entries: Vec<Value> = text.split(' ').map(|e| Value::Unicode(e.to_string())).collect();
 
         Ok(Value::Array { data_type, entries })
     } else {

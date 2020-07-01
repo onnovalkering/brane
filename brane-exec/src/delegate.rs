@@ -1,13 +1,13 @@
-use crate::{docker, openapi};
 use crate::ExecuteInfo;
+use crate::{docker, openapi};
 use anyhow::Result;
+use openapiv3::OpenAPI;
+use serde_json::{json, Value as JValue};
 use specifications::common::Value;
 use specifications::instructions::ActInstruction;
-use openapiv3::OpenAPI;
-use std::io::BufReader;
-use serde_json::{json, Value as JValue};
 use std::fs::{self, File};
 use std::io::prelude::*;
+use std::io::BufReader;
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -51,11 +51,14 @@ pub async fn exec_cwl(
         format!("{}:{}", working_dir_str, working_dir_str),
     ];
 
-    let command = vec!["--quiet", "document.cwl", "input.json"].iter().map(|s| s.to_string()).collect();
+    let command = vec!["--quiet", "document.cwl", "input.json"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     let exec = ExecuteInfo::new(image, None, Some(mounts), Some(working_dir_str), Some(command));
 
     let (stdout, stderr) = docker::run_and_wait(exec).await?;
-    if stderr.len() > 0 {
+    if !stderr.is_empty() {
         warn!("{}", stderr);
     }
 
@@ -71,7 +74,7 @@ pub async fn exec_cwl(
     };
 
     let output: Map<JValue> = serde_json::from_str(&stdout)?;
-    for (_, value) in output.iter() {
+    if let Some((_, value)) = output.iter().next() {
         let mut value_file = File::open(value["path"].as_str().unwrap())?;
         let mut value = String::new();
         value_file.read_to_string(&mut value)?;
@@ -111,27 +114,21 @@ pub async fn exec_ecu(
     let command = vec![String::from("exec"), base64::encode(serde_json::to_string(&payload)?)];
     debug!("{:?}", command);
 
-    let exec = ExecuteInfo::new(
-        image.clone(),
-        image_file,
-        None,
-        None,
-        Some(command),
-    );
+    let exec = ExecuteInfo::new(image.clone(), image_file, None, None, Some(command));
 
     let (stdout, stderr) = docker::run_and_wait(exec).await?;
-    if stderr.len() > 0 {
+    if !stderr.is_empty() {
         error!("stderr: {}", stderr);
     }
 
     debug!("stdout: {}", stdout);
 
     let output: Map<Value> = serde_json::from_str(&stdout)?;
-    for (_, value) in output.iter() {
-        return Ok(Some(value.clone()))
+    if let Some((_, value)) = output.iter().next() {
+        Ok(Some(value.clone()))
+    } else {
+        Ok(None)
     }
-
-    Ok(None)
 }
 
 ///
@@ -141,7 +138,11 @@ pub async fn exec_oas(
     act: &ActInstruction,
     arguments: Map<Value>,
 ) -> Result<Option<Value>> {
-    let oas_file = act.meta.get("oas_file").map(PathBuf::from).expect("Missing OAS document.");
+    let oas_file = act
+        .meta
+        .get("oas_file")
+        .map(PathBuf::from)
+        .expect("Missing OAS document.");
     let oas_reader = BufReader::new(File::open(&oas_file)?);
     let oas_document: OpenAPI = serde_yaml::from_reader(oas_reader)?;
 
@@ -152,12 +153,15 @@ pub async fn exec_oas(
         Value::Unit => Ok(None),
         Value::Struct { properties, .. } => {
             if let Some(data_type) = &act.data_type {
-                Ok(Some(Value::Struct { data_type: data_type.clone(), properties: properties.clone() }))
+                Ok(Some(Value::Struct {
+                    data_type: data_type.clone(),
+                    properties: properties.clone(),
+                }))
             } else {
                 Ok(Some(output))
             }
-        },
-        _ => Ok(Some(output))
+        }
+        _ => Ok(Some(output)),
     }
 }
 
