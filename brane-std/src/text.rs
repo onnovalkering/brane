@@ -16,8 +16,8 @@ lazy_static! {
         // Concat
         functions.insert(String::from("concat1"), Function::new(
             vec![
-                Parameter::new(String::from("left"), String::from("integer"), None, None),
-                Parameter::new(String::from("right"), String::from("string"), None, None)
+                Parameter::new(String::from("left"), String::from("integer"), None, None, None),
+                Parameter::new(String::from("right"), String::from("string"), None, None, None)
             ],
             Some(CallPattern::new(None, Some(vec![String::from("+")]), None)),
             String::from("string")
@@ -25,8 +25,8 @@ lazy_static! {
 
         functions.insert(String::from("concat2"), Function::new(
             vec![
-                Parameter::new(String::from("left"), String::from("string"), None, None),
-                Parameter::new(String::from("right"), String::from("integer"), None, None)
+                Parameter::new(String::from("left"), String::from("string"), None, None, None),
+                Parameter::new(String::from("right"), String::from("integer"), None, None, None)
             ],
             Some(CallPattern::new(None, Some(vec![String::from("+")]), None)),
             String::from("string")
@@ -34,8 +34,8 @@ lazy_static! {
 
         functions.insert(String::from("concat3"), Function::new(
             vec![
-                Parameter::new(String::from("left"), String::from("string"), None, None),
-                Parameter::new(String::from("right"), String::from("string"), None, None)
+                Parameter::new(String::from("left"), String::from("string"), None, None, None),
+                Parameter::new(String::from("right"), String::from("string"), None, None, None)
             ],
             Some(CallPattern::new(None, Some(vec![String::from("+")]), None)),
             String::from("string")
@@ -43,7 +43,7 @@ lazy_static! {
 
         // Split
         functions.insert(String::from("split"), Function::new(
-            vec![Parameter::new(String::from("input"), String::from("string"), None, None)],
+            vec![Parameter::new(String::from("input"), String::from("string"), None, None, None)],
             Some(CallPattern::new(Some(String::from("split")), None, None)),
             String::from("string[]")
         ));

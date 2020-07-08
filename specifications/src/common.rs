@@ -16,6 +16,7 @@ pub struct Parameter {
     pub default: Option<Value>,
     pub name: String,
     pub optional: Option<bool>,
+    pub secret: Option<String>,
 }
 
 impl Parameter {
@@ -27,12 +28,14 @@ impl Parameter {
         data_type: String,
         optional: Option<bool>,
         default: Option<Value>,
+        secret: Option<String>,
     ) -> Self {
         Parameter {
             data_type,
             default,
             name,
             optional,
+            secret,
         }
     }
 }
@@ -132,7 +135,7 @@ impl Property {
     ///
     ///
     pub fn into_parameter(self) -> Parameter {
-        Parameter::new(self.name, self.data_type, self.optional, self.default)
+        Parameter::new(self.name, self.data_type, self.optional, self.default, None)
     }
 }
 

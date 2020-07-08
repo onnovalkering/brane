@@ -112,7 +112,7 @@ fn build_cwl_functions(cwl_document: &CwlDocument) -> Result<(Map<Function>, Map
         };
         types.insert(input_data_type.clone(), input_type);
 
-        let input_parameter = Parameter::new(String::from("input"), input_data_type, None, None);
+        let input_parameter = Parameter::new(String::from("input"), input_data_type, None, None, None);
         vec![input_parameter]
     } else {
         input_properties

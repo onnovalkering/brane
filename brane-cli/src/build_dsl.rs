@@ -70,7 +70,7 @@ fn generate_package_info(
         match instruction {
             Instruction::Var(var) => {
                 for get in &var.get {
-                    let parameter = Parameter::new(get.name.clone(), get.data_type.clone(), None, None);
+                    let parameter = Parameter::new(get.name.clone(), get.data_type.clone(), None, None, None);
                     input_parameters.push(parameter);
                 }
             }
