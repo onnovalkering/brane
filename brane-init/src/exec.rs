@@ -1,6 +1,6 @@
 use crate::Payload;
 use specifications::common::{Parameter, Type, Value};
-use specifications::container::ContainerInfo;
+use specifications::container::{ActionCommand, ContainerInfo};
 use std::path::PathBuf;
 use std::process::Command;
 use yaml_rust::{Yaml, YamlLoader};
@@ -30,7 +30,10 @@ pub async fn handle(
     );
 
     let entrypoint = &container_info.entrypoint.exec;
-    let command = action.command.as_ref().unwrap();
+    let command = action.command.clone().unwrap_or_else(|| ActionCommand {
+        args: Default::default(),
+        capture: None,
+    });
 
     let stdout = execute(entrypoint, &command.args, &payload.arguments, &working_dir)?;
     let output = capture_output(stdout, &action.output, &command.capture, &container_info.types)?;
