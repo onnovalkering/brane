@@ -1,4 +1,5 @@
 use crate::environment::Environment;
+use crate::vault::Vault;
 use anyhow::Result;
 use brane_exec::delegate;
 use flate2::read::GzDecoder;
@@ -13,6 +14,7 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::PathBuf;
 use tar::Archive;
+use std::rc::Rc;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -23,6 +25,7 @@ pub struct Machine {
     cursor: usize,
     pub environment: Box<dyn Environment>,
     packages_dir: Option<PathBuf>,
+    pub vault: Rc<dyn Vault>,
 }
 
 impl Machine {
@@ -31,12 +34,14 @@ impl Machine {
     ///
     pub fn new(
         environment: Box<dyn Environment>,
+        vault: Rc<dyn Vault>,
         packages_dir: Option<PathBuf>,
     ) -> Self {
         Machine {
             cursor: 0,
             environment,
             packages_dir,
+            vault,
         }
     }
 
@@ -97,8 +102,11 @@ impl Machine {
         let mut arguments = Map::<Value>::new();
         for (name, value) in &act.input {
             match &value {
-                Value::Pointer { variable, .. } => {
-                    if variable.contains(".") {
+                Value::Pointer { variable, secret, .. } => {
+                    if *secret {
+                        let value = self.vault.get(variable);
+                        arguments.insert(name.clone(), value.clone());
+                    } else if variable.contains(".") {
                         let segments: Vec<_> = variable.split(".").collect();
                         let arch_value = self.environment.get(segments[0]);
 
@@ -180,7 +188,7 @@ impl Machine {
         for (name, value) in arguments {
             sub_environment.set(&name, &value);
         }
-        let mut sub_machine = Machine::new(sub_environment, self.packages_dir.clone());
+        let mut sub_machine = Machine::new(sub_environment, self.vault.clone(), self.packages_dir.clone());
 
         let instructions = if let Some(ref packages_dir) = self.packages_dir {
             preprocess_instructions(&instructions, packages_dir)?
@@ -256,7 +264,7 @@ impl Machine {
             bail!("Not a SUB instruction.");
         };
 
-        let mut sub_machine = Machine::new(self.environment.child(), self.packages_dir.clone());
+        let mut sub_machine = Machine::new(self.environment.child(), self.vault.clone(), self.packages_dir.clone());
         sub_machine.interpret(sub.instructions)?;
 
         // Commit variables to parent (this) machine
@@ -418,7 +426,7 @@ pub fn get_package_dir(
 }
 
 lazy_static! {
-    static ref API_HOST: String = { env::var("API_HOST").unwrap_or_else(|_| String::from("brane-api:8080")) };
+    static ref API_HOST: String = env::var("API_HOST").unwrap_or_else(|_| String::from("brane-api:8080"));
 }
 
 ///

@@ -1,7 +1,9 @@
 use crate::packages;
 use anyhow::Result;
 use brane_exec::{docker, openapi, ExecuteInfo};
-use brane_vm::{environment::InMemoryEnvironment, machine::Machine};
+use brane_vm::machine::Machine;
+use brane_vm::environment::InMemoryEnvironment;
+use brane_vm::vault::InMemoryVault;
 use console::style;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input as Prompt, Select};
@@ -20,6 +22,7 @@ use std::{
     fmt::{Debug, Display},
     str::FromStr,
 };
+use std::rc::Rc;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -133,8 +136,11 @@ fn test_dsl(
     let mut arguments = Map::<Value>::new();
     test_dsl_preprocess_instructions(&mut instructions, &mut arguments)?;
 
+    let secrets = Map::<Value>::new();
+    let vault = InMemoryVault::new(secrets);
+
     let environment = InMemoryEnvironment::new(Some(arguments), None);
-    let mut machine = Machine::new(Box::new(environment), Some(packages::get_packages_dir()));
+    let mut machine = Machine::new(Box::new(environment), Rc::new(vault), Some(packages::get_packages_dir()));
     let output = machine.interpret(instructions)?;
 
     let output = output.map(|o| {

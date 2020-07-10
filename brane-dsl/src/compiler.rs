@@ -157,6 +157,7 @@ impl Compiler {
                 let value = Value::Pointer {
                     variable: variable.clone(),
                     data_type: data_type.clone(),
+                    secret: false,
                 };
 
                 (Some(value), data_type.clone())
@@ -291,6 +292,7 @@ impl Compiler {
                         let value = Value::Pointer {
                             variable: name.clone(),
                             data_type: data_type.clone(),
+                            secret: false,
                         };
                         let variable =
                             Variable::new(terminate, data_type.clone(), Some(String::from("output")), Some(value));
@@ -406,6 +408,7 @@ pub fn terms_to_instructions(
                                 Value::Pointer {
                                     variable: arg,
                                     data_type: parameter.data_type.clone(),
+                                    secret: false,
                                 }
                             };
 
@@ -417,6 +420,23 @@ pub fn terms_to_instructions(
                         }
                     }
                 }
+
+                // Add implicit arguments to input (secrets)
+                function
+                    .parameters
+                    .iter()
+                    .filter(|p| p.secret.is_some())
+                    .for_each(|p| {
+                        let pointer = Value::Pointer {
+                            variable: p.secret.as_ref().unwrap().clone(),
+                            data_type: p.data_type.clone(),
+                            secret: true,
+                        };
+
+                        input.insert(p.name.clone(), pointer);
+                    });
+
+                debug!("Input: {:?}", &input);
 
                 // Decide if we can reuse consumed temp variable, or create a new one.
                 let temp_var = if let Some(temp_var) = consumed_temp {

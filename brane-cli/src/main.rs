@@ -84,7 +84,10 @@ enum SubCommand {
     },
 
     #[structopt(name = "repl", about = "Start an interactive DSL session")]
-    Repl {},
+    Repl {
+        #[structopt(short, long, help = "File containing secrets")]
+        secrets: Option<PathBuf>,
+    },
 
     #[structopt(name = "test", about = "Test a package locally")]
     Test {
@@ -181,8 +184,8 @@ async fn run(options: CLI) -> Result<()> {
         Remove { name, version, force } => {
             packages::remove(name, version, force)?;
         }
-        Repl {} => {
-            repl::start().await?;
+        Repl { secrets } => {
+            repl::start(secrets).await?;
         }
         Test { name, version } => {
             test::handle(name, version).await?;

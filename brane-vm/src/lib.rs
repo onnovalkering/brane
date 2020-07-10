@@ -7,3 +7,4 @@ extern crate log;
 
 pub mod environment;
 pub mod machine;
+pub mod vault;

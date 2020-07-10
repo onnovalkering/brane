@@ -1,15 +1,22 @@
 use crate::{packages, registry};
 use anyhow::Result;
 use brane_dsl::compiler::{Compiler, CompilerOptions};
-use brane_vm::{environment::InMemoryEnvironment, machine::Machine};
+use brane_vm::machine::Machine;
+use brane_vm::environment::InMemoryEnvironment;
+use brane_vm::vault::InMemoryVault;
 use futures::executor::block_on;
 use linefeed::{Interface, ReadResult};
 use specifications::common::Value;
 use specifications::instructions::Instruction;
 use std::fs::File;
 use std::io::BufReader;
+use std::rc::Rc;
+use std::path::PathBuf;
+use serde_yaml;
 
-pub async fn start() -> Result<()> {
+type Map<T> = std::collections::HashMap<String, T>;
+
+pub async fn start(secrets_file: Option<PathBuf>) -> Result<()> {
     println!("Starting interactive session, press Ctrl+D to exit.\n");
 
     let interface = Interface::new("brane-repl")?;
@@ -20,8 +27,16 @@ pub async fn start() -> Result<()> {
     let mut compiler = Compiler::new(CompilerOptions::repl(), package_index)?;
 
     // Prepare machine
+    let secrets: Map<Value> = if let Some(secrets_file) = secrets_file {
+        let reader = BufReader::new(File::open(&secrets_file)?);
+        serde_yaml::from_reader(reader)?
+    } else {
+        Default::default()
+    };
+
     let environment = InMemoryEnvironment::new(None, None);
-    let mut machine = Machine::new(Box::new(environment), Some(packages::get_packages_dir()));
+    let vault = InMemoryVault::new(secrets);
+    let mut machine = Machine::new(Box::new(environment), Rc::new(vault), Some(packages::get_packages_dir()));
 
     while let ReadResult::Input(line) = interface.read_line()? {
         if !line.trim().is_empty() {
@@ -29,6 +44,7 @@ pub async fn start() -> Result<()> {
         };
 
         let instructions = compiler.compile(&line);
+        debug!("Instructions: {:?}", instructions);
 
         match instructions {
             Ok(instructions) => {
@@ -68,7 +84,6 @@ async fn preprocess_instructions(instructions: &Vec<Instruction>) -> Result<Vec<
                 let version = act.meta.get("version").expect("No `version` property in metadata.");
                 let kind = act.meta.get("kind").expect("No `kind` property in metadata.");
 
-                let _package_dir = packages::get_package_dir(&name, Some(version))?;
                 match kind.as_str() {
                     "cwl" => {
                         let cwl_file = registry::get_package_source(&name, &version, &kind).await?;

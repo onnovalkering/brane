@@ -1,6 +1,6 @@
 use anyhow::Result;
 use itertools::interleave;
-use specifications::common::{Function, Parameter};
+use specifications::common::{CallPattern, Function, Parameter};
 use specifications::package::PackageInfo;
 
 type Map<T> = std::collections::HashMap<String, T>;
@@ -24,7 +24,7 @@ pub fn get_module_patterns(module: &PackageInfo) -> Result<Vec<FunctionPattern>>
     }
 
     for (name, function) in module.functions.as_ref().unwrap().iter() {
-        let pattern = build_pattern(function)?;
+        let pattern = build_pattern(name, function)?;
         let mut meta = Map::<String>::new();
 
         meta.insert(String::from("kind"), module.kind.clone());
@@ -51,14 +51,14 @@ pub fn get_module_patterns(module: &PackageInfo) -> Result<Vec<FunctionPattern>>
 ///
 ///
 ///
-fn build_pattern(function: &Function) -> Result<String> {
+fn build_pattern(name: &String, function: &Function) -> Result<String> {
     let mut pattern = vec![];
 
     if function.pattern.is_none() {
-        return Err(anyhow!("Function doesn't have a call pattern."));
+        pattern.push(regex::escape(name));
     }
 
-    let notation = function.pattern.clone().unwrap();
+    let notation = function.pattern.clone().unwrap_or_else(|| CallPattern::new(None, None, None ));
     if let Some(prefix) = notation.prefix {
         pattern.push(regex::escape(&prefix));
     }
@@ -66,6 +66,7 @@ fn build_pattern(function: &Function) -> Result<String> {
     let mut arguments: Vec<String> = function
         .parameters
         .iter()
+        .filter(|p| p.secret.is_none()) // Ignore implicit arguments
         .map(|arg| {
             let data_type = regex::escape(&arg.data_type);
             let data_type = if data_type.ends_with(']') {

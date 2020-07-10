@@ -153,6 +153,8 @@ pub enum Value {
         #[serde(rename = "type")]
         data_type: String,
         variable: String,
+        #[serde(default = "Default::default")]
+        secret: bool,
     },
     Real(f64),
     Struct {
