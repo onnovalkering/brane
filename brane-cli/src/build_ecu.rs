@@ -214,6 +214,15 @@ fn build_ecu_image(
     package_dir: &PathBuf,
     tag: String,
 ) -> Result<()> {
+    let buildx = Command::new("docker")
+        .arg("buildx")
+        .output()
+        .expect("Couldn't run 'docker' command.");
+
+    if !buildx.status.success() {
+        return Err(anyhow!("Failed to build ECU image. Is BuildKit enabled (see documentation)?"));
+    }
+
     let output = Command::new("docker")
         .arg("buildx")
         .arg("build")
@@ -227,7 +236,7 @@ fn build_ecu_image(
         .expect("Couldn't run 'docker' command.");
 
     if !output.success() {
-        return Err(anyhow!("Failed to build ECU image."));
+        return Err(anyhow!("Failed to build ECU image. See Docker output above for more information."));
     }
 
     Ok(())
