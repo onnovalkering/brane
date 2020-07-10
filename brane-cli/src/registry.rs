@@ -17,7 +17,7 @@ use tokio::fs::File as TokioFile;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 lazy_static! {
-    static ref API_HOST: String = { env::var("API_HOST").unwrap_or_else(|_| String::from("brane-api:8080")) };
+    static ref API_HOST: String = env::var("API_HOST").unwrap_or_else(|_| String::from("brane-api:8080"));
 }
 
 ///
@@ -238,7 +238,7 @@ pub async fn get_package_source(
         }
         "ecu" => {
             let image_file = package_dir.join("image.tar");
-            if false && image_file.exists() {
+            if image_file.exists() {
                 image_file
             } else {
                 let archive_dir = temp_dir.join(format!("{}-{}-archive", name, version));
