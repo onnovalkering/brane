@@ -2,6 +2,7 @@ use crate::environment::Environment;
 use crate::vault::Vault;
 use anyhow::Result;
 use brane_exec::delegate;
+use brane_sys::System;
 use flate2::read::GzDecoder;
 use futures::executor::block_on;
 use semver::Version;
@@ -25,6 +26,7 @@ pub struct Machine {
     cursor: usize,
     pub environment: Box<dyn Environment>,
     packages_dir: Option<PathBuf>,
+    pub system: Rc<dyn System>,
     pub vault: Rc<dyn Vault>,
 }
 
@@ -34,6 +36,7 @@ impl Machine {
     ///
     pub fn new(
         environment: Box<dyn Environment>,
+        system: Rc<dyn System>,
         vault: Rc<dyn Vault>,
         packages_dir: Option<PathBuf>,
     ) -> Self {
@@ -41,6 +44,7 @@ impl Machine {
             cursor: 0,
             environment,
             packages_dir,
+            system,
             vault,
         }
     }
@@ -144,7 +148,7 @@ impl Machine {
             "dsl" => self.exec_dsl(&act, arguments)?,
             "ecu" => block_on(delegate::exec_ecu(&act, arguments))?,
             "oas" => block_on(delegate::exec_oas(&act, arguments))?,
-            "std" => delegate::exec_std(&act, arguments)?,
+            "std" => delegate::exec_std(&act, arguments, self.system.clone())?,
             _ => unreachable!(),
         };
 
@@ -188,7 +192,12 @@ impl Machine {
         for (name, value) in arguments {
             sub_environment.set(&name, &value);
         }
-        let mut sub_machine = Machine::new(sub_environment, self.vault.clone(), self.packages_dir.clone());
+        let mut sub_machine = Machine::new(
+            sub_environment,
+            self.system.clone(),
+            self.vault.clone(),
+            self.packages_dir.clone()
+        );
 
         let instructions = if let Some(ref packages_dir) = self.packages_dir {
             preprocess_instructions(&instructions, packages_dir)?
@@ -264,7 +273,12 @@ impl Machine {
             bail!("Not a SUB instruction.");
         };
 
-        let mut sub_machine = Machine::new(self.environment.child(), self.vault.clone(), self.packages_dir.clone());
+        let mut sub_machine = Machine::new(
+            self.environment.child(),
+            self.system.clone(),
+            self.vault.clone(),
+            self.packages_dir.clone()
+        );
         sub_machine.interpret(sub.instructions)?;
 
         // Commit variables to parent (this) machine

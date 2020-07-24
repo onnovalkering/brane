@@ -96,6 +96,22 @@ pub struct Type {
     pub properties: Vec<Property>,
 }
 
+impl Type {
+    ///
+    ///
+    ///
+    pub fn new(
+        name: String,
+        properties: Vec<Property>
+    ) -> Self {
+        Type {
+            name,
+            properties
+        }
+    }
+}
+
+
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -128,6 +144,23 @@ impl Property {
             optional,
             properties,
             secret,
+        }
+    }
+
+    ///
+    ///
+    ///
+    pub fn new_quick(
+        name: &str,
+        data_type: &str,
+    ) -> Self {
+        Property {
+            data_type: data_type.to_string(),
+            default: None,
+            name: name.to_string(),
+            optional: None,
+            properties: None,
+            secret: None,
         }
     }
 

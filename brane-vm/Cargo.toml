@@ -8,6 +8,7 @@ edition = "2018"
 anyhow = "1.0"
 appdirs = "0.2"
 brane-exec = { path = "../brane-exec" }
+brane-sys = { path = "../brane-sys" }
 flate2 = "1.0"
 futures = "0.3"
 lazy_static = "1.4"

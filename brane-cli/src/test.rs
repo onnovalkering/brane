@@ -4,6 +4,7 @@ use brane_exec::{docker, openapi, ExecuteInfo};
 use brane_vm::machine::Machine;
 use brane_vm::environment::InMemoryEnvironment;
 use brane_vm::vault::InMemoryVault;
+use brane_sys::local::LocalSystem;
 use console::style;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input as Prompt, Select};
@@ -23,6 +24,7 @@ use std::{
     str::FromStr,
 };
 use std::rc::Rc;
+use uuid::Uuid;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -136,11 +138,15 @@ fn test_dsl(
     let mut arguments = Map::<Value>::new();
     test_dsl_preprocess_instructions(&mut instructions, &mut arguments)?;
 
+    let session_id = Uuid::new_v4();
+
     let secrets = Map::<Value>::new();
     let vault = InMemoryVault::new(secrets);
 
     let environment = InMemoryEnvironment::new(Some(arguments), None);
-    let mut machine = Machine::new(Box::new(environment), Rc::new(vault), Some(packages::get_packages_dir()));
+    let system = LocalSystem::new(session_id);
+
+    let mut machine = Machine::new(Box::new(environment), Rc::new(system), Rc::new(vault), Some(packages::get_packages_dir()));
     let output = machine.interpret(instructions)?;
 
     let output = output.map(|o| {

@@ -4,6 +4,7 @@ use brane_dsl::compiler::{Compiler, CompilerOptions};
 use brane_vm::machine::Machine;
 use brane_vm::environment::InMemoryEnvironment;
 use brane_vm::vault::InMemoryVault;
+use brane_sys::local::LocalSystem;
 use futures::executor::block_on;
 use linefeed::{Interface, ReadResult};
 use specifications::common::Value;
@@ -13,6 +14,7 @@ use std::io::BufReader;
 use std::rc::Rc;
 use std::path::PathBuf;
 use serde_yaml;
+use uuid::Uuid;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -34,9 +36,12 @@ pub async fn start(secrets_file: Option<PathBuf>) -> Result<()> {
         Default::default()
     };
 
+    let session_id = Uuid::new_v4();
+
     let environment = InMemoryEnvironment::new(None, None);
+    let system = LocalSystem::new(session_id);
     let vault = InMemoryVault::new(secrets);
-    let mut machine = Machine::new(Box::new(environment), Rc::new(vault), Some(packages::get_packages_dir()));
+    let mut machine = Machine::new(Box::new(environment), Rc::new(system), Rc::new(vault), Some(packages::get_packages_dir()));
 
     while let ReadResult::Input(line) = interface.read_line()? {
         if !line.trim().is_empty() {

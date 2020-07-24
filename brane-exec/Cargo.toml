@@ -9,6 +9,7 @@ anyhow = "1.0"
 base64 = "0.12"
 brane-init = { path = "../brane-init" }
 brane-std = { path = "../brane-std" }
+brane-sys = { path = "../brane-sys" }
 bollard = "0.5"
 bytes = "0.5"
 env_logger = "0.7"

@@ -1,6 +1,7 @@
 use crate::ExecuteInfo;
 use crate::{docker, openapi};
 use anyhow::Result;
+use brane_sys::System;
 use openapiv3::OpenAPI;
 use serde_json::{json, Value as JValue};
 use specifications::common::Value;
@@ -10,6 +11,7 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::Write;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -171,11 +173,12 @@ pub async fn exec_oas(
 pub fn exec_std(
     act: &ActInstruction,
     arguments: Map<Value>,
+    system: Rc<dyn System>,
 ) -> Result<Option<Value>> {
     let package = act.meta.get("name").expect("No `name` property in metadata.");
     let function = brane_std::FUNCTIONS.get(package).unwrap().get(&act.name).unwrap();
 
-    let output = function(&arguments)?;
+    let output = function(&arguments, &system)?;
     if let Value::Unit = output {
         Ok(None)
     } else {

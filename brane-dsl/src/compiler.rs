@@ -213,6 +213,8 @@ impl Compiler {
         if let Some(package_info) = package_info {
             let package_patterns = functions::get_module_patterns(package_info)?;
             self.state.imports.extend(package_patterns);
+            self.state.imports.sort_by(|a, b| a.parameters.len().partial_cmp(&b.parameters.len()).unwrap());
+            self.state.imports.reverse();
 
             if let Some(types) = &package_info.types {
                 for (n, t) in types.iter() {
