@@ -1,7 +1,8 @@
 use crate::ExecuteInfo;
 use anyhow::Result;
+use bollard::models::HostConfig;
 use bollard::container::{
-    Config, CreateContainerOptions, HostConfig, LogOutput, LogsOptions, RemoveContainerOptions, StartContainerOptions,
+    Config, CreateContainerOptions, LogOutput, LogsOptions, RemoveContainerOptions, StartContainerOptions,
     WaitContainerOptions,
 };
 use bollard::errors::Error;
@@ -47,8 +48,8 @@ pub async fn run_and_wait(exec: ExecuteInfo) -> Result<(String, String)> {
 
     for log_output in log_outputs {
         match log_output {
-            LogOutput::StdErr { message } => stderr.push_str(&format!("{}\n", message)),
-            LogOutput::StdOut { message } => stdout.push_str(&format!("{}\n", message)),
+            LogOutput::StdErr { message } => stderr.push_str(String::from_utf8_lossy(&message).as_ref()),
+            LogOutput::StdOut { message } => stdout.push_str(String::from_utf8_lossy(&message).as_ref()),
             _ => unreachable!(),
         }
     }
