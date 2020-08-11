@@ -1,0 +1,86 @@
+name: lta
+version: 1.0.0
+kind: remote
+
+dependencies:
+  - curl
+  - libaio1
+  - python3
+  - python3-pip
+  - python3-yaml
+
+install:
+  - ./install.sh
+
+files:
+  - install.sh
+  - run.py
+
+entrypoint:
+  kind: task
+  exec: run.py
+
+actions:
+  'files':
+    command:
+      args:
+        - files
+    
+    pattern:
+      postfix: files
+
+    input:
+      - type: integer
+        name: observation_id
+
+      - type: string
+        name: username
+        secret: LOFAR_USERNAME
+
+      - type: string
+        name: password
+        secret: LOFAR_PASSWORD
+
+    output:
+      - type: string[]
+        name: surls
+
+  'stage':
+    command:
+      args:
+        - stage
+    
+    pattern:
+      prefix: stage
+
+    input:
+      - type: string[]
+        name: surls
+
+      - type: string
+        name: username
+        secret: LOFAR_USERNAME
+
+      - type: string
+        name: password
+        secret: LOFAR_PASSWORD
+    
+    output:
+      - type: integer
+        name: request_id
+
+  'status':
+    command:
+      args:
+        - status
+
+    pattern:
+      postfix: status
+
+    input:
+      - type: integer
+        name: request_id
+
+    output:
+      - type: string
+        name: status
