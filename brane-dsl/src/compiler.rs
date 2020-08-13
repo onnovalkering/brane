@@ -1,6 +1,6 @@
 use crate::functions::{self, FunctionPattern};
 use crate::indexes::PackageIndex;
-use crate::parser::{self, AstNode, AstTerm};
+use crate::parser::{self, AstNode, AstPredicate, AstTerm, AstRelation};
 use anyhow::Result;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
@@ -85,22 +85,22 @@ impl Compiler {
         let ast = parser::parse(input)?;
         let mut instructions = vec![];
 
-        use AstNode::*;
         for node in ast {
             let (variable, instruction) = match node {
-                Assignment { name, terms } => self.handle_assignment_node(name, terms)?,
-                Call { terms } => {
+                AstNode::Assignment { name, terms } => self.handle_assignment_node(name, terms)?,
+                AstNode::Call { terms } => {
                     if self.options.return_call {
                         self.handle_assignment_call_node(String::from("terminate"), terms)?
                     } else {
                         self.handle_call_node(terms)?
                     }
-                }
-                Parameter { name, complex } => self.handle_parameter_node(name, complex)?,
-                Repeat { predicate, exec } => self.handle_repeat_node(*predicate, *exec)?,
-                Terminate { terms } => self.handle_terminate_node(terms)?,
-                Import { module, version } => self.handle_import_node(module, version)?,
-                _ => unreachable!(),
+                },
+                AstNode::Condition { predicate, if_exec, el_exec } => self.handle_condition_node(predicate, *if_exec, el_exec.as_deref())?,
+                AstNode::Import { module, version } => self.handle_import_node(module, version)?,
+                AstNode::Parameter { name, complex } => self.handle_parameter_node(name, complex)?,
+                AstNode::Repeat { predicate, exec } => self.handle_repeat_node(predicate, *exec)?,
+                AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
+                AstNode::WaitUntil { predicate } => self.handle_wait_until_node(predicate)?,
             };
 
             // Variable bookkeeping
@@ -135,7 +135,6 @@ impl Compiler {
                 AstTerm::Value(_) => {
                     return self.handle_assignment_value_node(name, &terms[0]);
                 }
-                _ => unreachable!(),
             }
         }
 
@@ -162,7 +161,6 @@ impl Compiler {
 
                 (Some(value), data_type.clone())
             }
-            _ => unreachable!(),
         };
 
         let variable = Variable::new(name, data_type, None, value);
@@ -198,6 +196,18 @@ impl Compiler {
         let subroutine = SubInstruction::new(instructions, Default::default());
 
         Ok((None, Some(subroutine)))
+    }
+
+    ///
+    ///
+    ///
+    fn handle_condition_node(
+        &mut self,
+        _predicate: AstPredicate,
+        _if_exec: AstNode,
+        _el_exec: Option<&AstNode>,
+    ) -> Result<(Option<Variable>, Option<Instruction>)> {
+        unimplemented!();
     }
 
     ///
@@ -255,10 +265,51 @@ impl Compiler {
     ///
     fn handle_repeat_node(
         &mut self,
-        _predicate: AstNode,
+        _predicate: AstPredicate,
         _exec: AstNode,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
         unimplemented!();
+    }
+
+    ///
+    ///
+    ///
+    fn handle_wait_until_node (
+        &mut self,
+        predicate: AstPredicate,
+    ) -> Result<(Option<Variable>, Option<Instruction>)> {
+        let (poll, condition) = match predicate {
+            AstPredicate::Call { terms } => {
+                let (variable, poll) = self.handle_assignment_node(create_temp_var(false), terms)?;
+                let condition = Condition::eq(variable.unwrap().as_pointer(), Value::Boolean(true));
+
+                (poll.unwrap(), condition)
+            },
+            AstPredicate::Comparison { lhs_terms, relation, rhs_terms } => {
+                let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), lhs_terms)?;
+                let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), rhs_terms)?;
+                let poll = SubInstruction::new(vec!(lhs_poll.unwrap(), rhs_poll.unwrap()), Default::default());
+
+                let condition = match relation {
+                    AstRelation::Equals => Condition::eq(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::NotEquals => Condition::ne(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::Greater => Condition::gt(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::Less => Condition::lt(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::GreaterOrEqual => Condition::ge(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::LessOrEqual => Condition::le(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                };
+
+                (poll, condition)
+            }
+        };
+
+        let mut check_meta = Map::<String>::new();
+        check_meta.insert(String::from("interval"), String::from("10s"));
+
+        let check = MovInstruction::new(vec!(condition), vec!(Move::Forward, Move::Backward), check_meta);
+        let instruction = SubInstruction::new(vec!(poll, check), Default::default());
+        
+        Ok((None, Some(instruction)))
     }
 
     ///
@@ -340,7 +391,6 @@ pub fn terms_to_instructions(
                 AstTerm::Name(temp_var)
             }
             AstTerm::Name(n) => AstTerm::Name(n.clone()),
-            AstTerm::Symbol(s) => AstTerm::Symbol(s.clone()),
         })
         .collect();
 
@@ -541,9 +591,6 @@ fn build_terms_pattern(
 
                 // If the above attempt(s) faile, just add the name.
                 term_pattern_segments.push(name.to_string());
-            }
-            AstTerm::Symbol(symbol) => {
-                term_pattern_segments.push(symbol.to_string());
             }
             AstTerm::Value(value) => {
                 let segment = format!("<{}>", value.data_type());

@@ -20,7 +20,7 @@ pub enum AstNode {
         terms: Vec<AstTerm>,
     },
     Condition {
-        predicate: Box<AstNode>,
+        predicate: AstPredicate,
         if_exec: Box<AstNode>,
         el_exec: Option<Box<AstNode>>,
     },
@@ -33,12 +33,15 @@ pub enum AstNode {
         complex: String,
     },
     Repeat {
-        predicate: Box<AstNode>,
+        predicate: AstPredicate,
         exec: Box<AstNode>,
     },
     Terminate {
         terms: Option<Vec<AstTerm>>,
     },
+    WaitUntil {
+        predicate: AstPredicate,
+    }
 }
 
 impl AstNode {
@@ -56,7 +59,6 @@ impl AstNode {
 #[derive(Debug)]
 pub enum AstTerm {
     Name(String),
-    Symbol(String),
     Value(Value),
 }
 
@@ -71,6 +73,28 @@ impl AstTerm {
             false
         }
     }
+}
+
+#[derive(Debug)]
+pub enum AstPredicate {
+    Call {
+        terms: Vec<AstTerm>,
+    },
+    Comparison {
+        lhs_terms: Vec<AstTerm>,
+        relation: AstRelation,
+        rhs_terms: Vec<AstTerm>,
+    }
+}
+
+#[derive(Debug)]
+pub enum AstRelation {
+    Equals = 1,
+    NotEquals = 2,
+    Greater = 3,
+    Less = 4,
+    GreaterOrEqual = 5,
+    LessOrEqual = 6,
 }
 
 ///
@@ -89,6 +113,7 @@ pub fn parse(input: &str) -> Result<Vec<AstNode>> {
             Rule::parameter => ast.push(parse_parameter_rule(pair)?),
             Rule::repeat => ast.push(parse_repeat_rule(pair)?),
             Rule::terminate => ast.push(parse_terminate_rule(pair)?),
+            Rule::wait_until => ast.push(parse_wait_until_rule(pair)?),
             _ => {}
         }
     }
@@ -147,7 +172,7 @@ fn parse_call_rule(rule: Pair<Rule>) -> Result<AstNode> {
 fn parse_condition_rule(rule: Pair<Rule>) -> Result<AstNode> {
     let mut condition = rule.into_inner();
 
-    let predicate = Box::new(parse_call_rule(condition.next().unwrap())?);
+    let predicate = parse_predicate_rule(condition.next().unwrap())?;
     let if_exec = Box::new(parse_execution_rule(condition.next().unwrap())?);
     let el_exec = if let Some(node) = condition.next() {
         Some(Box::new(parse_execution_rule(node)?))
@@ -249,10 +274,71 @@ fn parse_parameter_rule(rule: Pair<Rule>) -> Result<AstNode> {
 ///
 ///
 ///
+fn parse_predicate_rule(rule: Pair<Rule>) -> Result<AstPredicate> {
+    let predicate = rule;
+
+    match predicate.as_rule() {
+        Rule::call => {
+            if let AstNode::Call { terms } = parse_call_rule(predicate)? {
+                Ok(AstPredicate::Call { terms })
+            } else {
+                unreachable!()
+            }
+        },
+        Rule::comparison => {
+            Ok(parse_comparison_rule(predicate)?)
+        }
+        _ => unreachable!(),
+    }
+}
+
+///
+///
+///
+fn parse_comparison_rule(rule: Pair<Rule>) -> Result<AstPredicate> {
+    let mut comparison = rule.into_inner();
+
+    let lhs_terms = if let AstNode::Call { terms } = parse_call_rule(comparison.next().unwrap())? {
+        terms
+    } else {
+        unreachable!();
+    };
+
+    let relation = parse_relation_rule(comparison.next().unwrap())?;
+
+    let rhs_terms = if let AstNode::Call { terms } = parse_call_rule(comparison.next().unwrap())? {
+        terms
+    } else {
+        unreachable!();
+    };
+
+    Ok(AstPredicate::Comparison { lhs_terms, relation, rhs_terms })
+}
+
+///
+///
+///
+fn parse_relation_rule(rule: Pair<Rule>) -> Result<AstRelation> {
+    let relation = rule.as_str().trim();
+
+    Ok(match relation {
+        "=" => AstRelation::Equals,
+        "!=" => AstRelation::NotEquals,
+        ">" => AstRelation::Greater,
+        "<" => AstRelation::Less,
+        ">=" => AstRelation::GreaterOrEqual,
+        "<=" => AstRelation::LessOrEqual,
+        _ => unreachable!()
+    })
+}
+
+///
+///
+///
 fn parse_repeat_rule(rule: Pair<Rule>) -> Result<AstNode> {
     let mut repeat = rule.into_inner();
 
-    let predicate = Box::new(parse_call_rule(repeat.next().unwrap())?);
+    let predicate = parse_predicate_rule(repeat.next().unwrap())?;
     let exec = Box::new(parse_execution_rule(repeat.next().unwrap())?);
 
     Ok(AstNode::Repeat { predicate, exec })
@@ -274,20 +360,13 @@ fn parse_string_rule(rule: Pair<Rule>) -> Result<String> {
 ///
 ///
 ///
-fn parse_symbol_rule(rule: Pair<Rule>) -> Result<String> {
-    Ok(rule.as_str().trim().to_string())
-}
-
-///
-///
-///
 fn parse_term_rule(rule: Pair<Rule>) -> Result<AstTerm> {
     let term = rule.into_inner().next().unwrap();
 
     match term.as_rule() {
         Rule::value => Ok(AstTerm::Value(parse_value_rule(term)?)),
         Rule::name => Ok(AstTerm::Name(parse_name_rule(term)?)),
-        Rule::symbol => Ok(AstTerm::Symbol(parse_symbol_rule(term)?)),
+        Rule::symbol => Ok(AstTerm::Name(parse_name_rule(term)?)),
         _ => unreachable!(),
     }
 }
@@ -310,6 +389,17 @@ fn parse_terminate_rule(rule: Pair<Rule>) -> Result<AstNode> {
     };
 
     Ok(AstNode::Terminate { terms })
+}
+
+///
+///
+///
+fn parse_wait_until_rule(rule: Pair<Rule>) -> Result<AstNode> {
+    let mut wait_until = rule.into_inner();
+
+    let predicate = parse_predicate_rule(wait_until.next().unwrap())?;
+
+    Ok(AstNode::WaitUntil { predicate })
 }
 
 ///

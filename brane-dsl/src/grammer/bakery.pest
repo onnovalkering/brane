@@ -4,7 +4,7 @@ COMMENT_BLOCK   = @{ "---" ~ (!"---" ~ ANY)* ~ "---" }
 COMMENT_LINE    = @{ "//" ~ (!("\r" | "\n") ~ ANY)* }
 
 program = _{ SOI ~ "\n"* ~ (statement ~ "\n"+) * ~ statement? ~ EOI }
-reserved = { "??" | "as" | "else" | "false" | "if" | "import" | "true" | "while" | "return" }
+reserved = { "??" | "as" | "else" | "false" | "if" | "import" | "true" | "until" | "wait" | "while" | "return" }
 
 // Utilities
 WS = _{ WHITESPACE }
@@ -16,22 +16,30 @@ execution  = _{
     | assignment
     | call
 }
+predicate = _{ 
+      comparison 
+    | call
+}
 statement = _{
       condition
     | execution
     | import
     | repeat
     | terminate
+    | wait_until
 }
 
 assignment      = { name ~ ":=" ~ call }
 call            = { term+ }
-condition       = { "if" ~ call ~ ":" ~ execution ~ (NL ~ "else" ~ ":" ~ execution)? }
+comparison      = { call ~ relational ~ call }
+condition       = { "if" ~ predicate ~ ":" ~ execution ~ (NL ~ "else" ~ ":" ~ execution)? }
 import          = { "import" ~ string ~ ("version" ~ string)? }
 parameter       = { name ~ ":=" ~ "??" ~ "as" ~ complex }
+
 complex         = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHA* ~ "[]"? }
-repeat          = { "while" ~ call ~ ":" ~ execution }
+repeat          = { "while" ~ predicate ~ ":" ~ execution }
 terminate       = { "return" ~ call? }
+wait_until      = { "wait" ~ "until" ~ predicate }
 
 // Terms
 term            = { name | symbol | value }
@@ -39,8 +47,11 @@ value 		      = { array | object | literal }
 literal         = { boolean | decimal | integer | string }
 name            = @{ name_sg ~ ("." ~ name_sg)* }
 name_sg         = @{ !reserved ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
-symbol          = { "+"+ | "-"+ | "*"+ | "/"+ | "%"+ | "="+
-                  | "<"+ | ">"+ | "="+ | "&"+ | "|"+ | "!"+ }
+symbol          = { "+" | "-" | "/" | "*" | "%" }
+
+// Operators
+relational      = { "=" | "!=" | ">" | "<" | ">=" | "<=" }
+logical         = { "and" | "or" | "not" }
 
 // Literals
 boolean         = { "true" | "false" }
