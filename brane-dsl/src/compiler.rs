@@ -95,7 +95,7 @@ impl Compiler {
                         self.handle_call_node(terms)?
                     }
                 },
-                AstNode::Condition { predicate, if_exec, el_exec } => self.handle_condition_node(predicate, *if_exec, el_exec.as_deref())?,
+                AstNode::Condition { predicate, if_exec, el_exec } => self.handle_condition_node(predicate, *if_exec, el_exec.map(|e| *e))?,
                 AstNode::Import { module, version } => self.handle_import_node(module, version)?,
                 AstNode::Parameter { name, complex } => self.handle_parameter_node(name, complex)?,
                 AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
@@ -203,11 +203,60 @@ impl Compiler {
     ///
     fn handle_condition_node(
         &mut self,
-        _predicate: AstPredicate,
-        _if_exec: AstNode,
-        _el_exec: Option<&AstNode>,
+        predicate: AstPredicate,
+        if_exec: AstNode,
+        el_exec: Option<AstNode>,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
-        unimplemented!();
+        let (poll, condition) = match predicate {
+            AstPredicate::Call { terms } => {
+                let (variable, poll) = self.handle_assignment_node(create_temp_var(false), terms)?;
+                let condition = Condition::eq(variable.unwrap().as_pointer(), Value::Boolean(true));
+
+                (poll.unwrap(), condition)
+            },
+            AstPredicate::Comparison { lhs_terms, relation, rhs_terms } => {
+                let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), lhs_terms)?;
+                let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), rhs_terms)?;
+                let poll = SubInstruction::new(vec!(lhs_poll.unwrap(), rhs_poll.unwrap()), Default::default());
+
+                let condition = match relation {
+                    AstRelation::Equals => Condition::eq(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::NotEquals => Condition::ne(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::Greater => Condition::gt(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::Less => Condition::lt(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::GreaterOrEqual => Condition::ge(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::LessOrEqual => Condition::le(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                };
+
+                (poll, condition)
+            }
+        };
+
+        let if_check = MovInstruction::new(vec!(condition.clone()), vec!(Move::Forward, Move::Skip), Default::default());
+
+        let (_, if_exec) = match if_exec {
+            AstNode::Assignment { name, terms } => self.handle_assignment_node(name, terms)?,
+            AstNode::Call { terms } => self.handle_call_node(terms)?,
+            AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
+            _ => unreachable!()
+        };
+
+        let instruction = if let Some(el_exec) = el_exec {
+            let (_, el_exec) = match el_exec {
+                AstNode::Assignment { name, terms } => self.handle_assignment_node(name, terms)?,
+                AstNode::Call { terms } => self.handle_call_node(terms)?,
+                AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
+                _ => unreachable!()
+            };
+
+            let el_check = MovInstruction::new(vec!(condition.clone()), vec!(Move::Skip, Move::Forward), Default::default());
+            SubInstruction::new(vec!(poll, if_check, if_exec.unwrap(), el_check, el_exec.unwrap()), Default::default())
+        } else {
+            SubInstruction::new(vec!(poll, if_check, if_exec.unwrap()), Default::default())
+        };
+
+        
+        Ok((None, Some(instruction)))
     }
 
     ///
@@ -337,6 +386,7 @@ impl Compiler {
         let (_, exec) = match exec {
             AstNode::Assignment { name, terms } => self.handle_assignment_node(name, terms)?,
             AstNode::Call { terms } => self.handle_call_node(terms)?,
+            AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
             _ => unreachable!()
         };
 

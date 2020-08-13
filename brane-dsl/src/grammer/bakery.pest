@@ -14,6 +14,7 @@ NL = _{ NEWLINE }
 execution  = _{
       assignment
     | call
+    | terminate
 }
 predicate = _{ 
       comparison 
@@ -26,7 +27,6 @@ statement = _{
     | execution
     | wait_until
     | while_loop
-    | terminate
 }
 
 assignment      = { name ~ ":=" ~ call }
