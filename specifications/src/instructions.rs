@@ -63,7 +63,7 @@ impl MovInstruction {
     ///
     ///
     #[allow(clippy::new_ret_no_self)]
-    pub fn new_mov(
+    pub fn new(
         conditions: Vec<Condition>,
         branches: Vec<Move>,
         meta: Map<String>,

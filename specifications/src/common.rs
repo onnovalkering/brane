@@ -420,4 +420,17 @@ impl Variable {
             value,
         }
     }
+
+    ///
+    ///
+    ///
+    pub fn as_pointer(
+        &self
+    ) -> Value {
+        Value::Pointer { 
+            data_type: self.data_type.clone(), 
+            secret: false,
+            variable: self.name.clone(), 
+        }
+    }
 }
