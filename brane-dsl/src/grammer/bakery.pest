@@ -12,8 +12,7 @@ NL = _{ NEWLINE }
 
 // Statements
 execution  = _{
-      parameter
-    | assignment
+      assignment
     | call
 }
 predicate = _{ 
@@ -21,12 +20,13 @@ predicate = _{
     | call
 }
 statement = _{
-      condition
+      import
+    | parameter
+    | condition
     | execution
-    | import
-    | repeat
-    | terminate
     | wait_until
+    | while_loop
+    | terminate
 }
 
 assignment      = { name ~ ":=" ~ call }
@@ -35,11 +35,10 @@ comparison      = { call ~ relational ~ call }
 condition       = { "if" ~ predicate ~ ":" ~ execution ~ (NL ~ "else" ~ ":" ~ execution)? }
 import          = { "import" ~ string ~ ("version" ~ string)? }
 parameter       = { name ~ ":=" ~ "??" ~ "as" ~ complex }
-
 complex         = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHA* ~ "[]"? }
-repeat          = { "while" ~ predicate ~ ":" ~ execution }
 terminate       = { "return" ~ call? }
 wait_until      = { "wait" ~ "until" ~ predicate }
+while_loop      = { "while" ~ predicate ~ ":" ~ execution }
 
 // Terms
 term            = { name | symbol | value }

@@ -98,9 +98,9 @@ impl Compiler {
                 AstNode::Condition { predicate, if_exec, el_exec } => self.handle_condition_node(predicate, *if_exec, el_exec.as_deref())?,
                 AstNode::Import { module, version } => self.handle_import_node(module, version)?,
                 AstNode::Parameter { name, complex } => self.handle_parameter_node(name, complex)?,
-                AstNode::Repeat { predicate, exec } => self.handle_repeat_node(predicate, *exec)?,
                 AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
                 AstNode::WaitUntil { predicate } => self.handle_wait_until_node(predicate)?,
+                AstNode::WhileLoop { predicate, exec } => self.handle_while_loop_node(predicate, *exec)?,
             };
 
             // Variable bookkeeping
@@ -263,17 +263,6 @@ impl Compiler {
     ///
     ///
     ///
-    fn handle_repeat_node(
-        &mut self,
-        _predicate: AstPredicate,
-        _exec: AstNode,
-    ) -> Result<(Option<Variable>, Option<Instruction>)> {
-        unimplemented!();
-    }
-
-    ///
-    ///
-    ///
     fn handle_wait_until_node (
         &mut self,
         predicate: AstPredicate,
@@ -308,6 +297,54 @@ impl Compiler {
 
         let check = MovInstruction::new(vec!(condition), vec!(Move::Forward, Move::Backward), check_meta);
         let instruction = SubInstruction::new(vec!(poll, check), Default::default());
+        
+        Ok((None, Some(instruction)))
+    }
+
+    ///
+    ///
+    ///
+    fn handle_while_loop_node(
+        &mut self,
+        predicate: AstPredicate,
+        exec: AstNode,
+    ) -> Result<(Option<Variable>, Option<Instruction>)> {
+        let (poll, condition) = match predicate {
+            AstPredicate::Call { terms } => {
+                let (variable, poll) = self.handle_assignment_node(create_temp_var(false), terms)?;
+                let condition = Condition::eq(variable.unwrap().as_pointer(), Value::Boolean(true));
+
+                (poll.unwrap(), condition)
+            },
+            AstPredicate::Comparison { lhs_terms, relation, rhs_terms } => {
+                let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), lhs_terms)?;
+                let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), rhs_terms)?;
+                let poll = SubInstruction::new(vec!(lhs_poll.unwrap(), rhs_poll.unwrap()), Default::default());
+
+                let condition = match relation {
+                    AstRelation::Equals => Condition::eq(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::NotEquals => Condition::ne(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::Greater => Condition::gt(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::Less => Condition::lt(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::GreaterOrEqual => Condition::ge(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::LessOrEqual => Condition::le(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                };
+
+                (poll, condition)
+            }
+        };
+
+        let (_, exec) = match exec {
+            AstNode::Assignment { name, terms } => self.handle_assignment_node(name, terms)?,
+            AstNode::Call { terms } => self.handle_call_node(terms)?,
+            _ => unreachable!()
+        };
+
+        let check_before = MovInstruction::new(vec!(condition.clone()), vec!(Move::Forward, Move::Skip), Default::default());
+        let check_after = MovInstruction::new(vec!(condition.clone()), vec!(Move::Backward, Move::Forward), Default::default());
+        
+        let exec_and_poll = SubInstruction::new(vec!(exec.unwrap(), poll.clone()), Default::default());
+        let instruction = SubInstruction::new(vec!(poll, check_before, exec_and_poll, check_after), Default::default());
         
         Ok((None, Some(instruction)))
     }

@@ -32,16 +32,16 @@ pub enum AstNode {
         name: String,
         complex: String,
     },
-    Repeat {
-        predicate: AstPredicate,
-        exec: Box<AstNode>,
-    },
     Terminate {
         terms: Option<Vec<AstTerm>>,
     },
     WaitUntil {
         predicate: AstPredicate,
-    }
+    },
+    WhileLoop {
+        predicate: AstPredicate,
+        exec: Box<AstNode>,
+    },
 }
 
 impl AstNode {
@@ -111,9 +111,9 @@ pub fn parse(input: &str) -> Result<Vec<AstNode>> {
             Rule::condition => ast.push(parse_condition_rule(pair)?),
             Rule::import => ast.push(parse_import_rule(pair)?),
             Rule::parameter => ast.push(parse_parameter_rule(pair)?),
-            Rule::repeat => ast.push(parse_repeat_rule(pair)?),
             Rule::terminate => ast.push(parse_terminate_rule(pair)?),
             Rule::wait_until => ast.push(parse_wait_until_rule(pair)?),
+            Rule::while_loop => ast.push(parse_while_loop_rule(pair)?),
             _ => {}
         }
     }
@@ -335,13 +335,13 @@ fn parse_relation_rule(rule: Pair<Rule>) -> Result<AstRelation> {
 ///
 ///
 ///
-fn parse_repeat_rule(rule: Pair<Rule>) -> Result<AstNode> {
-    let mut repeat = rule.into_inner();
+fn parse_while_loop_rule(rule: Pair<Rule>) -> Result<AstNode> {
+    let mut while_loop = rule.into_inner();
 
-    let predicate = parse_predicate_rule(repeat.next().unwrap())?;
-    let exec = Box::new(parse_execution_rule(repeat.next().unwrap())?);
+    let predicate = parse_predicate_rule(while_loop.next().unwrap())?;
+    let exec = Box::new(parse_execution_rule(while_loop.next().unwrap())?);
 
-    Ok(AstNode::Repeat { predicate, exec })
+    Ok(AstNode::WhileLoop { predicate, exec })
 }
 
 ///
