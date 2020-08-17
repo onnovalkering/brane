@@ -342,7 +342,7 @@ impl Compiler {
         };
 
         let mut check_meta = Map::<String>::new();
-        check_meta.insert(String::from("interval"), String::from("10s"));
+        check_meta.insert(String::from("sleep_after_false"), String::from("10s"));
 
         let check = MovInstruction::new(vec!(condition), vec!(Move::Forward, Move::Backward), check_meta);
         let instruction = SubInstruction::new(vec!(poll, check), Default::default());

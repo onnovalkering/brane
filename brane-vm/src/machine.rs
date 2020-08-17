@@ -15,7 +15,9 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::PathBuf;
 use tar::Archive;
+use humantime;
 use std::rc::Rc;
+use std::thread;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -254,6 +256,12 @@ impl Machine {
             if truthy {
                 movement = mov.branches.get(i).unwrap().clone();
                 break;
+            } else {
+                if let Some(sleep_after_false) = mov.meta.get("sleep_after_false") {
+                    let duration = humantime::parse_duration(sleep_after_false)?;
+                    debug!("Sleeping after false: {:?}", duration);
+                    thread::sleep(duration);
+                }
             }
         }
 

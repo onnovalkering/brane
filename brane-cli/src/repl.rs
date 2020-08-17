@@ -60,7 +60,7 @@ pub async fn start(
 
         match instructions {
             Ok(instructions) => {
-                let instructions = preprocess_instructions(&instructions).await?;
+                let instructions = preprocess_instructions(&instructions)?;
                 let output = machine.interpret(instructions)?;
 
                 if let Some(value) = output {
@@ -126,28 +126,28 @@ async fn preprocess_instructions(instructions: &Vec<Instruction>) -> Result<Vec<
 
                 match kind.as_str() {
                     "cwl" => {
-                        let cwl_file = registry::get_package_source(&name, &version, &kind).await?;
+                        let cwl_file = block_on(registry::get_package_source(&name, &version, &kind))?;
                         if cwl_file.exists() {
                             act.meta
                                 .insert(String::from("cwl_file"), String::from(cwl_file.to_string_lossy()));
                         }
                     }
                     "dsl" => {
-                        let instr_file = registry::get_package_source(&name, &version, &kind).await?;
+                        let instr_file = block_on(registry::get_package_source(&name, &version, &kind))?;
                         if instr_file.exists() {
                             act.meta
                                 .insert(String::from("instr_file"), String::from(instr_file.to_string_lossy()));
                         }
                     }
                     "ecu" => {
-                        let image_file = registry::get_package_source(&name, &version, &kind).await?;
+                        let image_file = block_on(registry::get_package_source(&name, &version, &kind))?;
                         if image_file.exists() {
                             act.meta
                                 .insert(String::from("image_file"), String::from(image_file.to_string_lossy()));
                         }
                     }
                     "oas" => {
-                        let oas_file = registry::get_package_source(&name, &version, &kind).await?;
+                        let oas_file = block_on(registry::get_package_source(&name, &version, &kind))?;
                         if oas_file.exists() {
                             act.meta
                                 .insert(String::from("oas_file"), String::from(oas_file.to_string_lossy()));
@@ -168,7 +168,8 @@ async fn preprocess_instructions(instructions: &Vec<Instruction>) -> Result<Vec<
                     sub.instructions = serde_yaml::from_reader(instructions_reader)?;
                 }
 
-                sub.instructions = block_on(preprocess_instructions(&sub.instructions))?;
+                debug!("Preprocess nested sub instrucations.");
+                sub.instructions = preprocess_instructions(&sub.instructions)?;
             }
             _ => continue,
         }

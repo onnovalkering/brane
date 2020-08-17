@@ -11,6 +11,7 @@ brane-exec = { path = "../brane-exec" }
 brane-sys = { path = "../brane-sys" }
 flate2 = "1.0"
 futures = "0.3"
+humantime = "2.0"
 lazy_static = "1.4"
 log = "0.4"
 redis = "0.17"
