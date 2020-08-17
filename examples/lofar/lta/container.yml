@@ -81,6 +81,14 @@ actions:
       - type: integer
         name: request_id
 
+      - type: string
+        name: username
+        secret: LOFAR_USERNAME
+
+      - type: string
+        name: password
+        secret: LOFAR_PASSWORD
+
     output:
       - type: string
         name: status
