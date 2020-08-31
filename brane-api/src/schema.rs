@@ -28,4 +28,17 @@ table! {
     }
 }
 
-allow_tables_to_appear_in_same_query!(invocations, packages,);
+table! {
+    sessions (id) {
+        id -> Int4,
+        created -> Timestamp,
+        uuid -> Varchar,
+        status -> Varchar,
+    }
+}
+
+allow_tables_to_appear_in_same_query!(
+    invocations,
+    packages,
+    sessions,
+);

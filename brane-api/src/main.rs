@@ -22,6 +22,7 @@ mod invocations;
 mod models;
 mod packages;
 mod schema;
+mod sessions;
 
 embed_migrations!();
 
@@ -97,6 +98,7 @@ async fn main() -> std::io::Result<()> {
             .data(producer.clone())
             .service(invocations::scope())
             .service(packages::scope())
+            .service(sessions::scope())
     });
 
     let address = format!("{}:{}", options.host, options.port);

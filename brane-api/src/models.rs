@@ -1,4 +1,4 @@
-use crate::schema::{invocations, packages};
+use crate::schema::{invocations, packages, sessions};
 use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
 use specifications::common::Value;
@@ -133,6 +133,40 @@ impl NewPackage {
             uuid: info.id.to_string(),
             version: info.version,
         }
+    }
+}
+
+#[derive(Serialize, Queryable, Identifiable)]
+pub struct Session {
+    pub id: i32,
+    // Metadata
+    pub created: NaiveDateTime,
+    pub uuid: String,
+    // Content
+    pub status: String,
+}
+
+#[derive(Insertable)]
+#[table_name = "sessions"]
+pub struct NewSession {
+    // Metadata
+    pub created: NaiveDateTime,
+    pub uuid: String,
+    // Content
+    pub status: String,
+}
+
+impl NewSession {
+    pub fn new() -> FResult<Self> {
+        let created = Utc::now().naive_utc();
+        let uuid = Uuid::new_v4().to_string();
+        let status = String::from("active");
+
+        Ok(NewSession {
+            created,
+            uuid,
+            status,
+        })
     }
 }
 
