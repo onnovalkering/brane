@@ -2,10 +2,9 @@ use anyhow::Result;
 use brane_sys::System;
 use specifications::common::{CallPattern, Function, Parameter, Value};
 use specifications::package::PackageInfo;
-use std::rc::Rc;
 
 type Map<T> = std::collections::HashMap<String, T>;
-type Func = fn(&Map<Value>, &Rc<dyn System>) -> Result<Value>;
+type Func = fn(&Map<Value>, &Box<dyn System>) -> Result<Value>;
 
 lazy_static! {
     pub static ref PACKAGE: PackageInfo = {
@@ -67,7 +66,7 @@ lazy_static! {
 ///
 ///
 ///
-pub fn concat(arguments: &Map<Value>, _system: &Rc<dyn System>) -> Result<Value> {
+pub fn concat(arguments: &Map<Value>, _system: &Box<dyn System>) -> Result<Value> {
     let left = arguments.get("left").expect("Missing `left` argument");
     let right = arguments.get("right").expect("Missing `right` argument");
 
@@ -77,7 +76,7 @@ pub fn concat(arguments: &Map<Value>, _system: &Rc<dyn System>) -> Result<Value>
 ///
 ///
 ///
-pub fn split(arguments: &Map<Value>, _system: &Rc<dyn System>) -> Result<Value> {
+pub fn split(arguments: &Map<Value>, _system: &Box<dyn System>) -> Result<Value> {
     let input = arguments.get("input").expect("Missing `input` argument.");
     if let Value::Unicode(text) = input {
         let data_type = String::from("string[]");

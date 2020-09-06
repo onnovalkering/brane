@@ -2,13 +2,12 @@ use anyhow::Result;
 use brane_sys::System;
 use specifications::common::{Function, CallPattern, Value, Type, Parameter, Property};
 use specifications::package::PackageInfo;
-use std::rc::Rc;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use url::Url;
 
 type Map<T> = std::collections::HashMap<String, T>;
-type Func = fn(&Map<Value>, &Rc<dyn System>) -> Result<Value>;
+type Func = fn(&Map<Value>, &Box<dyn System>) -> Result<Value>;
 
 lazy_static! {
     pub static ref PACKAGE: PackageInfo = {
@@ -111,7 +110,7 @@ lazy_static! {
 ///
 ///
 ///
-pub fn new_directory(arguments: &Map<Value>, system: &Rc<dyn System>) -> Result<Value> {
+pub fn new_directory(arguments: &Map<Value>, system: &Box<dyn System>) -> Result<Value> {
     let name = arguments
         .get("name")
         .map(|v| v.as_string().unwrap())
@@ -145,7 +144,7 @@ pub fn new_directory(arguments: &Map<Value>, system: &Rc<dyn System>) -> Result<
 ///
 ///
 ///
-pub fn new_file(arguments: &Map<Value>, system: &Rc<dyn System>) -> Result<Value> {
+pub fn new_file(arguments: &Map<Value>, system: &Box<dyn System>) -> Result<Value> {
     let name = arguments
         .get("name")
         .map(|v| v.as_string().unwrap())
@@ -179,7 +178,7 @@ pub fn new_file(arguments: &Map<Value>, system: &Rc<dyn System>) -> Result<Value
 ///
 ///
 ///
-pub fn new_temp_directory(arguments: &Map<Value>, system: &Rc<dyn System>) -> Result<Value> {
+pub fn new_temp_directory(arguments: &Map<Value>, system: &Box<dyn System>) -> Result<Value> {
     let name = arguments
         .get("name")
         .map(|v| v.as_string().unwrap())
@@ -203,7 +202,7 @@ pub fn new_temp_directory(arguments: &Map<Value>, system: &Rc<dyn System>) -> Re
 ///
 ///
 ///
-pub fn new_temp_file(arguments: &Map<Value>, system: &Rc<dyn System>) -> Result<Value> {
+pub fn new_temp_file(arguments: &Map<Value>, system: &Box<dyn System>) -> Result<Value> {
     let name = arguments
         .get("name")
         .map(|v| v.as_string().unwrap())

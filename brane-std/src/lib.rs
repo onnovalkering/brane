@@ -8,10 +8,9 @@ use anyhow::Result;
 use brane_sys::System;
 use specifications::common::Value;
 use specifications::package::PackageInfo;
-use std::rc::Rc;
 
 type Map<T> = std::collections::HashMap<String, T>;
-type Func = fn(&Map<Value>, &Rc<dyn System>) -> Result<Value>;
+type Func = fn(&Map<Value>, &Box<dyn System>) -> Result<Value>;
 
 lazy_static! {
     pub static ref PACKAGES: Map<PackageInfo> = {
