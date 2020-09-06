@@ -1,5 +1,5 @@
-use crate::models::{Invocation, NewInvocation};
-use crate::schema::{self, invocations::dsl as db};
+use crate::models::{Invocation, NewInvocation, Session};
+use crate::schema::{self, invocations::dsl as db, sessions::dsl as s_db};
 use actix_web::Scope;
 use actix_web::{web, HttpRequest, HttpResponse};
 use diesel::prelude::*;
@@ -7,11 +7,9 @@ use diesel::{r2d2, r2d2::ConnectionManager};
 use futures::*;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use serde::Deserialize;
-use specifications::common::Value;
 use specifications::instructions::Instruction;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
-type Map<T> = std::collections::HashMap<String, T>;
 
 const MSG_NO_DB_CONNECTION: &str = "Couldn't get connection from db pool.";
 const MSG_ONLY_STOPPED_DELETED: &str = "Only stopped invocations can be deleted.";
@@ -37,8 +35,8 @@ pub fn scope() -> Scope {
 
 #[derive(Deserialize)]
 pub struct CreateInvocation {
+    pub session: String,
     pub name: Option<String>,
-    pub arguments: Map<Value>,
     pub instructions: Vec<Instruction>,
 }
 
@@ -54,25 +52,28 @@ async fn create_invocation(
     let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
 
     // Store invocation information in database
-    let new_invocation = NewInvocation::new(json.name.clone(), &json.arguments, &json.instructions).unwrap();
     let invocation = web::block(move || {
+        let session = s_db::sessions.filter(s_db::uuid.eq(&json.session)).first::<Session>(&conn).unwrap();
+        // TODO: check if session is "created" or "idle", i.e. there is currently no other invocation active
+
+        let new_invocation = NewInvocation::new(session.id, json.name.clone(), &json.instructions).unwrap();
         diesel::insert_into(schema::invocations::table)
             .values(&new_invocation)
             .get_result::<Invocation>(&conn)
     })
     .await;
 
-    // Something went wrong when creating the invocation.
+    // Something went wrong while creating the invocation.
     if invocation.is_err() {
         return HttpResponse::InternalServerError().body("");
     }
 
     // Send control message (fire-and-forget) to announce the new invocation
     let invocation = invocation.unwrap();
-    let delivery = announce_status(&producer, invocation.id, &invocation.status).await;
+    let delivery = trigger_event(&producer, invocation.id, &invocation.status).await;
 
     if delivery.is_ok() {
-        HttpResponse::Ok().body("")
+        HttpResponse::Ok().json(invocation)
     } else {
         HttpResponse::InternalServerError().body("")
     }
@@ -187,7 +188,7 @@ async fn resume_invocation(
 
     // Send control message (fire-and-forget) to announce the new invocation
     let invocation = invocation.unwrap();
-    let delivery = announce_status(&producer, invocation.id, &invocation.status).await;
+    let delivery = trigger_event(&producer, invocation.id, &invocation.status).await;
 
     if delivery.is_ok() {
         HttpResponse::Ok().body("")
@@ -231,7 +232,7 @@ async fn stop_invocation(
 
     // Send control message (fire-and-forget) to announce the new invocation
     let invocation = invocation.unwrap();
-    let delivery = announce_status(&producer, invocation.id, &invocation.status).await;
+    let delivery = trigger_event(&producer, invocation.id, &invocation.status).await;
 
     if delivery.is_ok() {
         HttpResponse::Ok().body("")
@@ -275,7 +276,7 @@ async fn suspend_invocation(
 
     // Send control message (fire-and-forget) to announce the new invocation
     let invocation = invocation.unwrap();
-    let delivery = announce_status(&producer, invocation.id, &invocation.status).await;
+    let delivery = trigger_event(&producer, invocation.id, &invocation.status).await;
 
     if delivery.is_ok() {
         HttpResponse::Ok().body("")
@@ -287,13 +288,13 @@ async fn suspend_invocation(
 ///
 ///
 ///
-async fn announce_status(
+async fn trigger_event(
     producer: &FutureProducer,
     invocation_id: i32,
-    status: &str,
+    event: &str,
 ) -> Result<(), ()> {
     let message_key = format!("inv#{}", invocation_id);
-    let message_payload = format!(r#"{{"status": "{}"}}"#, status);
+    let message_payload = format!(r#"{{"event": "{}"}}"#, event);
     let message = FutureRecord::to(TOPIC_CONTROL)
         .payload(&message_payload)
         .key(&message_key);
@@ -306,15 +307,15 @@ async fn announce_status(
             match delivery {
                 Ok(_) => {
                     info!(
-                        "Announced that the status of invocation #{} is now '{}'.",
-                        invocation_id, status
+                        "Triggered '{}' event for invocation #{}.",
+                        event, invocation_id
                     );
                     Ok(())
                 }
                 Err(error) => {
                     info!(
-                        "Unable to announced that the status of invocation #{} is now '{}':\n{:#?}",
-                        invocation_id, status, error
+                        "Unable to trigger '{}' event for of invocation #{}:\n{:#?}",
+                        event, invocation_id, error
                     );
                     Err(())
                 }

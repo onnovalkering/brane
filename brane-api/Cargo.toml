@@ -25,7 +25,7 @@ semver = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.8"
-specifications = { git = "https://github.com/onnovalkering/brane" }
+specifications = { path = "../specifications" }
 structopt = "0.3"
 tar = "0.4"
 tokio = { version = "0.2", features = ["full"] }

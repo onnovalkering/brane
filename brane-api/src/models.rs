@@ -1,60 +1,66 @@
-use crate::schema::{invocations, packages, sessions};
+use crate::schema::{invocations, packages, sessions, variables};
 use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
-use specifications::common::Value;
 use specifications::instructions::Instruction;
 use specifications::package::PackageInfo;
 use std::path::PathBuf;
 use uuid::Uuid;
 
 type FResult<T> = Result<T, failure::Error>;
-type Map<T> = std::collections::HashMap<String, T>;
+
+#[derive(Clone)]
+pub struct Config {
+    pub docker_host: String,
+    pub packages_dir: PathBuf,
+    pub temporary_dir: PathBuf,
+}
 
 #[derive(Serialize, Queryable, Identifiable)]
 pub struct Invocation {
     pub id: i32,
+    pub session: i32,
     // Metadata
     pub created: NaiveDateTime,
     pub name: Option<String>,
+    pub started: Option<NaiveDateTime>,
+    pub stopped: Option<NaiveDateTime>,
     pub uuid: String,
     // Content
-    pub status: String,
-    pub arguments_json: String,
     pub instructions_json: String,
+    pub status: String,
 }
 
 #[derive(Insertable)]
 #[table_name = "invocations"]
 pub struct NewInvocation {
+    pub session: i32,
     // Metadata
     pub created: NaiveDateTime,
     pub name: Option<String>,
     pub uuid: String,
     // Content
-    pub status: String,
-    pub arguments_json: String,
     pub instructions_json: String,
+    pub status: String,
 }
 
 impl NewInvocation {
     pub fn new(
+        session: i32,
         name: Option<String>,
-        arguments: &Map<Value>,
         instructions: &[Instruction],
     ) -> FResult<Self> {
         let created = Utc::now().naive_utc();
         let uuid = Uuid::new_v4().to_string();
-        let status = String::from("created");
-        let arguments_json = serde_json::to_string(arguments)?;
         let instructions_json = serde_json::to_string(instructions)?;
+        let status = String::from("created");
 
         Ok(NewInvocation {
+            session,
             created,
             name,
             uuid,
-            status,
-            arguments_json,
             instructions_json,
+            status,
         })
     }
 }
@@ -137,6 +143,7 @@ impl NewPackage {
 }
 
 #[derive(Serialize, Queryable, Identifiable)]
+#[primary_key(id)]
 pub struct Session {
     pub id: i32,
     // Metadata
@@ -170,9 +177,47 @@ impl NewSession {
     }
 }
 
-#[derive(Clone)]
-pub struct Config {
-    pub docker_host: String,
-    pub packages_dir: PathBuf,
-    pub temporary_dir: PathBuf,
+#[derive(Associations, Serialize, Queryable, Identifiable)]
+#[belongs_to(Session, foreign_key = "session")]
+pub struct Variable {
+    pub id: i32,
+    pub session: i32,
+    // Metadata
+    pub created: NaiveDateTime,
+    pub updated: Option<NaiveDateTime>,
+    // Content
+    pub name: String,
+    pub type_: String,
+    pub content_json: Option<String>,
+}
+
+#[derive(Insertable)]
+#[table_name = "variables"]
+pub struct NewVariable {
+    pub session: i32,
+    // Metadata
+    pub created: NaiveDateTime,
+    // Content
+    pub name: String,
+    pub type_: String,
+    pub content_json: Option<String>,
+}
+
+impl NewVariable {
+    pub fn new(
+        session: i32,
+        name: String,
+        type_: String,
+        content_json: Option<String>
+    ) -> FResult<Self> {
+        let created = Utc::now().naive_utc();
+
+        Ok(NewVariable {
+            session,
+            created,
+            name,
+            type_,
+            content_json
+        })
+    }
 }

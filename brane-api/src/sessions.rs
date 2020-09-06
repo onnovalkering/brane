@@ -1,4 +1,4 @@
-use crate::models::{Session, NewSession};
+use crate::models::{Session, NewSession, Variable};
 use crate::schema::{self, sessions::dsl as db};
 use actix_web::Scope;
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -23,6 +23,7 @@ pub fn scope() -> Scope {
         .route("", web::get().to(get_sessions))
         .route("/{uuid}", web::get().to(get_session))
         .route("/{uuid}", web::delete().to(delete_session))
+        .route("/{uuid}/variables", web::get().to(get_session_variables))
 }
 
 #[derive(Deserialize)]
@@ -85,7 +86,7 @@ async fn get_session(
 ) -> HttpResponse {
     let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
 
-    let sessions = web::block(move || db::sessions.filter(db::uuid.eq(&path.0)).load::<Session>(&conn)).await;
+    let sessions = web::block(move || db::sessions.filter(db::uuid.eq(&path.0)).limit(1).load::<Session>(&conn)).await;
 
     if let Ok(sessions) = sessions {
         if sessions.len() == 1 {
@@ -126,6 +127,35 @@ async fn delete_session(
 
     if diesel::delete(&session).execute(&conn).is_ok() {
         HttpResponse::Ok().body("")
+    } else {
+        HttpResponse::InternalServerError().body("")
+    }
+}
+
+///
+///
+///
+async fn get_session_variables(
+    _req: HttpRequest,
+    pool: web::Data<DbPool>,
+    path: web::Path<(String,)>,
+) -> HttpResponse {
+    let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
+
+    let sessions = db::sessions.filter(db::uuid.eq(&path.0)).load::<Session>(&conn);
+    let variables = if let Ok(sessions) = sessions {
+        if sessions.len() == 1 {
+            let session: &Session = sessions.first().unwrap();
+            Variable::belonging_to(session).load::<Variable>(&conn)
+        } else {
+            return HttpResponse::NotFound().body("")
+        }
+    } else {
+        return HttpResponse::InternalServerError().body("")
+    };
+
+    if let Ok(variables) = variables {
+        HttpResponse::Ok().json(variables)
     } else {
         HttpResponse::InternalServerError().body("")
     }
