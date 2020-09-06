@@ -173,12 +173,12 @@ pub async fn exec_oas(
 pub fn exec_std(
     act: &ActInstruction,
     arguments: Map<Value>,
-    system: Rc<dyn System>,
+    system: &Box<dyn System>,
 ) -> Result<Option<Value>> {
     let package = act.meta.get("name").expect("No `name` property in metadata.");
     let function = brane_std::FUNCTIONS.get(package).unwrap().get(&act.name).unwrap();
 
-    let output = function(&arguments, &system)?;
+    let output = function(&arguments, system)?;
     if let Value::Unit = output {
         Ok(None)
     } else {
