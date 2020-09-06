@@ -148,7 +148,7 @@ impl Machine {
             "dsl" => self.exec_dsl(&act, arguments)?,
             "ecu" => block_on(delegate::exec_ecu(&act, arguments))?,
             "oas" => block_on(delegate::exec_oas(&act, arguments))?,
-            "std" => delegate::exec_std(&act, arguments, self.system.clone())?,
+            "std" => unimplemented!(),
             _ => unreachable!(),
         };
 

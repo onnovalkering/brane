@@ -3,8 +3,11 @@ use crate::vault::Vault;
 use anyhow::Result;
 use brane_sys::System;
 use specifications::common::Value;
-use specifications::instructions::{Instruction, Instruction::*, Move, Move::*, Operator::*};
+use specifications::instructions::{Instruction, Instruction::*, Move, Move::*, Operator::*, ActInstruction};
 use crate::cursor::Cursor;
+use brane_exec::delegate;
+
+type Map<T> = std::collections::HashMap<String, T>;
 
 pub enum MachineResult {
     Waiting,
@@ -50,7 +53,23 @@ impl AsyncMachine {
     ) -> Result<MachineResult> {
         while let Some(instruction) = get_current_instruction(&self.instructions, &self.cursor) {
             let movement = match instruction {
-                Act(_) => unimplemented!(),
+                Act(act) => {
+                    let arguments = prepare_arguments(&act.input, &self.environment, &self.vault);
+                    let kind = act.meta.get("kind").expect("Missing `kind` metadata property.");
+
+                    match kind.as_str() {
+                        "std" => {
+                            let value = delegate::exec_std(&act, arguments, &self.system)?;
+                            if let Some(value) = value {
+                                self.callback(value)?;
+                            }
+
+                            Some(Forward)
+                        },
+                        _ => handle_act(&act, &self.environment, &self.system, &self.vault)
+                    }
+
+                },
                 Mov(_) => handle_mov(&instruction, &self.environment),
                 Sub(_) => handle_sub(&instruction, &mut self.cursor),
                 Var(_) => handle_var(&instruction, &mut self.environment),
@@ -62,6 +81,39 @@ impl AsyncMachine {
         }
 
         Ok(MachineResult::Complete)
+    }
+
+    ///
+    ///
+    ///
+    pub fn callback(
+        &mut self,
+        value: Value,
+    ) -> Result<()> {
+        let instruction = get_current_instruction(&self.instructions, &self.cursor).unwrap();
+        let act = if let Act(act) = instruction {
+            act
+        } else {
+            unreachable!();
+        };
+
+        if let Some(ref assignment) = act.assignment {
+            // Assert that types match
+            let actual_type = value.data_type();
+            let expected_type = act.data_type.expect("Missing `data_type` property.");
+
+            if actual_type != expected_type {
+                return Err(anyhow!(
+                    "Type assertion failed. Expected '{}', but was '{}'.",
+                    expected_type,
+                    actual_type
+                ));
+            }
+
+            self.environment.set(assignment, &value);
+        }
+
+        Ok(())
     }
 }
 
@@ -86,6 +138,67 @@ fn get_current_instruction(
     });
 
     Some(instruction.clone())
+}
+
+///
+///
+///
+fn prepare_arguments(
+    input: &Map<Value>,
+    environment: &Box<dyn Environment>,
+    vault: &Box<dyn Vault>,
+) -> Map<Value> {
+    let mut arguments = Map::<Value>::new();
+
+    for (name, value) in input {
+        match &value {
+            Value::Pointer { variable, secret, .. } => {
+                if *secret {
+                    let value = vault.get(variable);
+                    arguments.insert(name.clone(), value.clone());
+                } else if variable.contains(".") {
+                    let segments: Vec<_> = variable.split(".").collect();
+                    let arch_value = environment.get(segments[0]);
+
+                    match arch_value {
+                        Value::Array { entries, .. } => {
+                            if segments[1] == "length" {
+                                arguments.insert(name.clone(), Value::Integer(entries.len() as i64));
+                            } else {
+                                panic!("Trying to access undeclared variable.");
+                            }
+                        }
+                        Value::Struct { properties, .. } => {
+                            if let Some(value) = properties.get(segments[1]) {
+                                arguments.insert(name.clone(), value.clone());
+                            } else {
+                                panic!("Trying to access undeclared variable.");
+                            }
+                        }
+                        _ => unreachable!(),
+                    };
+                } else {
+                    let value = environment.get(variable);
+                    arguments.insert(name.clone(), value);
+                }
+            }
+            _ => {
+                arguments.insert(name.clone(), value.clone());
+            }
+        }
+    }
+
+    arguments
+}
+
+
+fn handle_act(
+    instruction: &ActInstruction,
+    environment: &Box<dyn Environment>,
+    system: &Box<dyn System>,
+    vault: &Box<dyn Vault>,
+) -> Option<Move> {
+    unimplemented!()
 }
 
 ///
