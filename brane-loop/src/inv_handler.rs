@@ -29,6 +29,7 @@ pub async fn handle(context: String, payload: JValue, db: &DbPool, rd: &Client) 
 
     match event {
         "active" => on_active(context, payload, db, rd).await,
+        "callback" => on_callback(context, payload, db, rd).await,
         "complete" => on_complete(context, payload, db, rd).await,
         "created" => on_created(context, payload, db, rd).await,
         "ready" => on_ready(context, payload, db, rd).await,
@@ -56,10 +57,17 @@ async fn on_active(context: String, _payload: JValue, db: &DbPool, rd: &Client) 
     let instructions = serde_json::from_str(&instructions_json)?;
     let system = LocalSystem::new(session_uuid.parse()?);
     let vault = InMemoryVault::new(Default::default());
-    let mut machine = AsyncMachine::new(instructions, Box::new(cursor), Box::new(environment), Box::new(system), Box::new(vault));
+    let mut machine = AsyncMachine::new(
+        instructions, 
+        invocation_id,
+        Box::new(cursor), 
+        Box::new(environment),
+        Box::new(system),
+        Box::new(vault)
+    );
     
     // Run
-    let result = machine.walk()?;
+    let result = machine.walk().await?;
     let status = match result {
         MachineResult::Complete => "complete",
         MachineResult::Waiting => "waiting",
@@ -71,6 +79,46 @@ async fn on_active(context: String, _payload: JValue, db: &DbPool, rd: &Client) 
         .get_result::<Invocation>(&db_conn)?;
 
     Ok(vec!((context, String::from(format!(r#"{{"event": "{}"}}"#, status)))))
+}
+
+///
+///
+///
+async fn on_callback(context: String, payload: JValue, db: &DbPool, rd: &Client) -> Result<Vec<Event>> {
+    let db_conn = db.get().expect(MSG_NO_DB_CONNECTION);
+    let mut rd_conn = rd.get_async_connection().await.expect(MSG_NO_RD_CONNECTION);
+
+    debug!("Handling 'callback' event within context: {}", context);
+    debug!("Callback payload: {:#?}", payload);
+
+    let invocation_id: i32 = context[4..].parse()?;
+    let instructions_json: String = rd_conn.get(format!("{}_instructions", context)).await?;
+    let session_uuid: String = rd_conn.get(format!("{}_session", context)).await?;
+
+    // Setup VM
+    let cursor = RedisCursor::new(format!("{}_cursor", context), rd);
+    let environment = RedisEnvironment::new(format!("{}_env", context), None, rd);
+    let instructions = serde_json::from_str(&instructions_json)?;
+    let system = LocalSystem::new(session_uuid.parse()?);
+    let vault = InMemoryVault::new(Default::default());
+    let mut machine = AsyncMachine::new(
+        instructions, 
+        invocation_id,
+        Box::new(cursor), 
+        Box::new(environment),
+        Box::new(system),
+        Box::new(vault)
+    );
+
+    // Run
+    machine.callback(Value::Unit)?;
+
+    // Update invocation status
+    diesel::update(inv_db::invocations.find(invocation_id))
+        .set(inv_db::status.eq("active"))
+        .get_result::<Invocation>(&db_conn)?;
+
+    Ok(vec!((context, String::from(format!(r#"{{"event": "active"}}"#)))))
 }
 
 ///
