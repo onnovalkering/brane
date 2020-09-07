@@ -1,4 +1,6 @@
 #[macro_use]
+extern crate lazy_static;
+#[macro_use]
 extern crate log;
 
 use serde::{Deserialize, Serialize};
@@ -7,6 +9,7 @@ use std::path::PathBuf;
 pub mod delegate;
 pub mod docker;
 pub mod openapi;
+pub mod schedule;
 
 ///
 ///

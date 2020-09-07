@@ -19,6 +19,7 @@ futures-util = "0.3"
 k8s-openapi = { version = "0.7", features = ["v1_15"] }
 kube = "0.28"
 hyper = "0.13"
+lazy_static = "1.4"
 log = "0.4"
 openapiv3 = "0.3"
 reqwest = { version = "0.10", features = ["json"] }

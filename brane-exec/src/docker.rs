@@ -19,6 +19,23 @@ use uuid::Uuid;
 ///
 ///
 ///
+pub async fn run(exec: ExecuteInfo) -> Result<()> {
+    let docker = Docker::connect_with_local_defaults()?;
+
+    // Import image if a image file was provided
+    if exec.image_file.is_some() {
+        import_image(&docker, &exec).await?;
+    }
+
+    // Start container and wait for completion
+    create_and_start_container(&docker, &exec).await?;
+
+    Ok(())
+}
+
+///
+///
+///
 pub async fn run_and_wait(exec: ExecuteInfo) -> Result<(String, String)> {
     let docker = Docker::connect_with_local_defaults()?;
 
