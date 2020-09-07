@@ -3,9 +3,10 @@ use crate::vault::Vault;
 use anyhow::Result;
 use brane_sys::System;
 use specifications::common::Value;
-use specifications::instructions::{Instruction, Instruction::*, Move, Move::*, Operator::*, ActInstruction};
+use specifications::instructions::{Instruction, Instruction::*, Move::*, Operator::*};
+use specifications::instructions::{ActInstruction, MovInstruction, SubInstruction, VarInstruction};
 use crate::cursor::Cursor;
-use brane_exec::delegate;
+use brane_exec::{delegate, schedule};
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -21,6 +22,7 @@ pub struct AsyncMachine {
     pub cursor: Box<dyn Cursor>,
     pub environment: Box<dyn Environment>,
     pub instructions: Vec<Instruction>,
+    pub invocation_id: i32,
     pub system: Box<dyn System>,
     pub vault: Box<dyn Vault>,
 }
@@ -31,6 +33,7 @@ impl AsyncMachine {
     ///
     pub fn new(
         instructions: Vec<Instruction>,
+        invocation_id: i32,
         cursor: Box<dyn Cursor>,
         environment: Box<dyn Environment>,
         system: Box<dyn System>,
@@ -40,6 +43,7 @@ impl AsyncMachine {
             cursor,
             environment,
             instructions,
+            invocation_id,
             system,
             vault,
         }
@@ -48,11 +52,11 @@ impl AsyncMachine {
     ///
     ///
     ///
-    pub fn walk(
+    pub async fn walk(
         &mut self,
     ) -> Result<MachineResult> {
         while let Some(instruction) = get_current_instruction(&self.instructions, &self.cursor) {
-            let movement = match instruction {
+            match instruction {
                 Act(act) => {
                     let arguments = prepare_arguments(&act.input, &self.environment, &self.vault);
                     let kind = act.meta.get("kind").expect("Missing `kind` metadata property.");
@@ -63,20 +67,17 @@ impl AsyncMachine {
                             if let Some(value) = value {
                                 self.callback(value)?;
                             }
-
-                            Some(Forward)
                         },
-                        _ => handle_act(&act, &self.environment, &self.system, &self.vault)
+                        _ => {
+                            handle_act(&act, arguments, self.invocation_id).await?;
+                            return Ok(MachineResult::Waiting);
+                        }
                     }
 
                 },
-                Mov(_) => handle_mov(&instruction, &self.environment),
-                Sub(_) => handle_sub(&instruction, &mut self.cursor),
-                Var(_) => handle_var(&instruction, &mut self.environment),
-            };
-
-            if let Some(movement) = movement {
-                self.cursor.go(movement);
+                Mov(mov) => handle_mov(&mov, &mut self.cursor, &self.environment),
+                Sub(sub) => handle_sub(&sub, &mut self.cursor),
+                Var(var) => handle_var(&var, &mut self.cursor, &mut self.environment),
             }
         }
 
@@ -113,6 +114,7 @@ impl AsyncMachine {
             self.environment.set(assignment, &value);
         }
 
+        self.cursor.go(Forward);
         Ok(())
     }
 }
@@ -192,28 +194,33 @@ fn prepare_arguments(
 }
 
 
-fn handle_act(
-    instruction: &ActInstruction,
-    environment: &Box<dyn Environment>,
-    system: &Box<dyn System>,
-    vault: &Box<dyn Vault>,
-) -> Option<Move> {
-    unimplemented!()
+async fn handle_act(
+    act: &ActInstruction,
+    arguments: Map<Value>,
+    invocation_id: i32,
+) -> Result<()> {
+    let kind = act.meta.get("kind").expect("Missing `kind` metadata property.");
+
+    match kind.as_str() {
+        "cwl" => unimplemented!(),
+        "dsl" => unimplemented!(),
+        "ecu" => schedule::ecu(&act, arguments, invocation_id).await?,
+        "oas" => unimplemented!(),
+        "std" => unimplemented!(),
+        _ => unreachable!()
+    };
+
+    Ok(())
 }
 
 ///
 ///
 ///
 fn handle_mov(
-    instruction: &Instruction,
+    mov: &MovInstruction,
+    cursor: &Box<dyn Cursor>,
     environment: &Box<dyn Environment>,
-) -> Option<Move> {
-    let mov = if let Mov(mov) = instruction {
-        mov
-    } else {
-        unreachable!();
-    };
-
+) -> () {
     let mut movement = if mov.conditions.len() == mov.branches.len() {
         // Default, may be overriden based on the specific branch
         Forward
@@ -250,41 +257,28 @@ fn handle_mov(
         }
     }
 
-    Some(movement)
+    cursor.go(movement);
 }
 
 ///
 ///
 ///
 fn handle_sub(
-    instruction: &Instruction,
+    sub: &SubInstruction,
     cursor: &mut Box<dyn Cursor>,
-) -> Option<Move> {
-    let sub = if let Sub(sub) = instruction {
-        sub
-    } else {
-        unreachable!();
-    };
-
+) -> () {
     let max_subposition = sub.instructions.len() - 1;
     cursor.enter_sub(max_subposition);
-
-    None
 }
 
 ///
 ///
 ///
 fn handle_var(
-    instruction: &Instruction,
+    var: &VarInstruction,
+    cursor: &mut Box<dyn Cursor>,
     environment: &mut Box<dyn Environment>,
-) -> Option<Move> {
-    let var = if let Var(var) = instruction {
-        var
-    } else {
-        unreachable!();
-    };
-
+) -> () {
     for variable in &var.get {
         let variable_exists = environment.exists(&variable.name);
         if !variable_exists {
@@ -303,5 +297,5 @@ fn handle_var(
         }
     }
 
-    Some(Forward)
+    cursor.go(Forward);
 }
