@@ -10,7 +10,8 @@ setup(
     author='Onno Valkering',
     url='https://github.com/onnovalkering/brane',
     install_requires=[
-        'pexpect'
+        'requests',
+        'zmq', 
     ],
     classifiers=[],
 )

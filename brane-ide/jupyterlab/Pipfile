@@ -11,7 +11,8 @@ ipykernel = "*"
 ipython = "*"
 jupyter-client = "*"
 jupyterlab = "*"
-pexpect = "*"
+zmq = "*"
+requests = "*"
 
 [requires]
 python_version = "3.8"
