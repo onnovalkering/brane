@@ -246,7 +246,7 @@ async fn test_ecu(
         "action": function_name,
         "arguments": arguments,
     });
-    let command = vec![String::from("-d"), String::from("exec"), base64::encode(serde_json::to_string(&payload)?)];
+    let command = vec![String::from("exec"), base64::encode(serde_json::to_string(&payload)?)];
     debug!("{:?}", command);
 
     let exec = ExecuteInfo::new(image, image_file, None, None, Some(command));
@@ -256,10 +256,10 @@ async fn test_ecu(
         warn!("{}", stderr);
     }
 
-    let output: Map<Value> = serde_json::from_str(&stdout)?;
-    for (name, value) in output.iter() {
-        println!("{}:\n{}\n", style(&name).bold().cyan(), value);
-    }
+    debug!("stdout: {}", stdout);
+
+    let output: Value = serde_json::from_str(&stdout)?;
+    println!("{}", style(&output).bold().cyan());
 
     Ok(())
 }
