@@ -193,7 +193,7 @@ async fn upload_package(
                     Command::new("skopeo")
                         .arg("copy")
                         .arg("--dest-tls-verify=false")
-                        .arg(format!("tarball:{}", image_tar))
+                        .arg(format!("docker-archive:{}", image_tar))
                         .arg(format!("docker://{}/library/{}", docker_host, image_label))
                         .status()
                 })
