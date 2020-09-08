@@ -18,7 +18,14 @@ use uuid::Uuid;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
-pub async fn start(secrets_file: Option<PathBuf>) -> Result<()> {
+pub async fn start(
+    secrets_file: Option<PathBuf>,
+    compile_only: bool,
+) -> Result<()> {
+    if compile_only {
+        return start_compile_service().await;
+    }
+
     println!("Starting interactive session, press Ctrl+D to exit.\n");
 
     let interface = Interface::new("brane-repl")?;
@@ -74,6 +81,34 @@ pub async fn start(secrets_file: Option<PathBuf>) -> Result<()> {
 
     println!("Goodbye.");
     Ok(())
+}
+
+///
+///
+///
+async fn start_compile_service() -> Result<()> {
+    println!("Starting compile-only service\n");
+
+    // Prepare DSL compiler
+    let package_index = registry::get_package_index().await?;
+    let mut compiler = Compiler::new(CompilerOptions::repl(), package_index)?;
+
+    let context = zmq::Context::new();
+    let socket = context.socket(zmq::REP)?;
+
+    socket.bind("tcp://*:5555")?;
+    loop {
+        let mut instructions = vec!();
+        let data = socket.recv_string(0)?;
+
+        if let Ok(data) = data {
+            instructions = compiler.compile(&data)?;
+            debug!("Instructions: {:#?}", instructions);
+        }
+
+        let instructions_json = serde_json::to_string(&instructions)?;
+        socket.send(&instructions_json, 0)?;
+    }    
 }
 
 ///

@@ -30,6 +30,8 @@ enum SubCommand {
         file: PathBuf,
         #[structopt(short, long, help = "Kind of package: cwl, dsl, ecu or oas")]
         kind: Option<String>,
+        #[structopt(short, long, help = "Path to the init binary to use (override Brane's binary)")]
+        init: Option<PathBuf>,
     },
 
     #[structopt(name = "inspect", about = "Inspect a package")]
@@ -87,6 +89,8 @@ enum SubCommand {
     Repl {
         #[structopt(short, long, help = "File containing secrets")]
         secrets: Option<PathBuf>,
+        #[structopt(short, long, help = "Start compile only service (zmq)")]
+        compile_only: bool,
     },
 
     #[structopt(name = "test", about = "Test a package locally")]
@@ -148,7 +152,7 @@ async fn main() -> Result<()> {
 async fn run(options: CLI) -> Result<()> {
     use SubCommand::*;
     match options.sub_command {
-        Build { context, file, kind } => {
+        Build { context, file, kind, init } => {
             let kind = if let Some(kind) = kind {
                 kind.to_lowercase()
             } else {
@@ -158,7 +162,7 @@ async fn run(options: CLI) -> Result<()> {
             match kind.as_str() {
                 "cwl" => build_cwl::handle(context, file)?,
                 "dsl" => build_dsl::handle(context, file).await?,
-                "ecu" => build_ecu::handle(context, file)?,
+                "ecu" => build_ecu::handle(context, file, init)?,
                 "oas" => build_oas::handle(context, file)?,
                 _ => println!("Unsupported package kind: {}", kind),
             }
@@ -184,8 +188,8 @@ async fn run(options: CLI) -> Result<()> {
         Remove { name, version, force } => {
             packages::remove(name, version, force)?;
         }
-        Repl { secrets } => {
-            repl::start(secrets).await?;
+        Repl { secrets, compile_only} => {
+            repl::start(secrets, compile_only).await?;
         }
         Test { name, version } => {
             test::handle(name, version).await?;

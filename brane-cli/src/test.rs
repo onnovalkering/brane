@@ -246,7 +246,7 @@ async fn test_ecu(
         "action": function_name,
         "arguments": arguments,
     });
-    let command = vec![String::from("exec"), base64::encode(serde_json::to_string(&payload)?)];
+    let command = vec![String::from("-d"), String::from("exec"), base64::encode(serde_json::to_string(&payload)?)];
     debug!("{:?}", command);
 
     let exec = ExecuteInfo::new(image, image_file, None, None, Some(command));

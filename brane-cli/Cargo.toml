@@ -43,3 +43,4 @@ tokio = { version = "0.2", features = ["full"] }
 tokio-util = "0.3"
 uuid = { version = "0.8", features = ["v4"] }
 yaml-rust = "0.4"
+zmq = { version = "0.9", features = ["vendored"] }

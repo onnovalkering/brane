@@ -24,6 +24,7 @@ const INIT_URL: &str = concat!(
 pub fn handle(
     context: PathBuf,
     file: PathBuf,
+    init_path: Option<PathBuf>,
 ) -> Result<()> {
     let context = fs::canonicalize(context)?;
     debug!("Using {:?} as build context", context);
@@ -33,10 +34,10 @@ pub fn handle(
     let ecu_document = ContainerInfo::from_reader(ecu_reader)?;
 
     // Prepare package directory
-    let dockerfile = generate_dockerfile(&ecu_document)?;
+    let dockerfile = generate_dockerfile(&ecu_document, init_path.is_some())?;
     let package_info = generate_package_info(&ecu_document)?;
     let package_dir = packages::get_package_dir(&package_info.name, Some(&package_info.version))?;
-    prepare_directory(&ecu_document, dockerfile, &context, &package_info, &package_dir)?;
+    prepare_directory(&ecu_document, dockerfile, init_path, &context, &package_info, &package_dir)?;
 
     debug!("Successfully prepared package directory.");
 
@@ -84,7 +85,10 @@ fn generate_package_info(container_info: &ContainerInfo) -> Result<PackageInfo> 
 ///
 ///
 ///
-fn generate_dockerfile(ecu_document: &ContainerInfo) -> Result<String> {
+fn generate_dockerfile(
+    ecu_document: &ContainerInfo,
+    override_init: bool,
+) -> Result<String> {
     let mut contents = String::new();
     let base = ecu_document
         .base
@@ -102,11 +106,6 @@ fn generate_dockerfile(ecu_document: &ContainerInfo) -> Result<String> {
         }
     }
 
-    // Add Brane entrypoint
-    writeln!(contents, "ADD {} init", INIT_URL)?;
-    writeln!(contents, "RUN chmod +x init")?;
-    writeln!(contents, "ENTRYPOINT [\"./init\"]")?;
-
     // Add dependencies
     if base.starts_with("alpine") {
         write!(contents, "RUN apk add --no-cache ")?;
@@ -119,6 +118,14 @@ fn generate_dockerfile(ecu_document: &ContainerInfo) -> Result<String> {
         }
     }
     writeln!(contents)?;
+
+    // Add default init library
+    if override_init {
+        writeln!(contents, "ADD init init")?;
+    } else {
+        writeln!(contents, "ADD {} init", INIT_URL)?;
+        writeln!(contents, "RUN chmod +x init")?;
+    }
 
     // Copy files
     writeln!(contents, "COPY container.yml /container.yml")?;
@@ -133,6 +140,7 @@ fn generate_dockerfile(ecu_document: &ContainerInfo) -> Result<String> {
     }
 
     writeln!(contents, "WORKDIR /")?;
+    writeln!(contents, "ENTRYPOINT [\"./init\"]")?;
 
     Ok(contents)
 }
@@ -143,6 +151,7 @@ fn generate_dockerfile(ecu_document: &ContainerInfo) -> Result<String> {
 fn prepare_directory(
     ecu_document: &ContainerInfo,
     dockerfile: String,
+    init_path: Option<PathBuf>,
     context: &PathBuf,
     package_info: &PackageInfo,
     package_dir: &PathBuf,
@@ -162,6 +171,11 @@ fn prepare_directory(
     let mut buffer = File::create(package_dir.join("package.yml"))?;
     write!(buffer, "{}", serde_yaml::to_string(&package_info)?)?;
 
+    // Copy custom init binary to package directory
+    if let Some(init_path) = init_path {
+        fs::copy(fs::canonicalize(init_path)?, package_dir.join("init"))?;
+    }
+
     // Create the working directory and copy required files.
     let wd = package_dir.join("wd");
     if let Some(files) = &ecu_document.files {
@@ -176,6 +190,7 @@ fn prepare_directory(
             let file_path = context.join(file);
             fs::copy(&file_path, &wd_path)
                 .with_context(|| format!("Couldn't find {:?} within the build context.", file_path))?;
+                
             debug!("Copied {:?} to working directory", file_path);
         }
     }
