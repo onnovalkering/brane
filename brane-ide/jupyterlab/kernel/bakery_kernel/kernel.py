@@ -1,6 +1,20 @@
 from ipykernel.kernelbase import Kernel
-from pexpect.replwrap import REPLWrapper
 from os import environ
+from zmq import Context, REQ
+from json import loads, dumps
+
+context = zmq.Context()
+
+#  Socket to talk to server
+print("Connecting to service…")
+socket = context.socket(zmq.REQ)
+socket.connect("tcp://localhost:5555")
+
+dsl = b"a := 1\nb:= 2"
+socket.send(dsl)
+message = socket.recv()
+print(message)
+    
 
 class BakeryKernel(Kernel):
     implementation = 'Bakery'
@@ -17,18 +31,16 @@ class BakeryKernel(Kernel):
 
     def __init__(self, **kwargs):
         Kernel.__init__(self, **kwargs)
+        self.context = Context()
+        self.repl = self.context.socket(REQ)
+        self.repl.connect('tcp://localhost:5555')
 
-        # Start a new Bakery REPL session
-        environ['TERM'] = 'xterm-256color'
-        self.repl = REPLWrapper('/kernel/brane -s repl', self.prompt, None)
+    def do_execute(self, code, silent, store_history=True, user_expressions=None, allow_stdin=False):
+        socket.send(code.encode('UTF-8'))
+        instructions = load(socket.recv())
 
-    def do_execute(self, command, silent, store_history=True, user_expressions=None, allow_stdin=False):
-        output = self.repl.run_command(command)
-        output = '\n'.join(output.strip().split('\r\n')[1:]).strip()
-
-        if output != '' :
-            stream_content = {'name': 'stdout', 'text': output }
-            self.send_response(self.iopub_socket, 'stream', stream_content)
+        stream_content = {'name': 'stdout', 'text': dumps(instructions) }
+        self.send_response(self.iopub_socket, 'stream', stream_content)
 
         return {
             'status': 'ok',
