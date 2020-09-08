@@ -10,5 +10,6 @@
             "v": "integer"
         }
     },
-    "identifier": "1+1"
+    "invocationId": 1,
+    "callbackUrl": "http://localhost:8080/callback/act"
 }

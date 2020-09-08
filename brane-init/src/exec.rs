@@ -1,33 +1,30 @@
-use crate::Payload;
+use anyhow::{Context, Result};
 use specifications::common::{Parameter, Type, Value};
 use specifications::container::{ActionCommand, ContainerInfo};
 use std::path::PathBuf;
 use std::process::Command;
 use yaml_rust::{Yaml, YamlLoader};
 
-type FResult<T> = Result<T, failure::Error>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 ///
 ///
 ///
 pub async fn handle(
+    action: &String,
+    arguments: &Map<Value>,
     container_info: ContainerInfo,
-    payload: Payload,
     working_dir: PathBuf,
-) -> FResult<Map<Value>> {
-    let action = container_info.actions.get(&payload.action);
-    ensure!(action.is_some(), "Action '{}' not found.", payload.action);
+) -> Result<Value> {
+    debug!("Executing '{}' using arguments:\n{:#?}", action, arguments);
+
+    let action = container_info.actions
+        .get(action)
+        .with_context(|| format!("Action '{}' not found.", action))?;
 
     // Validate and prepare action execution
-    let action = action.unwrap();
-    assert_input(&action.input, &payload.arguments)?;
+    assert_input(&action.input, arguments)?;
     initialize(&working_dir)?;
-
-    debug!(
-        "Executing '{}' using arguments:\n{:#?}",
-        payload.action, payload.arguments
-    );
 
     let entrypoint = &container_info.entrypoint.exec;
     let command = action.command.clone().unwrap_or_else(|| ActionCommand {
@@ -35,10 +32,18 @@ pub async fn handle(
         capture: None,
     });
 
-    let stdout = execute(entrypoint, &command.args, &payload.arguments, &working_dir)?;
+    let stdout = execute(entrypoint, &command.args, arguments, &working_dir)?;
     let output = capture_output(stdout, &action.output, &command.capture, &container_info.types)?;
 
-    Ok(output)
+    if let Some(parameter) = action.output.first() {
+        let value = output
+            .get(&parameter.name)
+            .with_context(|| format!("Output '{}' not found.", parameter.name))?;
+
+        Ok(value.clone())
+    } else {
+        Ok(Value::Unit)
+    }
 }
 
 ///
@@ -47,7 +52,7 @@ pub async fn handle(
 fn assert_input(
     parameters: &[Parameter],
     arguments: &Map<Value>,
-) -> FResult<()> {
+) -> Result<()> {
     debug!("Asserting input arguments");
 
     for p in parameters {
@@ -78,7 +83,7 @@ fn assert_input(
 ///
 ///
 ///
-fn initialize(working_dir: &PathBuf) -> FResult<()> {
+fn initialize(working_dir: &PathBuf) -> Result<()> {
     debug!("Initializing working directory");
 
     let init_sh = working_dir.join("init.sh");
@@ -101,7 +106,7 @@ fn execute(
     command_args: &[String],
     arguments: &Map<Value>,
     working_dir: &PathBuf,
-) -> FResult<String> {
+) -> Result<String> {
     let entrypoint_path = working_dir.join(entrypoint).canonicalize()?;
     let mut command = if entrypoint_path.is_file() {
         Command::new(entrypoint_path)
@@ -138,7 +143,7 @@ fn execute(
 ///
 ///
 ///
-fn construct_envs(variables: &Map<Value>) -> FResult<Map<String>> {
+fn construct_envs(variables: &Map<Value>) -> Result<Map<String>> {
     let mut envs = Map::<String>::new();
 
     for (name, variable) in variables.iter() {
@@ -189,7 +194,7 @@ fn capture_output(
     parameters: &[Parameter],
     mode: &Option<String>,
     c_types: &Option<Map<Type>>,
-) -> FResult<Map<Value>> {
+) -> Result<Map<Value>> {
     let stdout = preprocess_stdout(stdout, &mode)?;
     let docs = YamlLoader::load_from_str(&stdout)?;
 
@@ -206,7 +211,7 @@ fn unwrap_yaml_hash(
     value: &Yaml,
     parameters: &[Parameter],
     _types: &Map<Type>,
-) -> FResult<Map<Value>> {
+) -> Result<Map<Value>> {
     let map = value.as_hash().unwrap();
 
     let mut output = Map::<Value>::new();
@@ -244,7 +249,7 @@ fn unwrap_yaml_hash(
 fn unwrap_yaml_value(
     value: &Yaml,
     data_type: &str,
-) -> FResult<Value> {
+) -> Result<Value> {
     debug!("Unwrapping as {}: {:?} ", data_type, value);
 
     let value = match data_type {
@@ -279,7 +284,7 @@ const PREFIX: &str = "~~>";
 fn preprocess_stdout(
     stdout: String,
     mode: &Option<String>,
-) -> FResult<String> {
+) -> Result<String> {
     let mode = mode.clone().unwrap_or_else(|| String::from("complete"));
 
     if mode == "complete" {

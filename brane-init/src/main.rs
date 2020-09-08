@@ -1,20 +1,12 @@
+use anyhow::Result;
 use base64::decode;
-use brane_init::{exec, Payload};
-use dialoguer::theme::ColorfulTheme;
-use dialoguer::{Input as Prompt, Select};
+use brane_init::{callback, exec, Payload, relay};
 use log::LevelFilter;
-use specifications::common::Value;
 use specifications::container::ContainerInfo;
 use std::path::PathBuf;
 use std::process;
-use std::{
-    fmt::{Debug, Display},
-    str::FromStr,
-};
 use structopt::StructOpt;
-
-type FResult<T> = Result<T, failure::Error>;
-type Map<T> = std::collections::HashMap<String, T>;
+use std::thread;
 
 #[derive(StructOpt)]
 #[structopt(name = "init")]
@@ -48,12 +40,10 @@ enum SubCommand {
         #[structopt(help = "Payload as Base64 encoded JSON")]
         payload: String,
     },
-    #[structopt(name = "test", about = "Interactivly test an action specified in container.yml")]
-    Test,
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn main() -> Result<()> {
     let options = CLI::from_args();
 
     let mut logger = env_logger::builder();
@@ -68,75 +58,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let container_info = ContainerInfo::from_path(options.container_info)?;
     let working_dir = options.working_dir;
 
-    let payload = match options.sub_command {
+    let payload: Payload = match options.sub_command {
         SubCommand::Exec { payload } => {
             let payload = decode(payload).unwrap()[..].to_vec(); // Decode Base64 to byte vector (UTF-8)
             serde_json::from_str(&String::from_utf8(payload)?)? // Convert bytes to String, and deserialize as JSON
         }
-        SubCommand::Test => build_payload(&container_info)?,
     };
 
-    let output = exec::handle(container_info, payload, working_dir).await?;
-    let output = serde_json::to_string(&output)?; // Serialize output as JSON
-
-    println!("{}", output);
-    process::exit(0);
-}
-
-///
-///
-///
-fn build_payload(container_info: &ContainerInfo) -> FResult<Payload> {
-    let actions: Vec<String> = container_info.actions.keys().map(|k| k.to_string()).collect();
-
-    let index = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("The action the execute")
-        .default(0)
-        .items(&actions[..])
-        .interact()?;
-
-    let name = &actions[index];
-    let action = &container_info.actions[name];
-
-    println!("\nPlease provide input for the chosen action:\n");
-
-    let mut arguments = Map::<Value>::new();
-    for i in &action.input {
-        let data_type = i.data_type.as_str();
-        let value = match data_type {
-            "boolean" => Value::Boolean(prompt(&i.name, data_type)?),
-            "integer" => Value::Integer(prompt(&i.name, data_type)?),
-            "real" => Value::Real(prompt(&i.name, data_type)?),
-            "string" => Value::Unicode(prompt(&i.name, data_type)?),
-            _ => continue,
-        };
-
-        arguments.insert(i.name.clone(), value);
+    let invocation_id = payload.invocation_id.clone();
+    if let Some(callback_url) = payload.callback_url.clone() {
+        thread::spawn(move || {
+            relay::start(callback_url, invocation_id).unwrap();
+        });
     }
 
-    let payload = Payload {
-        action: name.clone(),
-        arguments,
-        identifier: String::from("ID"),
-        callback_url: None,
-        monitor_url: None,
-    };
+    let output = exec::handle(&payload.action, &payload.arguments, container_info, working_dir).await?;
+    if let Some(callback_url) = payload.callback_url {
+        callback::submit(&callback_url, invocation_id, &output).await?;
+    }
 
-    Ok(payload)
-}
-
-///
-///
-///
-fn prompt<T>(
-    name: &str,
-    data_type: &str,
-) -> std::io::Result<T>
-where
-    T: Clone + FromStr + Display,
-    T::Err: Display + Debug,
-{
-    Prompt::with_theme(&ColorfulTheme::default())
-        .with_prompt(&format!("{} ({})", name, data_type))
-        .interact()
+    process::exit(0);
 }
