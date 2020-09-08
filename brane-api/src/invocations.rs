@@ -3,15 +3,19 @@ use crate::schema::{self, invocations::dsl as db, sessions::dsl as s_db};
 use actix_web::Scope;
 use actix_web::{web, HttpRequest, HttpResponse};
 use diesel::prelude::*;
-use diesel::{r2d2, r2d2::ConnectionManager};
+use diesel::r2d2::ConnectionManager;
 use futures::*;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use serde::Deserialize;
 use specifications::instructions::Instruction;
+use redis::Commands;
+use serde_json::json;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
+type RedisPool = r2d2::Pool<redis::Client>;
 
 const MSG_NO_DB_CONNECTION: &str = "Couldn't get connection from db pool.";
+const MSG_NO_RD_CONNECTION: &str = "Couldn't get connection from rd pool.";
 const MSG_ONLY_STOPPED_DELETED: &str = "Only stopped invocations can be deleted.";
 const MSG_ONLY_HALTED_RESUMED: &str = "Only halted invocations can be halted.";
 const MSG_ONLY_RUNNING_STOPPED: &str = "Only running invocations can be stopped.";
@@ -31,6 +35,7 @@ pub fn scope() -> Scope {
         .route("/{uuid}/resume", web::post().to(resume_invocation))
         .route("/{uuid}/stop", web::post().to(stop_invocation))
         .route("/{uuid}/suspend", web::post().to(suspend_invocation))
+        .route("/{uuid}/status", web::get().to(get_invocation_status))
 }
 
 #[derive(Deserialize)]
@@ -288,12 +293,56 @@ async fn suspend_invocation(
 ///
 ///
 ///
+async fn get_invocation_status(
+    _req: HttpRequest,
+    path: web::Path<(String,)>,
+    db_pool: web::Data<DbPool>,
+    rd_pool: web::Data<RedisPool>,
+) -> HttpResponse {
+    let db_conn = db_pool.get().expect(MSG_NO_DB_CONNECTION);
+    let mut rd_conn = rd_pool.get().expect(MSG_NO_RD_CONNECTION);
+
+    let invocation = web::block(move || db::invocations.filter(db::uuid.eq(&path.0)).first::<Invocation>(&db_conn)).await;
+    if invocation.is_err() {
+        return HttpResponse::NotFound().body("");
+    }
+
+    let invocation = invocation.unwrap();
+    let position: i32 = rd_conn.get(format!("inv-{}_cursor_position", invocation.id)).unwrap_or(0);
+    let depth: i32 = rd_conn.get(format!("inv-{}_cursor_depth", invocation.id)).unwrap_or(0);
+
+    println!("{}", format!("inv-{}_cursor_depth: {}", invocation.id, depth));
+
+    let subpositions: Vec<i32> = if depth > 0 {
+        (1..depth+1).map(|d| {
+            let subposition: i32 = rd_conn.get(format!("inv-{}_cursor_subposition_{}", invocation.id, d)).unwrap();
+            subposition
+        }).collect()
+    } else {
+        vec!()
+    };
+
+    let status = json!({
+        "invocation": invocation,
+        "cursor": {
+            "position": position,
+            "depth": depth,
+            "subpositions": subpositions,
+        }
+    });
+
+    HttpResponse::Ok().json(status)
+}
+
+///
+///
+///
 async fn trigger_event(
     producer: &FutureProducer,
     invocation_id: i32,
     event: &str,
 ) -> Result<(), ()> {
-    let message_key = format!("inv#{}", invocation_id);
+    let message_key = format!("inv-{}", invocation_id);
     let message_payload = format!(r#"{{"event": "{}"}}"#, event);
     let message = FutureRecord::to(TOPIC_CONTROL)
         .payload(&message_payload)

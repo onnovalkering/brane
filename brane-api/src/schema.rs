@@ -9,6 +9,7 @@ table! {
         uuid -> Varchar,
         instructions_json -> Text,
         status -> Varchar,
+        return_json -> Nullable<Varchar>,
     }
 }
 

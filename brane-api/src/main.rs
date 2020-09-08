@@ -1,4 +1,6 @@
 #[macro_use]
+extern crate anyhow;
+#[macro_use]
 extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
@@ -8,7 +10,7 @@ extern crate log;
 use actix_web::middleware;
 use actix_web::{App, HttpServer};
 use diesel::pg::PgConnection;
-use diesel::{r2d2, r2d2::ConnectionManager};
+use diesel::r2d2::ConnectionManager;
 use dotenv::dotenv;
 use log::LevelFilter;
 use rdkafka::config::ClientConfig;
@@ -17,7 +19,9 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use redis::Client;
 
+mod callback;
 mod invocations;
 mod models;
 mod packages;
@@ -30,6 +34,7 @@ const DEF_DATABASE_URL: &str = "postgres://postgres:postgres@postgres/postgres";
 const DEF_DOCKER_HOST: &str = "registry:5000";
 const DEF_KAFKA_BROKERS: &str = "kafka:9092";
 const DEF_PACKAGES_DIR: &str = "./packages";
+const DEF_REDIS_URL: &str = "redis://redis";
 const DEF_TEMPORARY_DIR: &str = "./temporary";
 
 #[derive(StructOpt)]
@@ -64,12 +69,17 @@ async fn main() -> std::io::Result<()> {
     fs::create_dir_all(&packages_dir)?;
 
     // Create a database pool
-    let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| String::from(DEF_DATABASE_URL));
-    let manager = ConnectionManager::<PgConnection>::new(database_url);
-    let pool = r2d2::Pool::builder().build(manager).expect("Failed to create pool.");
+    let db_url = env::var("DATABASE_URL").unwrap_or_else(|_| String::from(DEF_DATABASE_URL));
+    let db_manager = ConnectionManager::<PgConnection>::new(db_url);
+    let db_pool = r2d2::Pool::builder().build(db_manager).expect("Failed to create DB connection pool.");
+
+    // Create a Redis connection pool
+    let rd_url = env::var("REDIS_URL").unwrap_or_else(|_| String::from(DEF_REDIS_URL));
+    let rd_manager = Client::open(rd_url).unwrap();
+    let rd_pool = r2d2::Pool::builder().build(rd_manager).expect("Failed to create Redis connection pool.");
 
     // Run database migrations
-    let conn = pool.get().expect("Couldn't get connection from db pool.");
+    let conn = db_pool.get().expect("Couldn't get connection from db pool.");
     embedded_migrations::run(&conn).expect("Failed to run database migrations.");
 
     // Create Kafka producer
@@ -94,8 +104,10 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .wrap(middleware::NormalizePath)
             .data(config.clone())
-            .data(pool.clone())
+            .data(db_pool.clone())
+            .data(rd_pool.clone())
             .data(producer.clone())
+            .service(callback::scope())
             .service(invocations::scope())
             .service(packages::scope())
             .service(sessions::scope())

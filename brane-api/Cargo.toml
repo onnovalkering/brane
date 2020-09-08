@@ -5,6 +5,7 @@ authors = ["Onno Valkering"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0"
 actix-files = "0.2"
 actix-multipart = "0.2"
 actix-rt = "1"
@@ -16,11 +17,13 @@ failure = "0.1"
 flate2 = "1.0"
 futures = "0.3"
 log = "0.4"
+r2d2 = "0.8"
 diesel = { version = "1.4", features = ["r2d2", "postgres", "chrono"] }
 diesel_migrations = "1.4"
 dotenv = "0.15"
 rand = "0.7"
 rdkafka = { version = "0.23", features = ["cmake-build"] }
+redis = { version = "0.17", features = ["r2d2"] }
 semver = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

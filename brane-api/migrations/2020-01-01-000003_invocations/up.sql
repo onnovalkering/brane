@@ -12,6 +12,7 @@ CREATE TABLE "invocations" (
   -- content
   , "instructions_json" TEXT NOT NULL
   , "status" VARCHAR NOT NULL
+  , "return_json" VARCHAR
 );
 
 CREATE UNIQUE INDEX "invocation_uuid" ON invocations("uuid");
