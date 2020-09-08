@@ -6,7 +6,7 @@ use bollard::container::{
     WaitContainerOptions,
 };
 use bollard::errors::Error;
-use bollard::image::ImportImageOptions;
+use bollard::image::{CreateImageOptions, ImportImageOptions};
 use bollard::Docker;
 use futures_util::stream::TryStreamExt;
 use hyper::Body;
@@ -16,6 +16,7 @@ use tokio::stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use uuid::Uuid;
 use std::env;
+use std::path::PathBuf;
 
 lazy_static! {
     static ref DOCKER_NETWORK: String = env::var("DOCKER_NETWORK").unwrap_or_else(|_| String::from("bridge"));
@@ -27,10 +28,8 @@ lazy_static! {
 pub async fn run(exec: ExecuteInfo) -> Result<()> {
     let docker = Docker::connect_with_local_defaults()?;
 
-    // Import image if a image file was provided
-    if exec.image_file.is_some() {
-        import_image(&docker, &exec).await?;
-    }
+    // Either import or pull image, if not already present
+    ensure_image(&docker, &exec).await?;
 
     // Start container and wait for completion
     create_and_start_container(&docker, &exec).await?;
@@ -44,10 +43,8 @@ pub async fn run(exec: ExecuteInfo) -> Result<()> {
 pub async fn run_and_wait(exec: ExecuteInfo) -> Result<(String, String)> {
     let docker = Docker::connect_with_local_defaults()?;
 
-    // Import image if a image file was provided
-    if exec.image_file.is_some() {
-        import_image(&docker, &exec).await?;
-    }
+    // Either import or pull image, if not already present
+    ensure_image(&docker, &exec).await?;
 
     // Start container and wait for completion
     let name = create_and_start_container(&docker, &exec).await?;
@@ -123,17 +120,32 @@ async fn create_and_start_container(
 ///
 ///
 ///
-async fn import_image(
+async fn ensure_image(
     docker: &Docker,
     exec: &ExecuteInfo,
 ) -> Result<()> {
-    let image_file = &exec.image_file.clone().unwrap();
-
     // Abort, if image is already loaded
     if docker.inspect_image(&exec.image).await.is_ok() {
+        info!("Image already exists in Docker deamon.");
         return Ok(());
     }
 
+    if let Some(image_file) = &exec.image_file {
+        info!("Image doesn't exist in Docker deamon: importing...");
+        import_image(docker, image_file).await
+    } else {
+        info!("Image doesn't exist in Docker deamon: pulling...");
+        pull_image(docker, exec.image.clone()).await
+    }
+}
+
+///
+///
+///
+async fn import_image(
+    docker: &Docker,
+    image_file: &PathBuf,
+) -> Result<()> {
     let options = ImportImageOptions { quiet: true };
 
     let file = TFile::open(image_file).await?;
@@ -145,5 +157,22 @@ async fn import_image(
     let body = Body::wrap_stream(byte_stream);
     docker.import_image(options, body, None).try_collect::<Vec<_>>().await?;
 
+    Ok(())
+}
+
+///
+///
+///
+async fn pull_image(
+    docker: &Docker,
+    image: String,
+) -> Result<()> {
+    let options = Some(CreateImageOptions{
+        from_image: image,
+        ..Default::default()
+    });
+
+    docker.create_image(options, None, None).try_collect::<Vec<_>>().await?;
+      
     Ok(())
 }

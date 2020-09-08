@@ -13,7 +13,8 @@ use std::env;
 type Map<T> = std::collections::HashMap<String, T>;
 
 lazy_static! {
-    static ref CALLBACK_URL: String = env::var("CALLBACK_URL").unwrap_or_else(|_| String::from("brane-api:8080/callback"));
+    static ref CALLBACK_URL: String = env::var("CALLBACK_URL").unwrap_or_else(|_| String::from("http://brane-api:8080/callback"));
+    static ref DOCKER_HOST: String = env::var("DOCKER_HOST").unwrap_or_else(|_| String::from("registry:5000"));
 }
 
 ///
@@ -107,14 +108,18 @@ pub async fn ecu(
     arguments: Map<Value>,
     invocation_id: i32,
 ) -> Result<()> {
-    let image = act.meta.get("image").expect("Missing `image` metadata property.");
+    let mut image = act.meta.get("image").expect("Missing `image` metadata property.").clone();
     let image_file = act.meta.get("image_file").map(PathBuf::from);
     let payload = json!({
         "action": act.name,
         "arguments": arguments,
-        "callback_url": CALLBACK_URL.as_str(),
-        "invocation_id": invocation_id,
+        "callbackUrl": CALLBACK_URL.as_str(),
+        "invocationId": invocation_id,
     });
+
+    if image_file.is_none() {
+        image = format!("{}/library/{}", DOCKER_HOST.as_str(), image);
+    }
 
     let command = vec![String::from("exec"), base64::encode(serde_json::to_string(&payload)?)];
     let exec = ExecuteInfo::new(image.clone(), image_file, None, None, Some(command));
