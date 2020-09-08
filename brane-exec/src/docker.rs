@@ -15,6 +15,11 @@ use tokio::fs::File as TFile;
 use tokio::stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use uuid::Uuid;
+use std::env;
+
+lazy_static! {
+    static ref DOCKER_NETWORK: String = env::var("DOCKER_NETWORK").unwrap_or_else(|_| String::from("bridge"));
+}
 
 ///
 ///
@@ -95,6 +100,7 @@ async fn create_and_start_container(
 
     let host_config = HostConfig {
         binds: exec.mounts.clone(),
+        network_mode: Some(DOCKER_NETWORK.to_string()),
         ..Default::default()
     };
 

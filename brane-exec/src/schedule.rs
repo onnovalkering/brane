@@ -110,7 +110,6 @@ pub async fn ecu(
     let image = act.meta.get("image").expect("Missing `image` metadata property.");
     let image_file = act.meta.get("image_file").map(PathBuf::from);
     let payload = json!({
-        "identifier": "test",
         "action": act.name,
         "arguments": arguments,
         "callback_url": CALLBACK_URL.as_str(),
@@ -118,8 +117,6 @@ pub async fn ecu(
     });
 
     let command = vec![String::from("exec"), base64::encode(serde_json::to_string(&payload)?)];
-    debug!("{:?}", command);
-
     let exec = ExecuteInfo::new(image.clone(), image_file, None, None, Some(command));
 
     docker::run(exec).await?;

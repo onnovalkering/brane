@@ -11,7 +11,6 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::Write;
 use std::path::PathBuf;
-use std::rc::Rc;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
