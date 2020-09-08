@@ -23,6 +23,7 @@ pub struct Invocation {
     // Content
     pub instructions_json: String,
     pub status: String,
+    pub return_json: Option<String>,
 }
 
 #[derive(Serialize, Queryable, Identifiable)]

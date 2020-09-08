@@ -89,11 +89,13 @@ async fn on_callback(context: String, payload: JValue, db: &DbPool, rd: &Client)
     let mut rd_conn = rd.get_async_connection().await.expect(MSG_NO_RD_CONNECTION);
 
     debug!("Handling 'callback' event within context: {}", context);
-    debug!("Callback payload: {:#?}", payload);
+    debug!("Callback payload: {}", payload);
 
     let invocation_id: i32 = context[4..].parse()?;
     let instructions_json: String = rd_conn.get(format!("{}_instructions", context)).await?;
     let session_uuid: String = rd_conn.get(format!("{}_session", context)).await?;
+
+    // TODO: verify that status of invocation is 'waiting', otherwise discard (illegal or outdated).
 
     // Setup VM
     let cursor = RedisCursor::new(format!("{}_cursor", context), rd);
@@ -111,7 +113,8 @@ async fn on_callback(context: String, payload: JValue, db: &DbPool, rd: &Client)
     );
 
     // Run
-    machine.callback(Value::Unit)?;
+    let value = serde_json::from_value(payload["value"].clone())?;
+    machine.callback(value)?;
 
     // Update invocation status
     diesel::update(inv_db::invocations.find(invocation_id))
@@ -137,10 +140,22 @@ async fn on_complete(context: String, _payload: JValue, db: &DbPool, rd: &Client
     let variables = environment.variables();
     debug!("Variables: {:?}", variables);
 
+    // Store 'terminate' variable as invocation output
+    if let Some(terminate) = variables.get("terminate") {
+        let return_json = serde_json::to_string(terminate)?;
+        diesel::update(inv_db::invocations.find(invocation_id))
+            .set(inv_db::return_json.eq(return_json))
+            .get_result::<Invocation>(&db_conn)?;   
+    }
+
     let variables = variables.iter().filter(|(k, _)| !k.starts_with("_"));
     // Only variables that are new or updated: after each set, append key to Redis set. 
 
     for (key, value) in variables {
+        if key == "terminate" {
+            continue;
+        }
+
         let value_json = serde_json::to_string(value)?;
         let new_variable = NewVariable::new(
             invocation.session, 
@@ -156,6 +171,12 @@ async fn on_complete(context: String, _payload: JValue, db: &DbPool, rd: &Client
             .set((var_db::content_json.eq(value_json), var_db::updated.eq(Utc::now().naive_utc())))
             .execute(&db_conn)?;
     }
+
+    // Update invocation status
+    let stopped = Utc::now().naive_utc();
+    diesel::update(inv_db::invocations.find(invocation_id))
+        .set(inv_db::stopped.eq(stopped))
+        .get_result::<Invocation>(&db_conn)?;    
     
     Ok(vec!())
 }
@@ -205,8 +226,9 @@ async fn on_ready(context: String, _payload: JValue, db: &DbPool, _rd: &Client) 
     let invocation_id: i32 = context[4..].parse()?;
 
     // Update invocation status
+    let started = Utc::now().naive_utc();
     diesel::update(inv_db::invocations.find(invocation_id))
-        .set(inv_db::status.eq("active"))
+        .set((inv_db::status.eq("active"), inv_db::started.eq(started)))
         .get_result::<Invocation>(&db_conn)?;
 
     Ok(vec!((context, String::from(r#"{"event": "active"}"#))))
