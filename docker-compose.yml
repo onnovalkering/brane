@@ -1,5 +1,9 @@
 version: '3'
 
+networks:
+  default:
+    driver: brane_default
+
 services:
   adminer:
     image: adminer
@@ -22,6 +26,8 @@ services:
     depends_on:
       - kafka
       - postgres
+    environment:
+      DOCKER_NETWORK: "brane_default"
 
   jupyterlab:
     build: ./brane-ide/jupyterlab
