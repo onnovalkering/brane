@@ -1,12 +1,11 @@
 use anyhow::Result;
 use base64::decode;
-use brane_init::{callback, exec, Payload, relay};
+use brane_init::{callback, exec, Payload};
 use log::LevelFilter;
 use specifications::container::ContainerInfo;
 use std::path::PathBuf;
 use std::process;
 use structopt::StructOpt;
-use std::thread;
 
 #[derive(StructOpt)]
 #[structopt(name = "init")]
@@ -65,16 +64,11 @@ async fn main() -> Result<()> {
         }
     };
 
-    let invocation_id = payload.invocation_id.clone();
-    if let Some(callback_url) = payload.callback_url.clone() {
-        thread::spawn(move || {
-            relay::start(callback_url, invocation_id).unwrap();
-        });
-    }
-
     let output = exec::handle(&payload.action, &payload.arguments, container_info, working_dir).await?;
     if let Some(callback_url) = payload.callback_url {
-        callback::submit(&callback_url, invocation_id, &output).await?;
+        callback::submit(&callback_url, payload.invocation_id.unwrap(), &output).await?;
+    } else {
+        println!("{}", serde_json::to_string(&output)?);
     }
 
     process::exit(0);

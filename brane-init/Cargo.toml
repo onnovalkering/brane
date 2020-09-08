@@ -18,4 +18,3 @@ structopt = "0.3"
 tokio = { version = "0.2", features = ["full"] }
 tokio-util = "0.3"
 yaml-rust = "0.4"
-zmq = { version = "0.9", features = ["vendored"] }

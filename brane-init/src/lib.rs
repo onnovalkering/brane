@@ -8,7 +8,6 @@ use specifications::common::Value;
 
 pub mod callback;
 pub mod exec;
-pub mod relay;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -18,5 +17,5 @@ pub struct Payload {
     pub action: String,
     pub arguments: Map<Value>,
     pub callback_url: Option<String>,
-    pub invocation_id: i32,
+    pub invocation_id: Option<i32>,
 }
