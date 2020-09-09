@@ -9,9 +9,5 @@ setup(
     long_description='',
     author='Onno Valkering',
     url='https://github.com/onnovalkering/brane',
-    install_requires=[
-        'requests',
-        'zmq', 
-    ],
     classifiers=[],
 )
