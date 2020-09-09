@@ -1,15 +1,6 @@
 version: '3'
 
-networks:
-  default:
-    driver: brane_default
-
 services:
-  adminer:
-    image: adminer
-    ports:
-      - 8070:8080
-
   brane-api:
     build: ./brane-api
     depends_on:
@@ -17,26 +8,21 @@ services:
       - postgres
     ports:
       - 8080:8080
-    environment:
-      HOST: 0.0.0.0
-      PORT: 8080
 
   brane-loop:
     build: ./brane-loop
     depends_on:
       - kafka
       - postgres
-    environment:
-      DOCKER_NETWORK: "brane_default"
+    volumes:
+      - /tmp:/tmp
+      - /var/run/docker.sock:/var/run/docker.sock
 
   jupyterlab:
     build: ./brane-ide/jupyterlab
     command: ["jupyter", "lab", "--allow-root", "--LabApp.token=''"]
     ports:
       - 8888:8888
-    volumes:
-      - /tmp:/tmp
-      - /var/run/docker.sock:/var/run/docker.sock
 
   kafka:
     image: confluentinc/cp-kafka:5.5.0
@@ -58,6 +44,11 @@ services:
       - 5432:5432
     environment:
       POSTGRES_PASSWORD: postgres
+
+  redis:
+    image: redis:6-alpine
+    ports:
+      - 6379:6379
 
   registry:
     image: registry:2
