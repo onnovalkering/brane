@@ -175,7 +175,21 @@ fn construct_envs(variables: &Map<Value>) -> Result<Map<String>> {
             Value::Real(value) => {
                 envs.insert(name, value.to_string());
             }
-            Value::Struct { .. } => unimplemented!(),
+            Value::Struct { properties, ..} => {
+                for (key, entry) in properties.iter() {
+                    let value = match entry {
+                        Value::Array { entries: _, .. }=> unimplemented!(),
+                        Value::Boolean(value) => value.to_string(),
+                        Value::Integer(value) => value.to_string(),
+                        Value::Real(value) => value.to_string(),
+                        Value::Unicode(value) => value.to_string(),
+                        Value::Struct { properties: _, .. } => unimplemented!(),
+                        _ => unreachable!()
+                    };
+
+                    envs.insert(format!("{}_{}", &name, key.to_ascii_uppercase()), value);
+                }
+            },
             Value::Unicode(value) => {
                 envs.insert(name, value.to_string());
             }
@@ -183,6 +197,7 @@ fn construct_envs(variables: &Map<Value>) -> Result<Map<String>> {
         }
     }
 
+    debug!("envs: {:?}", envs);
     Ok(envs)
 }
 
