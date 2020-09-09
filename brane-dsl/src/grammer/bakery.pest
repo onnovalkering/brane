@@ -56,9 +56,10 @@ logical         = { "and" | "or" | "not" }
 boolean         = { "true" | "false" }
 decimal         = @{ "-"? ~ ASCII_DIGIT* ~ "." ~ ASCII_DIGIT+ }
 integer         = @{ "-"? ~ ASCII_DIGIT+ }
-string          = { string_sq | string_dq }
-string_sq       = { "'" ~ (!"'" ~ ANY)* ~ "'" }
-string_dq       = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+string          = ${ string_sq | string_dq }
+string_sq       = { (PUSH("'") ~ string_body? ~ POP) }
+string_dq       = { (PUSH("\"") ~ string_body? ~ POP) }
+string_body     = _{ (!(NL | PEEK) ~ ANY)+ }
 
 // Structures
 array 		      = { "[" ~ NL* ~ "]" | "[" ~ NL* ~ value ~ ("," ~ NL* ~ value)* ~ NL* ~ "]" }

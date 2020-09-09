@@ -409,10 +409,12 @@ fn parse_value_rule(rule: Pair<Rule>) -> Result<Value> {
     let value = rule.into_inner().next().unwrap();
 
     match value.as_rule() {
-        Rule::array => Ok(Value::Array {
-            data_type: "array".to_string(), // TODO: specify actual type
-            entries: parse_array_rule(value)?,
-        }),
+        Rule::array => {
+            let entries = parse_array_rule(value)?;
+            let data_type = format!("{}[]", entries.first().unwrap().data_type());
+
+            Ok(Value::Array { data_type, entries })
+        },
         Rule::object => Ok(Value::Struct {
             data_type: "object".to_string(), // TODO: specify actual type
             properties: parse_object_rule(value)?,
