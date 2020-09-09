@@ -20,10 +20,10 @@ type Map<T> = std::collections::HashMap<String, T>;
 
 pub async fn start(
     secrets_file: Option<PathBuf>,
-    compile_only: bool,
+    co_address: Option<PathBuf>,
 ) -> Result<()> {
-    if compile_only {
-        return start_compile_service().await;
+    if let Some(co_address) = co_address {
+        return start_compile_service(co_address).await;
     }
 
     println!("Starting interactive session, press Ctrl+D to exit.\n");
@@ -86,7 +86,7 @@ pub async fn start(
 ///
 ///
 ///
-async fn start_compile_service() -> Result<()> {
+async fn start_compile_service(co_address: PathBuf) -> Result<()> {
     println!("Starting compile-only service\n");
 
     // Prepare DSL compiler
@@ -96,7 +96,12 @@ async fn start_compile_service() -> Result<()> {
     let context = zmq::Context::new();
     let socket = context.socket(zmq::REP)?;
 
-    socket.bind("tcp://*:5555")?;
+    let address = co_address.into_os_string().into_string().unwrap();
+    let endpoint = format!("ipc://{}", address);
+
+    debug!("endpoint: {}", endpoint);
+    socket.bind(&endpoint)?;
+
     loop {
         let mut instructions = vec!();
         let data = socket.recv_string(0)?;

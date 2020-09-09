@@ -87,10 +87,10 @@ enum SubCommand {
 
     #[structopt(name = "repl", about = "Start an interactive DSL session")]
     Repl {
-        #[structopt(short, long, help = "File containing secrets")]
+        #[structopt(short, long, name = "SECRETS", help = "File containing secrets")]
         secrets: Option<PathBuf>,
-        #[structopt(short, long, help = "Start compile only service (zmq)")]
-        compile_only: bool,
+        #[structopt(short, long = "compile-only", name = "ADDRESS", help = "Start compile-only service at the provided IPC pathname")]
+        co_address: Option<PathBuf>,
     },
 
     #[structopt(name = "test", about = "Test a package locally")]
@@ -188,8 +188,8 @@ async fn run(options: CLI) -> Result<()> {
         Remove { name, version, force } => {
             packages::remove(name, version, force)?;
         }
-        Repl { secrets, compile_only} => {
-            repl::start(secrets, compile_only).await?;
+        Repl { secrets, co_address} => {
+            repl::start(secrets, co_address).await?;
         }
         Test { name, version } => {
             test::handle(name, version).await?;
