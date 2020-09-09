@@ -60,7 +60,7 @@ pub async fn start(
 
         match instructions {
             Ok(instructions) => {
-                let instructions = preprocess_instructions(&instructions)?;
+                let instructions = preprocess_instructions(&instructions).await?;
                 let output = machine.interpret(instructions)?;
 
                 if let Some(value) = output {
@@ -169,7 +169,7 @@ async fn preprocess_instructions(instructions: &Vec<Instruction>) -> Result<Vec<
                 }
 
                 debug!("Preprocess nested sub instrucations.");
-                sub.instructions = preprocess_instructions(&sub.instructions)?;
+                sub.instructions = block_on(preprocess_instructions(&sub.instructions))?;
             }
             _ => continue,
         }
