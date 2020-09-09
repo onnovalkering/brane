@@ -1,0 +1,10 @@
+import "fs"
+import "lta"
+
+observation := ?? as Integer
+
+staging := stage observation files
+wait until staging status = "success"
+
+directory := new_directory
+download observation files to directory

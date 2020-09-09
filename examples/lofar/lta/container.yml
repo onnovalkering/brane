@@ -4,23 +4,58 @@ kind: remote
 
 dependencies:
   - curl
+  - fetch-crl
+  - globus-gass-copy-progs
+  - gnupg2
   - libaio1
+  - openjdk-8-jdk-headless
   - python3
   - python3-pip
   - python3-yaml
+  - wget
+  - voms-clients 
 
 install:
   - ./install.sh
 
 files:
+  - Environment.cfg
   - install.sh
+  - lofar.vo
+  - lta-url-copy.sh
   - run.py
+  - voms.grid.sara.nl.lsc
 
 entrypoint:
   kind: task
   exec: run.py
 
 actions:
+  'download':
+    command:
+      args:
+        - download
+
+    pattern:
+      prefix: download
+      infix:
+        - to
+
+    input: 
+      - type: string[]
+        name: surls
+
+      - type: Directory
+        name: target
+    
+      - type: string
+        name: proxy
+        secret: LOFAR_PROXY
+
+    output:
+      - type: string[]
+        name: files
+
   'files':
     command:
       args:

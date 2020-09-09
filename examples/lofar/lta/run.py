@@ -1,17 +1,43 @@
 #!/usr/bin/env python3
 import base64
 import os
+import os.path
+import subprocess
 import sys
 import xmlrpc.client
 import yaml
 
+def download(): 
+    target = os.environ["TARGET_URL"]
 
-USERNAME = os.environ["USERNAME"]
-PASSWORD = os.environ["PASSWORD"]
+    # Write proxy to /opt/wd/proxy
+    proxy = base64.b64decode(os.environ["PROXY"]).decode("UTF-8")
+    with open("/opt/wd/proxy", "w") as f:
+        f.write(proxy)
 
+    # Write copyjob to /opt/wd/copyjob
+    surls = [os.environ[f"SURLS_{i}"] for i in range(int(os.environ["SURLS"]))]
+    files = [os.path.join(target, os.path.basename(s)) for s in surls]
+    copyjob = '\n'.join([f"{s} {f}" for (s, f) in zip(surls, files)])
 
-def get_lta_proxy():
-    return xmlrpc.client.ServerProxy(f"https://{USERNAME}:{PASSWORD}@webportal.astron.nl/service-public/xmlrpc")
+    with open("/opt/wd/copyjob", "w") as f:
+        f.write(copyjob)
+
+    env = os.environ.copy()
+    env["SRM_PATH"] = "/opt/wd/srmclient-2.6.28/usr/share/srm"
+
+    command = [
+        "/opt/wd/srmclient-2.6.28/usr/bin/srmcp",
+        "-use_urlcopy_script=true",
+        "-urlcopy=/opt/wd/lta-url-copy.sh",
+        "-server_mode=passive",
+        "-x509_user_proxy=/opt/wd/proxy",
+        "-copyjobfile=/opt/wd/copyjob"
+    ]
+
+    subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, env=env)
+
+    return {"files": files}
 
 
 def files():
@@ -62,8 +88,16 @@ def status():
     return {"status": status}
 
 
+def get_lta_proxy():
+    username = os.environ["USERNAME"]
+    password = os.environ["PASSWORD"]
+
+    return xmlrpc.client.ServerProxy(f"https://{username}:{password}@webportal.astron.nl/service-public/xmlrpc")
+
+
 if __name__ == "__main__":
     functions = {
+        "download": download,
         "files": files,
         "stage": stage,
         "status": status
