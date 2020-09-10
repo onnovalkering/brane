@@ -1,7 +1,8 @@
 from tempfile import mkdtemp
-from os import path
+from os import path, remove
 from zmq import Context, REQ
 from subprocess import Popen
+from json import loads
 
 class BakeryCompiler:
     """
@@ -11,18 +12,27 @@ class BakeryCompiler:
 
     def __init__(self):
         self.address = path.join(mkdtemp(), 'zmq')
-        self.service = Popen(["brane", "repl", "-c", self.address])
+        self.service = Popen(["brane-cli", "repl", "-c", self.address])
 
         self.context = Context()        
-        self.socket = context.socket(REQ)
-        socket.connect(f'ipc://{address}')
+        self.socket = self.context.socket(REQ)
+        self.socket.connect(f'ipc://{self.address}')
 
     def __del__(self):
-        if self.service is not None:
-            self.service.kill()
+        self.socket.close()
+        self.service.kill()
 
-    def compile(self, code: bytes):
-        self.socket(code.encode('UTF-8'))
-        instructions = self.socket.recv()
+        os.remove(self.address)
+        os.remove(path.dirname(self.address))
 
-        return loads(instructions)
+    def compile(self, code):
+        self.socket.send_string(code)
+        result = self.socket.recv()
+
+        return loads(result)
+
+    def inject_variables(self, variables):
+        # TODO: implement this on the compile-service side first.
+        pass
+
+        

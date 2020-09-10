@@ -6,13 +6,12 @@ verify_ssl = true
 [dev-packages]
 
 [packages]
-bakery-kernel = {editable = true, path = "./kernel"}
 ipykernel = "*"
 ipython = "*"
 jupyter-client = "*"
 jupyterlab = "*"
-zmq = "*"
 requests = "*"
+zmq = "*"
 
 [requires]
 python_version = "3.8"
