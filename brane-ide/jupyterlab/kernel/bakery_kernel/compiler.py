@@ -12,18 +12,22 @@ class BakeryCompiler:
 
     def __init__(self):
         self.address = path.join(mkdtemp(), 'zmq')
-        self.service = Popen(["brane-cli", "repl", "-c", self.address])
+        self.service = Popen(["brane-cli", "-d", "-s", "repl", "-c", self.address])
 
         self.context = Context()        
         self.socket = self.context.socket(REQ)
         self.socket.connect(f'ipc://{self.address}')
 
     def __del__(self):
-        self.socket.close()
-        self.service.kill()
+        if hasattr(self, 'socket'):
+            self.socket.close()
 
-        os.remove(self.address)
-        os.remove(path.dirname(self.address))
+        if hasattr(self, 'service'):
+            self.service.kill()
+
+        if hasattr(self, 'address'):
+            os.remove(self.address)
+            os.remove(path.dirname(self.address))
 
     def compile(self, code):
         self.socket.send_string(code)

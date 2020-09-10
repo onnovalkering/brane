@@ -8,9 +8,9 @@ from time import sleep
 from .compiler import BakeryCompiler
 
 
-API_HOST = getenv('API_HOST', 'http://brane-api:8080')
-INVOCATIONS_ENDPOINT = urljoin(API_HOST, 'invocations')
-SESSIONS_ENDPOINT = urljoin(API_HOST, 'sessions')
+API_HOST = getenv('API_HOST', 'brane-api:8080')
+INVOCATIONS_ENDPOINT = urljoin(f'http://{API_HOST}', 'invocations')
+SESSIONS_ENDPOINT = urljoin(f'http://{API_HOST}', 'sessions')
 
 
 class BakeryKernel(Kernel):

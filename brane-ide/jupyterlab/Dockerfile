@@ -1,19 +1,19 @@
 FROM jupyter/minimal-notebook
 
-USER root
-
 COPY kernel /kernel
 COPY renderer /renderer
 
-# Install Brane CLI
-RUN mkdir -p $HOME/.local/bin
-COPY brane-cli $HOME/.local/bin
+USER root
 
-# Install kernel and renderer
-RUN python /kernel/setup.py install \ 
- && python /kernel/bakery_kernel/install.py \
- && jupyter labextension install /renderer
+COPY brane-cli /usr/local/bin
 
-# Switch back to jovyan
+WORKDIR /kernel
+RUN python setup.py install \ 
+ && python install.py
+
+WORKDIR /renderer
+RUN jupyter labextension install /renderer
+
+# Switch back to jovyan to avoid accidental container runs as root
 USER $NB_UID
 WORKDIR $HOME
