@@ -15,6 +15,7 @@ use std::rc::Rc;
 use std::path::PathBuf;
 use serde_yaml;
 use uuid::Uuid;
+use serde_json::json;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -103,16 +104,34 @@ async fn start_compile_service(co_address: PathBuf) -> Result<()> {
     socket.bind(&endpoint)?;
 
     loop {
-        let mut instructions = vec!();
         let data = socket.recv_string(0)?;
 
         if let Ok(data) = data {
-            instructions = compiler.compile(&data)?;
-            debug!("Instructions: {:#?}", instructions);
-        }
+            let result = compiler.compile(&data);
+            let response = match result {
+                Ok(instructions) => {
+                    json!({
+                        "variant": "ok",
+                        "content": instructions,
+                    })
+                },
+                Err(err) => {
+                    debug!("{}", err);
+                    json!({
+                        "variant": "err",
+                        "content": err.to_string(),
+                    })
+                }
+            };
 
-        let instructions_json = serde_json::to_string(&instructions)?;
-        socket.send(&instructions_json, 0)?;
+            let response_json = serde_json::to_string(&response)?;
+            debug!("Response: {}", response_json);
+
+            socket.send(&response_json, 0)?;
+        } else {
+            warn!("Failed to read compile-service request, ignoring..");
+            socket.send("", 0)?;
+        };
     }    
 }
 
