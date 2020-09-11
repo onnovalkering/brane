@@ -14,7 +14,7 @@ type Map<T> = std::collections::HashMap<String, T>;
 
 lazy_static! {
     static ref CALLBACK_URL: String = env::var("CALLBACK_URL").unwrap_or_else(|_| String::from("http://brane-api:8080/callback"));
-    static ref DOCKER_HOST: String = env::var("DOCKER_HOST").unwrap_or_else(|_| String::from("registry:5000"));
+    static ref DOCKER_HOST: String = env::var("DOCKER_HOST").unwrap_or_else(|_| String::from("http://registry:5000"));
 }
 
 ///

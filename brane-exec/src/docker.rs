@@ -19,7 +19,7 @@ use std::env;
 use std::path::PathBuf;
 
 lazy_static! {
-    static ref DOCKER_NETWORK: String = env::var("DOCKER_NETWORK").unwrap_or_else(|_| String::from("bridge"));
+    static ref DOCKER_NETWORK: String = env::var("DOCKER_NETWORK").unwrap_or_else(|_| String::from("host"));
 }
 
 ///
@@ -126,15 +126,15 @@ async fn ensure_image(
 ) -> Result<()> {
     // Abort, if image is already loaded
     if docker.inspect_image(&exec.image).await.is_ok() {
-        info!("Image already exists in Docker deamon.");
+        debug!("Image already exists in Docker deamon.");
         return Ok(());
     }
 
     if let Some(image_file) = &exec.image_file {
-        info!("Image doesn't exist in Docker deamon: importing...");
+        debug!("Image doesn't exist in Docker deamon: importing...");
         import_image(docker, image_file).await
     } else {
-        info!("Image doesn't exist in Docker deamon: pulling...");
+        debug!("Image '{}' doesn't exist in Docker deamon: pulling...", exec.image);
         pull_image(docker, exec.image.clone()).await
     }
 }
