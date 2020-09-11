@@ -281,7 +281,7 @@ impl Compiler {
                 }
             }
         } else {
-            return Err(anyhow!("No package named '{}'", package));
+            return Err(anyhow!("No package found with name: {}", package));
         }
 
         Ok((None, None))
@@ -462,12 +462,13 @@ pub fn terms_to_instructions(
 ) -> Result<(Vec<Instruction>, String)> {
     let mut variables = state.variables.clone();
     let functions = state.imports.clone();
+    let original_terms = terms.clone();
 
     debug!("Terms: {:?}", terms);
 
     // Replace literals in terms with names
     let mut literals = Map::<Value>::new();
-    let terms = terms
+    let terms: Vec<AstTerm> = terms
         .iter()
         .map(|t| match t {
             AstTerm::Value(value) => {
@@ -497,7 +498,7 @@ pub fn terms_to_instructions(
     // consume a temporary variable, we can directly reuse it again.
     let mut temp_vars: Vec<String> = vec![];
 
-    let mut term_pattern = build_terms_pattern(terms, &variables, &state.types)?;
+    let mut term_pattern = build_terms_pattern(&terms, &variables, &state.types)?;
 
     let mut instructions: Vec<Instruction> = vec![];
     let mut return_data_type = String::from("unit");
@@ -607,7 +608,16 @@ pub fn terms_to_instructions(
             }
         }
 
-        ensure!(one_plus_matches, "Failed to match");
+        if !one_plus_matches {
+            let mut sb = String::new();
+            sb.push_str("Failed to match terms of statement:\n\n   ");
+            for term in &original_terms {
+                sb.push_str(&format!("{} ", term));
+            }
+            sb.push_str("\n");
+
+            bail!(sb);
+        }
     }
 
     // Modify assignment of last ACT instruction, if specified.
@@ -636,12 +646,12 @@ pub fn terms_to_instructions(
 ///
 ///
 fn build_terms_pattern(
-    terms: Vec<AstTerm>,
+    terms: &Vec<AstTerm>,
     variables: &Map<String>,
     types: &Map<Type>,
 ) -> Result<String> {
     let mut term_pattern_segments = vec![];
-    for term in &terms {
+    for term in terms {
         match term {
             AstTerm::Name(name) => {
                 if name.contains('.') {

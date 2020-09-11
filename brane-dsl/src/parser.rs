@@ -3,6 +3,7 @@ use pest::iterators::Pair;
 use pest::Parser;
 use semver::Version;
 use specifications::common::Value;
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Parser)]
 #[grammar = "grammer/bakery.pest"]
@@ -56,7 +57,7 @@ impl AstNode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum AstTerm {
     Name(String),
     Value(Value),
@@ -71,6 +72,18 @@ impl AstTerm {
             true
         } else {
             false
+        }
+    }
+}
+
+impl Display for AstTerm {
+    fn fmt(
+        &self,
+        f: &mut Formatter,
+    ) -> fmt::Result {
+        match self {
+            AstTerm::Name(name) => write!(f, "{}", name),
+            AstTerm::Value(value) => write!(f, "{}", value),
         }
     }
 }
