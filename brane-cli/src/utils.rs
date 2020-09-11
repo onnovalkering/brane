@@ -7,6 +7,14 @@ use std::path::PathBuf;
 ///
 ///
 ///
+pub fn get_config_dir() -> PathBuf {
+    appdirs::user_config_dir(Some("brane"), None, false)
+        .expect("Couldn't determine Brane condig directory.")
+}
+
+///
+///
+///
 pub fn calculate_crc32(path: &PathBuf) -> Result<u32> {
     let mut file = File::open(&path)?;
     let mut hasher = Hasher::new();

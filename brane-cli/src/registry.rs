@@ -1,85 +1,131 @@
 use crate::packages;
 use crate::utils;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use brane_dsl::indexes::PackageIndex;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use reqwest::{self, multipart::Form, multipart::Part, Body, Client, Method};
 use serde_json::{json, Value as JValue};
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use specifications::package::PackageInfo;
 use std::env;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::path::PathBuf;
+use std::io::BufReader;
 use tar::Archive;
 use tokio::fs::File as TokioFile;
 use tokio_util::codec::{BytesCodec, FramedRead};
+use url::Url;
+use console::{pad_str, Alignment};
+use prettytable::format::FormatBuilder;
+use prettytable::Table;
 
-lazy_static! {
-    static ref API_HOST: String = env::var("API_HOST").unwrap_or_else(|_| String::from("brane-api:8080"));
+#[skip_serializing_none]
+#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct RegistryConfig {
+    pub url: String,
+    pub username: String,    
+}
+
+impl RegistryConfig {
+    fn new() -> Self {
+        RegistryConfig {
+            url: Default::default(),
+            username: Default::default(),
+        }
+    }
+
+    fn from_path(path: &PathBuf) -> Result<RegistryConfig> {
+        let config_reader = BufReader::new(File::open(path)?);
+        let config = serde_yaml::from_reader(config_reader)?;
+
+        Ok(config)
+    }
 }
 
 ///
 ///
 ///
 pub fn login(
-    _host: String,
-    _username: String,
+    url: String,
+    username: String,
 ) -> Result<()> {
-    unimplemented!()
+    let url = Url::parse(&url)
+        .with_context(|| format!("Not a valid absolute URL: {}", url))?;
+
+    let host = url.host_str()
+        .with_context(|| format!("URL does not have a (valid) host: {}", url))?;
+    
+    let config_file = utils::get_config_dir().join("registry.yml");
+    let mut config = if config_file.exists() {
+        RegistryConfig::from_path(&config_file)?
+    } else {
+        RegistryConfig::new()
+    };
+
+    config.username = username;
+    config.url = format!(
+        "{}://{}:{}", 
+        url.scheme(), 
+        host,
+        url.port().unwrap_or(8080)
+    );
+
+    // Write registry.yml to config directory   
+    fs::create_dir_all(&config_file.parent().unwrap())?;
+    let mut buffer = File::create(config_file)?;
+    write!(buffer, "{}", serde_yaml::to_string(&config)?)?;
+
+    Ok(())
 }
 
 ///
 ///
 ///
-pub fn logout(_host: String) -> Result<()> {
-    unimplemented!()
+pub fn logout() -> Result<()> {
+    let config_file = utils::get_config_dir().join("registry.yml");
+    if config_file.exists() {
+        fs::remove_file(config_file)?;
+    }
+
+    Ok(())
 }
 
 ///
 ///
 ///
 pub async fn pull(
-    _name: String,
-    _version: Option<String>,
+    name: String,
+    version: Option<String>,
 ) -> Result<()> {
-    // let version = version.expect("please provide version");
+    let version = version.expect("please provide version");
+    
+    let url = get_registry_endpoint(format!("/{}/{}/archive", name, version))?;
+    let mut package_archive = reqwest::get(&url).await?;
 
-    // let url = format!("http://{}/packages/{}/{}", API_HOST.as_str(), name, version);
-    // let package: Result<PackageInfo, _> = reqwest::get(&url).await?.json().await;
-    // if package.is_err() {
-    //     println!("Cannot find version '{}' of package '{}'", version, name);
-    //     return Ok(());
-    // }
+    // Write package archive to temporary file
+    let temp_filepath = env::temp_dir().join("archive.tar.gz");
+    let mut temp_file = File::create(&temp_filepath)?;
+    while let Some(chunk) = package_archive.chunk().await? {
+        temp_file.write_all(&chunk)?; // If causes bug, use .write(&chunk)
+    }
 
-    // let url = format!("http://{}/packages/{}/{}/archive", API_HOST.as_str(), name, version);
-    // let mut package_archive = reqwest::get(&url).await?;
-    // let package = package.unwrap();
+    // Unpack temporary file to target location
+    let archive_file = File::open(&temp_filepath)?;
+    let package_dir = packages::get_package_dir(&name, Some(&version))?;
+    fs::create_dir_all(&package_dir)?;
 
-    // // Write package archive to temporary file
-    // let temp_filepath = env::temp_dir().join(package.filename);
-    // let mut temp_file = File::create(&temp_filepath)?;
-    // while let Some(chunk) = package_archive.chunk().await? {
-    //     temp_file.write_all(&chunk)?; // If causes bug, use .write(&chunk)
-    // }
+    let mut archive = Archive::new(GzDecoder::new(archive_file));
+    archive.unpack(&package_dir)?;
 
-    // // Verify checksum
-    // let checksum = utils::calculate_crc32(&temp_filepath)?;
-    // if checksum != package.checksum as u32 {
-    //     println!("Download failed, checksums don't match!");
-    //     return Ok(());
-    // }
-
-    // // Unpack temporary file to target location
-    // let archive_file = File::open(temp_filepath)?;
-    // let package_dir = packages::get_package_dir(&name, Some(&version))?;
-    // fs::create_dir_all(&package_dir)?;
-
-    // let mut archive = Archive::new(GzDecoder::new(archive_file));
-    // archive.unpack(&package_dir)?;
-
-    println!("Unimplemented");
+    // Remove temporary file
+    if let Err(_) = fs::remove_file(&temp_filepath) {
+        warn!("Failed to remove temporary file: {:?}", temp_filepath);
+    }
 
     Ok(())
 }
@@ -106,13 +152,7 @@ pub async fn push(
     let checksum = utils::calculate_crc32(&archive_filepath)?;
 
     // Upload file
-    let url = format!(
-        "http://{}/packages/{}/{}?checksum={}",
-        API_HOST.as_str(),
-        name,
-        version,
-        checksum
-    );
+    let url = get_registry_endpoint(format!("/{}/{}?checksum={}", name, version, checksum))?;
     let request = Client::new().request(Method::POST, &url);
 
     let file = TokioFile::open(&archive_filepath).await?;
@@ -133,12 +173,31 @@ pub async fn push(
 ///
 ///
 pub async fn search(term: String) -> Result<()> {
-    let url = format!("http://{}/packages?t={}", API_HOST.as_str(), term);
+    let url = get_registry_endpoint(format!("?t={}", term))?;
     let packages: Vec<PackageInfo> = reqwest::get(&url).await?.json().await?;
 
+    // Prepare display table
+    let format = FormatBuilder::new()
+        .column_separator('\0')
+        .borders('\0')
+        .padding(1, 1)
+        .build();
+
+    let mut table = Table::new();
+    table.set_format(format);
+    table.add_row(row!["NAME", "VERSION", "KIND", "DESCRIPTION"]);
+
     for package in packages {
-        println!("{}", package.name);
+        let name = pad_str(&package.name, 20, Alignment::Left, Some(".."));
+        let version = pad_str(&package.version, 10, Alignment::Left, Some(".."));
+        let kind = pad_str(&package.kind, 10, Alignment::Left, Some(".."));
+        let description = &package.description.unwrap_or_default();
+        let description = pad_str(description, 50, Alignment::Left, Some(".."));
+
+        table.add_row(row![name, version, kind, description]);
     }
+
+    table.printstd();
 
     Ok(())
 }
@@ -177,7 +236,7 @@ pub async fn get_package_index() -> Result<PackageIndex> {
 
         json!(package_infos)
     } else {
-        let url = format!("http://{}/packages", API_HOST.as_str());
+        let url = get_registry_endpoint(String::new())?;
         reqwest::get(url.as_str()).await?.json().await?
     };
 
@@ -203,7 +262,7 @@ pub async fn get_package_source(
             } else {
                 let cwl_file = temp_dir.join(format!("{}-{}-document.cwl", name, version));
                 if !cwl_file.exists() {
-                    let url = format!("http://{}/packages/{}/{}/source", API_HOST.as_str(), name, version);
+                    let url = get_registry_endpoint(format!("/{}/{}/source", name, version))?;
                     let mut source = reqwest::get(&url).await?;
 
                     // Write package archive to temporary file
@@ -223,7 +282,7 @@ pub async fn get_package_source(
             } else {
                 let instructions = temp_dir.join(format!("{}-{}-instructions.yml", name, version));
                 if !instructions.exists() {
-                    let url = format!("http://{}/packages/{}/{}/source", API_HOST.as_str(), name, version);
+                    let url = get_registry_endpoint(format!("/{}/{}/source", name, version))?;
                     let mut source = reqwest::get(&url).await?;
 
                     // Write package archive to temporary file
@@ -246,7 +305,7 @@ pub async fn get_package_source(
 
                 let image_file = archive_dir.join("image.tar");
                 if !image_file.exists() {
-                    let url = format!("http://{}/packages/{}/{}/archive", API_HOST.as_str(), name, version);
+                    let url = get_registry_endpoint(format!("/{}/{}/archive", name, version))?;
                     let mut archive = reqwest::get(&url).await?;
 
                     // Write package archive to temporary file
@@ -272,7 +331,7 @@ pub async fn get_package_source(
             } else {
                 let oas_file = temp_dir.join(format!("{}-{}-document.yml", name, version));
                 if !oas_file.exists() {
-                    let url = format!("http://{}/packages/{}/{}/source", API_HOST.as_str(), name, version);
+                    let url = get_registry_endpoint(format!("/{}/{}/source", name, version))?;
                     let mut source = reqwest::get(&url).await?;
 
                     // Write package archive to temporary file
@@ -289,4 +348,15 @@ pub async fn get_package_source(
     };
 
     Ok(path)
+}
+
+///
+///
+///
+pub fn get_registry_endpoint(path: String) -> Result<String> {
+    let config_file = utils::get_config_dir().join("registry.yml");
+    let config = RegistryConfig::from_path(&config_file)
+        .with_context(|| "No registry configuration found, please use `brane login` first.")?;
+
+    Ok(format!("{}/packages{}", config.url, path))
 }

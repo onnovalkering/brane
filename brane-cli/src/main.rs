@@ -54,10 +54,7 @@ enum SubCommand {
     },
 
     #[structopt(name = "logout", about = "Log out from a registry")]
-    Logout {
-        #[structopt(name = "HOST", help = "Hostname of the registry")]
-        host: String,
-    },
+    Logout {},
 
     #[structopt(name = "pull", about = "Pull a package from a registry")]
     Pull {
@@ -176,8 +173,8 @@ async fn run(options: CLI) -> Result<()> {
         Login { host, username } => {
             registry::login(host, username)?;
         }
-        Logout { host } => {
-            registry::logout(host)?;
+        Logout { } => {
+            registry::logout()?;
         }
         Pull { name, version } => {
             registry::pull(name, version).await?;
