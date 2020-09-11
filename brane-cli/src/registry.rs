@@ -1,5 +1,6 @@
 use crate::packages;
 use crate::utils;
+use console::style;
 use anyhow::{Context, Result};
 use brane_dsl::indexes::PackageIndex;
 use flate2::read::GzDecoder;
@@ -22,6 +23,7 @@ use url::Url;
 use console::{pad_str, Alignment};
 use prettytable::format::FormatBuilder;
 use prettytable::Table;
+use indicatif::{ProgressBar, ProgressStyle};
 
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
@@ -107,25 +109,54 @@ pub async fn pull(
     let url = get_registry_endpoint(format!("/{}/{}/archive", name, version))?;
     let mut package_archive = reqwest::get(&url).await?;
 
+    let content_length = package_archive
+        .headers()
+        .get("content-length")
+        .unwrap()
+        .to_str()?
+        .parse()?;
+
     // Write package archive to temporary file
     let temp_filepath = env::temp_dir().join("archive.tar.gz");
     let mut temp_file = File::create(&temp_filepath)?;
+
+    let progress = ProgressBar::new(content_length);
+    progress.set_style(ProgressStyle::default_bar()
+        .template("Downloading... [{elapsed_precise}] {bar:40.cyan/blue} {percent}/100%")
+        .progress_chars("##-"));
+
     while let Some(chunk) = package_archive.chunk().await? {
+        progress.inc(chunk.len() as u64);
         temp_file.write_all(&chunk)?; // If causes bug, use .write(&chunk)
     }
+
+    progress.finish();
 
     // Unpack temporary file to target location
     let archive_file = File::open(&temp_filepath)?;
     let package_dir = packages::get_package_dir(&name, Some(&version))?;
     fs::create_dir_all(&package_dir)?;
 
+    let progress = ProgressBar::new(content_length);
+    progress.set_style(ProgressStyle::default_bar()
+        .template("Extracting...  [{elapsed_precise}]"));
+    progress.enable_steady_tick(250);
+
     let mut archive = Archive::new(GzDecoder::new(archive_file));
     archive.unpack(&package_dir)?;
+
+    progress.finish();
 
     // Remove temporary file
     if let Err(_) = fs::remove_file(&temp_filepath) {
         warn!("Failed to remove temporary file: {:?}", temp_filepath);
     }
+
+    println!(
+        "\nSuccessfully pulled version {} of package {}.",
+        style(&version).bold().cyan(),
+        style(&name).bold().cyan(),
+    );
 
     Ok(())
 }
@@ -142,6 +173,11 @@ pub async fn push(
     let archive_filepath = env::temp_dir().join(archive_filename);
     let archive_file = File::create(&archive_filepath)?;
 
+    let progress = ProgressBar::new(0);
+    progress.set_style(ProgressStyle::default_bar()
+        .template("Compressing... [{elapsed_precise}]"));
+    progress.enable_steady_tick(250);
+
     // Create package tarball
     let gz = GzEncoder::new(&archive_file, Compression::fast());
     let mut tar = tar::Builder::new(gz);
@@ -150,6 +186,8 @@ pub async fn push(
 
     // Calcualte checksum
     let checksum = utils::calculate_crc32(&archive_filepath)?;
+
+    progress.finish();
 
     // Upload file
     let url = get_registry_endpoint(format!("/{}/{}?checksum={}", name, version, checksum))?;
@@ -161,10 +199,23 @@ pub async fn push(
     let mut form = Form::new();
     form = form.part("file", Part::stream(reader).file_name(archive_filename));
 
+    let progress = ProgressBar::new(0);
+    progress.set_style(ProgressStyle::default_bar()
+        .template("Uploading...   [{elapsed_precise}]"));
+    progress.enable_steady_tick(250);
+
     let request = request.multipart(form);
     let response = request.send().await?;
 
-    println!("{:?}", response.text().await?);
+    progress.finish();
+
+    debug!("{:?}", response.text().await?);
+
+    println!(
+        "\nSuccessfully pushed version {} of package {}.",
+        style(&version).bold().cyan(),
+        style(&name).bold().cyan(),
+    );
 
     Ok(())
 }
