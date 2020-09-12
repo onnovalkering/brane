@@ -9,6 +9,7 @@ anyhow = "1.0"
 appdirs = "0.2"
 brane-exec = { path = "../brane-exec" }
 brane-sys = { path = "../brane-sys" }
+brane-std = { path = "../brane-std" }
 flate2 = "1.0"
 futures = "0.3"
 humantime = "2.0"

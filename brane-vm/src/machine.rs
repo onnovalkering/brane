@@ -1,7 +1,6 @@
 use crate::environment::Environment;
 use crate::vault::Vault;
 use anyhow::Result;
-use brane_exec::delegate;
 use brane_sys::System;
 use flate2::read::GzDecoder;
 use futures::executor::block_on;
@@ -146,10 +145,10 @@ impl Machine {
 
         let kind = act.meta.get("kind").expect("Missing `kind` metadata property.");
         let output = match kind.as_str() {
-            "cwl" => block_on(delegate::exec_cwl(&act, arguments))?,
+            "cwl" => unimplemented!(),
             "dsl" => self.exec_dsl(&act, arguments)?,
-            "ecu" => block_on(delegate::exec_ecu(&act, arguments))?,
-            "oas" => block_on(delegate::exec_oas(&act, arguments))?,
+            "ecu" => unimplemented!(),
+            "oas" => unimplemented!(),
             "std" => unimplemented!(),
             _ => unreachable!(),
         };

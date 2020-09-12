@@ -4,13 +4,11 @@ use anyhow::Result;
 use brane_sys::System;
 use specifications::common::Value;
 use specifications::instructions::{Instruction, Instruction::*, Move::*, Operator::*};
-use specifications::instructions::{ActInstruction, MovInstruction, SubInstruction, VarInstruction};
+use specifications::instructions::{MovInstruction, SubInstruction, VarInstruction};
 use crate::cursor::Cursor;
-use brane_exec::{delegate, schedule};
+use brane_exec::schedule;
 
 type Map<T> = std::collections::HashMap<String, T>;
-
-static EXTERNAL_ACTS: &[&str] = &["cwl", "ecu", "dsl"];
 
 pub enum MachineResult {
     Waiting,
@@ -63,14 +61,24 @@ impl AsyncMachine {
                     let arguments = prepare_arguments(&act.input, &self.environment, &self.vault);
                     let kind = act.meta.get("kind").expect("Missing `kind` metadata property.");
 
-                    if EXTERNAL_ACTS.contains(&kind.as_str()) {
-                        handle_act_external(&act, arguments, self.invocation_id).await?;
-                        return Ok(MachineResult::Waiting);
+                    // Run standard library functions in-place, other ACTs will be scheduled.
+                    if kind == "std" {
+                        let package = act.meta.get("name").expect("No `name` property in metadata.");
+                        let function = brane_std::FUNCTIONS.get(package).unwrap().get(&act.name).unwrap();
+                        
+                        let output = function(&arguments, &self.system)?;
+                        self.callback(output);
                     } else {
-                        let value = handle_act_internal(&act, arguments, &self.system).await?;
-                        if let Some(value) = value {
-                            self.callback(value)?;
-                        }
+                        match kind.as_str() {
+                            "cwl" => schedule::cwl(&act, arguments, self.invocation_id).await?,
+                            "dsl" => schedule::src(&act, arguments, self.invocation_id).await?,
+                            "ecu" => schedule::ecu(&act, arguments, self.invocation_id).await?,
+                            "oas" => schedule::oas(&act, arguments, self.invocation_id).await?,
+                            _ => unreachable!()
+                        };
+
+                        // This will put the current machine in a waiting state
+                        return Ok(MachineResult::Waiting);
                     }
                 },
                 Mov(mov) => handle_mov(&mov, &mut self.cursor, &self.environment),
@@ -189,43 +197,6 @@ fn prepare_arguments(
     }
 
     arguments
-}
-
-///
-///
-///
-async fn handle_act_external(
-    act: &ActInstruction,
-    arguments: Map<Value>,
-    invocation_id: i32,
-) -> Result<()> {
-    let kind = act.meta.get("kind").expect("Missing `kind` metadata property.");
-
-    match kind.as_str() {
-        "cwl" => schedule::cwl(&act, arguments, invocation_id).await?,
-        "dsl" => schedule::dsl(&act, arguments, invocation_id).await?,
-        "ecu" => schedule::ecu(&act, arguments, invocation_id).await?,
-        _ => unreachable!()
-    };
-
-    Ok(())
-}
-
-///
-///
-///
-async fn handle_act_internal(
-    act: &ActInstruction,
-    arguments: Map<Value>,
-    system: &Box<dyn System>,
-) -> Result<Option<Value>> {
-    let kind = act.meta.get("kind").expect("Missing `kind` metadata property.");
-
-    match kind.as_str() {
-        "oas" => delegate::exec_oas(&act, arguments).await,
-        "std" => delegate::exec_std(&act, arguments, system),
-        _ => unreachable!()
-    }
 }
 
 ///
