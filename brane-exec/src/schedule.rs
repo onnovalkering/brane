@@ -5,7 +5,6 @@ use serde_json::{json, Value as JValue};
 use specifications::common::Value;
 use specifications::instructions::ActInstruction;
 use std::fs::{self, File};
-use std::io::prelude::*;
 use std::io::Write;
 use std::path::PathBuf;
 use std::env;
@@ -23,7 +22,8 @@ lazy_static! {
 pub async fn cwl(
     act: &ActInstruction,
     arguments: Map<Value>,
-) -> Result<Option<Value>> {
+    invocation_id: i32,
+) -> Result<()> {
     // Create (temporary) working directory
     let working_dir = tempfile::tempdir()?.into_path();
     let working_dir_str = working_dir.to_string_lossy().to_string();
@@ -66,38 +66,49 @@ pub async fn cwl(
         warn!("{}", stderr);
     }
 
-    // Determine data type
-    let data_type = if let Some(data_type) = &act.data_type {
-        if data_type == "unit" {
-            return Ok(None);
-        }
+    // // Determine data type
+    // let data_type = if let Some(data_type) = &act.data_type {
+    //     if data_type == "unit" {
+    //         return Ok(None);
+    //     }
 
-        data_type
-    } else {
-        return Ok(None);
-    };
+    //     data_type
+    // } else {
+    //     return Ok(None);
+    // };
 
-    let output: Map<JValue> = serde_json::from_str(&stdout)?;
-    if let Some((_, value)) = output.iter().next() {
-        let mut value_file = File::open(value["path"].as_str().unwrap())?;
-        let mut value = String::new();
-        value_file.read_to_string(&mut value)?;
+    // let output: Map<JValue> = serde_json::from_str(&stdout)?;
+    // if let Some((_, value)) = output.iter().next() {
+    //     let mut value_file = File::open(value["path"].as_str().unwrap())?;
+    //     let mut value = String::new();
+    //     value_file.read_to_string(&mut value)?;
 
-        let value = match data_type.as_str() {
-            "boolean" => Value::Boolean(value.parse()?),
-            "integer" => Value::Integer(value.parse()?),
-            "real" => Value::Real(value.parse()?),
-            "string" => Value::Unicode(value),
-            _ => {
-                debug!("Data type: {}", data_type);
-                unimplemented!()
-            }
-        };
+    //     let value = match data_type.as_str() {
+    //         "boolean" => Value::Boolean(value.parse()?),
+    //         "integer" => Value::Integer(value.parse()?),
+    //         "real" => Value::Real(value.parse()?),
+    //         "string" => Value::Unicode(value),
+    //         _ => {
+    //             debug!("Data type: {}", data_type);
+    //             unimplemented!()
+    //         }
+    //     };
 
-        return Ok(Some(value));
-    }
+    //     return Ok(Some(value));
+    // }
 
     unreachable!();
+}
+
+///
+///
+///
+pub async fn dsl(
+    act: &ActInstruction,
+    arguments: Map<Value>,
+    invocation_id: i32,
+) -> Result<()> {
+    unimplemented!()
 }
 
 ///
