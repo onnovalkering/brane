@@ -12,6 +12,7 @@ brane-sys = { path = "../brane-sys" }
 brane-std = { path = "../brane-std" }
 flate2 = "1.0"
 futures = "0.3"
+hashicorp_vault = "1.1"
 humantime = "2.0"
 lazy_static = "1.4"
 log = "0.4"

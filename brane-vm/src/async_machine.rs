@@ -58,7 +58,7 @@ impl AsyncMachine {
         while let Some(instruction) = get_current_instruction(&self.instructions, &self.cursor) {
             match instruction {
                 Act(act) => {
-                    let arguments = prepare_arguments(&act.input, &self.environment, &self.vault);
+                    let arguments = prepare_arguments(&act.input, &self.environment, &self.vault)?;
                     let kind = act.meta.get("kind").expect("Missing `kind` metadata property.");
 
                     // Run standard library functions in-place, other ACTs will be scheduled.
@@ -155,14 +155,14 @@ fn prepare_arguments(
     input: &Map<Value>,
     environment: &Box<dyn Environment>,
     vault: &Box<dyn Vault>,
-) -> Map<Value> {
+) -> Result<Map<Value>> {
     let mut arguments = Map::<Value>::new();
 
     for (name, value) in input {
         match &value {
             Value::Pointer { variable, secret, .. } => {
                 if *secret {
-                    let value = vault.get(variable);
+                    let value = vault.get(variable)?;
                     arguments.insert(name.clone(), value.clone());
                 } else if variable.contains(".") {
                     let segments: Vec<_> = variable.split(".").collect();
@@ -196,7 +196,7 @@ fn prepare_arguments(
         }
     }
 
-    arguments
+    Ok(arguments)
 }
 
 ///

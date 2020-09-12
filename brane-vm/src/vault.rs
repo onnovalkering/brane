@@ -1,4 +1,6 @@
+use anyhow::{Context, Result};
 use specifications::common::Value;
+use hashicorp_vault::{Client, client::TokenData};
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -11,8 +13,58 @@ pub trait Vault {
     fn get(
         &self,
         name: &str,
-    ) -> Value;
+    ) -> Result<Value>;
 }
+
+///
+///
+///
+pub struct HashiVault {
+    client: Client<TokenData>,
+}
+
+impl HashiVault {
+    ///
+    ///
+    ///
+    pub fn new(
+        host: String,
+        token: String
+    ) -> Self {
+        let client = Client::new(host, token).unwrap();
+
+        HashiVault { 
+            client
+        }
+    }
+}
+
+impl Vault for HashiVault {
+    ///
+    ///
+    ///
+    fn exists(
+        &self,
+        name: &str,
+    ) -> bool {
+        self.get(name).is_ok()
+    }
+
+    ///
+    ///
+    ///
+    fn get(
+        &self,
+        name: &str,
+    ) -> Result<Value> {
+        if let Ok(secret) = self.client.get_secret(name) {
+            Ok(Value::Unicode(secret))
+        } else {
+            bail!("Failed to get secret: {}", name)
+        }
+    }
+}
+
 
 ///
 ///
@@ -48,10 +100,10 @@ impl Vault for InMemoryVault {
     fn get(
         &self,
         name: &str,
-    ) -> Value {
-        self.secrets
+    ) -> Result<Value> {
+        Ok(self.secrets
             .get(name)
-            .expect("Trying to access undefined secret.")
-            .clone()
+            .with_context(|| format!("Trying to access undefined secret: {}", name))?
+            .clone())
     }
 }

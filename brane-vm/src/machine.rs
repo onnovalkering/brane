@@ -109,7 +109,7 @@ impl Machine {
             match &value {
                 Value::Pointer { variable, secret, .. } => {
                     if *secret {
-                        let value = self.vault.get(variable);
+                        let value = self.vault.get(variable)?;
                         arguments.insert(name.clone(), value.clone());
                     } else if variable.contains(".") {
                         let segments: Vec<_> = variable.split(".").collect();
