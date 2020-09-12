@@ -6,9 +6,7 @@ extern crate log;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub mod delegate;
 pub mod docker;
-pub mod openapi;
 pub mod schedule;
 
 ///
@@ -20,7 +18,6 @@ pub struct ExecuteInfo {
     pub image: String,
     pub image_file: Option<PathBuf>,
     pub mounts: Option<Vec<String>>,
-    pub working_dir: Option<String>,
 }
 
 impl ExecuteInfo {
@@ -31,7 +28,6 @@ impl ExecuteInfo {
         image: String,
         image_file: Option<PathBuf>,
         mounts: Option<Vec<String>>,
-        working_dir: Option<String>,
         command: Option<Vec<String>>,
     ) -> Self {
         ExecuteInfo {
@@ -39,7 +35,6 @@ impl ExecuteInfo {
             image,
             image_file,
             mounts,
-            working_dir,
         }
     }
 }

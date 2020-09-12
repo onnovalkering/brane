@@ -104,7 +104,6 @@ async fn create_and_start_container(
     let create_config = Config {
         image: Some(exec.image.clone()),
         cmd: exec.command.clone(),
-        working_dir: exec.working_dir.clone(),
         host_config: Some(host_config),
         ..Default::default()
     };
