@@ -2,9 +2,9 @@ use anyhow::Result;
 use serde_json::Value as JValue;
 use diesel::prelude::*;
 use chrono::Utc;
-use brane_sys::local::LocalSystem;
+use brane_sys::{System, local::LocalSystem};
 use brane_vm::async_machine::{AsyncMachine, MachineResult};
-use brane_vm::vault::InMemoryVault;
+use brane_vm::vault::{Vault, HashiVault, InMemoryVault};
 use diesel::pg::PgConnection;
 use diesel::r2d2::{Pool, ConnectionManager};
 use redis::Client;
@@ -14,6 +14,8 @@ use crate::schema::{invocations::dsl as inv_db, variables::dsl as var_db, sessio
 use crate::models::{Invocation, Variable, Session, NewVariable};
 use redis::AsyncCommands;
 use specifications::common::Value;
+use specifications::instructions::Instruction;
+use std::env;
 
 type DbPool = Pool<ConnectionManager<PgConnection>>;
 type Event = (String, String);
@@ -52,19 +54,8 @@ async fn on_active(context: String, _payload: JValue, db: &DbPool, rd: &Client) 
     let session_uuid: String = rd_conn.get(format!("{}_session", context)).await?;
 
     // Setup VM
-    let cursor = RedisCursor::new(format!("{}_cursor", context), rd);
-    let environment = RedisEnvironment::new(format!("{}_env", context), None, rd);
     let instructions = serde_json::from_str(&instructions_json)?;
-    let system = LocalSystem::new(session_uuid.parse()?);
-    let vault = InMemoryVault::new(Default::default());
-    let mut machine = AsyncMachine::new(
-        instructions, 
-        invocation_id,
-        Box::new(cursor), 
-        Box::new(environment),
-        Box::new(system),
-        Box::new(vault)
-    );
+    let mut machine = setup_machine(&context, session_uuid, invocation_id, instructions, rd)?;
     
     // Run
     let result = machine.walk().await?;
@@ -98,19 +89,8 @@ async fn on_callback(context: String, payload: JValue, db: &DbPool, rd: &Client)
     // TODO: verify that status of invocation is 'waiting', otherwise discard (illegal or outdated).
 
     // Setup VM
-    let cursor = RedisCursor::new(format!("{}_cursor", context), rd);
-    let environment = RedisEnvironment::new(format!("{}_env", context), None, rd);
     let instructions = serde_json::from_str(&instructions_json)?;
-    let system = LocalSystem::new(session_uuid.parse()?);
-    let vault = InMemoryVault::new(Default::default());
-    let mut machine = AsyncMachine::new(
-        instructions, 
-        invocation_id,
-        Box::new(cursor), 
-        Box::new(environment),
-        Box::new(system),
-        Box::new(vault)
-    );
+    let mut machine = setup_machine(&context, session_uuid, invocation_id, instructions, rd)?;
 
     // Run
     let value = serde_json::from_value(payload["value"].clone())?;
@@ -241,4 +221,53 @@ async fn on_waiting(context: String, _payload: JValue, _db: &DbPool, _rd: &Clien
     debug!("Handling 'waiting' event within context: {}", context);
 
     Ok(vec!())
+}
+
+///
+///
+///
+fn setup_machine(
+    context: &String,
+    session_uuid: String,
+    invocation_id: i32,
+    instructions: Vec<Instruction>,
+    rd: &Client,
+) -> Result<AsyncMachine> {
+    let cursor = RedisCursor::new(format!("{}_cursor", context), rd);
+    let environment = RedisEnvironment::new(format!("{}_env", context), None, rd);
+    let system = setup_system(session_uuid)?;
+    let vault = setup_vault()?;
+
+    let machine = AsyncMachine::new(
+        instructions, 
+        invocation_id,
+        Box::new(cursor), 
+        Box::new(environment),
+        system,
+        vault,
+    );
+
+    Ok(machine)
+}
+
+///
+///
+///
+fn setup_system(session_uuid: String) -> Result<Box<dyn System>> {
+    let system = LocalSystem::new(session_uuid.parse()?);
+    
+    Ok(Box::new(system))
+}
+
+///
+///
+///
+fn setup_vault() -> Result<Box<dyn Vault>> {
+    if let Ok(vault_host) = env::var("VAULT_HOST") {
+        let vault_token = env::var("VAULT_TOKEN")?;
+
+        Ok(Box::new(HashiVault::new(vault_host, vault_token)))
+    } else {
+        Ok(Box::new(InMemoryVault::new(Default::default())))
+    }
 }
