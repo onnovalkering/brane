@@ -23,6 +23,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       DOCKER_NETWORK: docker_default
+      VAULT_HOST: vault:8200
+      VAULT_TOKEN: mytoken
 
   jupyterlab:
     image: onnovalkering/brane-jupyterlab
@@ -61,6 +63,15 @@ services:
     image: registry:2
     ports:
       - 5000:5000
+
+  vault:
+    image: vault:1.5.3
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - 8200:8200
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: mytoken
 
   xenon:
     image: onnovalkering/xenon-grpc
