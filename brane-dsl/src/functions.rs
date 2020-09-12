@@ -30,7 +30,7 @@ pub fn get_module_patterns(module: &PackageInfo) -> Result<Vec<FunctionPattern>>
         meta.insert(String::from("kind"), module.kind.clone());
         meta.insert(String::from("name"), module.name.clone());
         meta.insert(String::from("version"), module.version.clone());
-        if module.kind == "ecu" {
+        if module.kind != "dsl" {
             meta.insert(String::from("image"), format!("{}:{}", module.name, module.version));
         }
 
