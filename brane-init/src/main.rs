@@ -61,6 +61,19 @@ async fn main() -> Result<()> {
         logger.filter_level(LevelFilter::Info).init();
     }
 
+    match run(options).await {
+        Ok(_) => process::exit(0),
+        Err(error) => {
+            println!("{:?}", error); // Anyhow
+            process::exit(1);
+        }
+    }
+}
+
+///
+///
+///
+async fn run(options: CLI) -> Result<()> {
     let output = match options.sub_command {
         SubCommand::Cwl { function, arguments } => {
             exec_cwl::handle(function, decode(arguments)?, options.working_dir)?
@@ -69,7 +82,7 @@ async fn main() -> Result<()> {
             exec_ecu::handle(function, decode(arguments)?, options.working_dir)?        
         },
         SubCommand::Oas { function, arguments } => {
-            exec_oas::handle(function, decode(arguments)?, options.working_dir)?
+            exec_oas::handle(function, decode(arguments)?, options.working_dir).await?
         }
     };
 
@@ -79,7 +92,7 @@ async fn main() -> Result<()> {
         println!("{}", serde_json::to_string(&output)?);
     }
 
-    process::exit(0);
+    Ok(())
 }
 
 ///
@@ -96,5 +109,5 @@ where
         .with_context(|| "Conversion failed, decoded input doesn't seem to be UTF-8 encoded.")?;
     
     serde_json::from_str(&input)
-        .with_context(|| "Deserialization failed, decoded input doesn't seem to be JSON.")
+        .with_context(|| "Deserialization failed, decoded input doesn't seem to be as expected.")
 }
