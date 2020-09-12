@@ -9,7 +9,7 @@ s:version: "1.0.0"
 
 cwlVersion: v1.0
 class: Workflow
-label: echo-wf
+label: echo
 
 inputs:
   input:
@@ -26,5 +26,6 @@ steps:
 outputs:
   output:
     type: File
+    format: text/plain
     outputSource: echo-step/output
 

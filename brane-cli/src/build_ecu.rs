@@ -41,9 +41,9 @@ pub fn handle(
 
     debug!("Successfully prepared package directory.");
 
-    // Build ECU image
-    let tag = format!("{}:{}", ecu_document.name, ecu_document.version);
-    build_ecu_image(&package_dir, tag)?;
+    // Build Docker image
+    let tag = format!("{}:{}", package_info.name, package_info.version);
+    build_docker_image(&package_dir, tag)?;
 
     println!(
         "Successfully built version {} of ECU package {}.",
@@ -167,7 +167,7 @@ fn prepare_directory(
     let mut buffer = File::create(package_dir.join("Dockerfile"))?;
     write!(buffer, "{}", dockerfile)?;
 
-    // Write Dockerfile to package directory
+    // Write package.yml to package directory
     let mut buffer = File::create(package_dir.join("package.yml"))?;
     write!(buffer, "{}", serde_yaml::to_string(&package_info)?)?;
 
@@ -225,7 +225,7 @@ fn prepare_directory(
 ///
 ///
 ///
-fn build_ecu_image(
+fn build_docker_image(
     package_dir: &PathBuf,
     tag: String,
 ) -> Result<()> {

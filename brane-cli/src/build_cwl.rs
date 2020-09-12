@@ -1,6 +1,7 @@
 use crate::{packages, utils};
 use anyhow::{Context, Result};
 use console::style;
+use cwl::v11_cm::Format;
 use cwl::v11_clt::{
     CommandInputParameter, CommandInputParameterType, CommandLineToolInput, CommandLineToolInputType,
     CommandLineToolOutput, CommandLineToolOutputType, CommandOutputParameter, CommandOutputParameterType,
@@ -12,11 +13,19 @@ use cwl::v11_wf::{
 use cwl::{v11::CwlDocument, v11_clt::CommandLineTool, v11_cm::Any, v11_cm::CwlType, v11_wf::Workflow};
 use specifications::common::{CallPattern, Function, Parameter, Property, Type, Value};
 use specifications::package::PackageInfo;
+use std::fmt::Write as FmtWrite;
 use std::fs::{self, File};
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
+use std::process::Command;
 
 type Map<T> = std::collections::HashMap<String, T>;
+
+const INIT_URL: &str = concat!(
+    "https://github.com/onnovalkering/brane/releases/download/",
+    concat!("v", env!("CARGO_PKG_VERSION")),
+    "/brane-init"
+);
 
 const CWL_ADD_NAME: &str = "Please add a name (s:name) to the CWL document.";
 const CWL_ADD_LABEL: &str = "Please add a function name (label) to the CWL document.";
@@ -30,15 +39,26 @@ const CWL_ONLY_PMAP_OUTPUT: &str = "Only ParameterMap notation is supported for 
 pub fn handle(
     context: PathBuf,
     file: PathBuf,
+    init_path: Option<PathBuf>,
 ) -> Result<()> {
+    let context = fs::canonicalize(context)?;
+    debug!("Using {:?} as build context", context);
+    
     let cwl_file = context.join(file);
     let cwl_reader = BufReader::new(File::open(&cwl_file)?);
     let cwl_document = CwlDocument::from_reader(cwl_reader).unwrap();
 
     // Prepare package directory
+    let dockerfile = generate_dockerfile(&cwl_document, init_path.is_some())?;
     let package_info = create_package_info(&cwl_document)?;
     let package_dir = packages::get_package_dir(&package_info.name, Some(&package_info.version))?;
-    prepare_directory(&cwl_document, &cwl_file, &package_info, &package_dir)?;
+    prepare_directory(&cwl_document, &cwl_file, dockerfile, init_path, &context, &package_info, &package_dir)?;
+
+    debug!("Successfully prepared package directory.");
+
+    // Build Docker image
+    let tag = format!("{}:{}", package_info.name, package_info.version);
+    build_docker_image(&package_dir, tag)?;
 
     println!(
         "Successfully built version {} of CWL package {}.",
@@ -133,7 +153,7 @@ fn build_cwl_functions(cwl_document: &CwlDocument) -> Result<(Map<Function>, Map
         output_data_type
     } else {
         if let Some(output_property) = output_properties.first() {
-            match output_property.data_type.as_str() {
+            match output_property.data_type.to_lowercase().as_str() {
                 "stdout" => String::from("string"),
                 _ => output_property.data_type.clone(),
             }
@@ -223,10 +243,33 @@ fn construct_clt_output_prop(
     name: String,
     output_parameter: &CommandOutputParameter,
 ) -> Result<Property> {
+    let format = if let Some(format) = &output_parameter.format {
+        if let Format::Format(format) = format {
+            Some(format)
+        } else {
+            unimplemented!();
+        }
+    } else {
+        None
+    };
+
     if let CommandOutputParameterType::Type(p_type) = &output_parameter.r#type {
         if let CommandLineToolOutputType::CwlType(cwl_type) = p_type {
             if let CwlType::Str(data_type) = cwl_type {
-                return Ok(Property::new(name, data_type.to_string(), None, None, None, None));
+                let data_type = if data_type.to_lowercase() == "file" {
+                    if let Some(format) = format {
+                        match format.as_str() {
+                            "text/plain" => "string",
+                            _ => "File",
+                        }
+                    } else {
+                        data_type
+                    }
+                } else {
+                    data_type
+                };
+
+                return Ok(Property::new_quick(&name, data_type));
             }
         }
     }
@@ -285,7 +328,7 @@ fn construct_wf_input_prop(
     if let WorkflowInputParameterType::Type(p_type) = &input_paramter.r#type {
         if let WorkflowInputType::CwlType(cwl_type) = p_type {
             if let CwlType::Str(data_type) = cwl_type {
-                return Ok(Property::new(name, data_type.to_string(), None, None, None, None));
+                return Ok(Property::new_quick(&name, data_type));
             }
         }
     }
@@ -300,10 +343,33 @@ fn construct_wf_output_prop(
     name: String,
     output_parameter: &WorkflowOutputParameter,
 ) -> Result<Property> {
+    let format = if let Some(format) = &output_parameter.format {
+        if let Format::Format(format) = format {
+            Some(format)
+        } else {
+            unimplemented!();
+        }
+    } else {
+        None
+    };
+
     if let WorkflowOutputParameterType::Type(p_type) = &output_parameter.r#type {
         if let WorkflowOutputType::CwlType(cwl_type) = p_type {
             if let CwlType::Str(data_type) = cwl_type {
-                return Ok(Property::new(name, data_type.to_string(), None, None, None, None));
+                let data_type = if data_type.to_lowercase() == "file" {
+                    if let Some(format) = format {
+                        match format.as_str() {
+                            "text/plain" => "string",
+                            _ => "File",
+                        }
+                    } else {
+                        data_type
+                    }
+                } else {
+                    data_type
+                };
+
+                return Ok(Property::new_quick(&name, data_type));
             }
         }
     }
@@ -314,37 +380,159 @@ fn construct_wf_output_prop(
 ///
 ///
 ///
+fn generate_dockerfile(
+    _cwl_document: &CwlDocument,
+    override_init: bool,
+) -> Result<String> {
+    let mut contents = String::new();
+
+    // Add default heading
+    writeln!(contents, "# Generated by Brane")?;
+    writeln!(contents, "FROM commonworkflowlanguage/cwltool")?;
+
+    // Add default init library
+    if override_init {
+        writeln!(contents, "ADD init init")?;
+    } else {
+        writeln!(contents, "ADD {} init", INIT_URL)?;
+        writeln!(contents, "RUN chmod +x init")?;
+    }
+
+    // Copy files
+    writeln!(contents, "ADD wd.tar.gz /opt")?;
+    writeln!(contents, "WORKDIR /opt/wd")?;
+
+    writeln!(contents, "WORKDIR /")?;
+    writeln!(contents, "ENTRYPOINT [\"./init\"]")?;
+
+    Ok(contents)
+}
+
+///
+///
+///
 fn prepare_directory(
     cwl_document: &CwlDocument,
     cwl_file: &PathBuf,
+    dockerfile: String,
+    init_path: Option<PathBuf>,
+    context: &PathBuf,
     package_info: &PackageInfo,
     package_dir: &PathBuf,
 ) -> Result<()> {
     fs::create_dir_all(&package_dir)?;
+    debug!("Created {:?} as package directory", package_dir);
 
-    // Copy CWL document(s) to package directory
-    fs::copy(cwl_file, package_dir.join("document.cwl"))?;
+    // Write Dockerfile to package directory
+    let mut buffer = File::create(package_dir.join("Dockerfile"))?;
+    write!(buffer, "{}", dockerfile)?;
+
+    // Write package.yml to package directory
+    let mut buffer = File::create(package_dir.join("package.yml"))?;
+    write!(buffer, "{}", serde_yaml::to_string(&package_info)?)?;
+
+    // Copy custom init binary to package directory
+    if let Some(init_path) = init_path {
+        fs::copy(fs::canonicalize(init_path)?, package_dir.join("init"))?;
+    }
+
+    // Create the working directory and copy required files.
+    let wd = package_dir.join("wd");
+    if !wd.exists() {
+        fs::create_dir(&wd)?;
+    }
+
+    // Always copy these two files, required by convention
+    fs::copy(cwl_file, wd.join("document.cwl"))?;
+    fs::copy(package_dir.join("package.yml"), wd.join("package.yml"))?;
+
     if let CwlDocument::Workflow(wf) = cwl_document {
         let runs: Vec<String> = match &wf.steps {
             WorkflowSteps::StepArray(steps) => steps.iter().map(|s| s.run.clone()).collect(),
             WorkflowSteps::StepMap(steps) => steps.iter().map(|(_, v)| v.run.clone()).collect(),
         };
 
+        debug!("runs: {:?}", runs);
+
         for run in runs {
             let run_file = PathBuf::from(run);
             if run_file.exists() {
-                if let Some(run_file) = run_file.file_name() {
-                    fs::copy(run_file, package_dir.join(run_file))?;
+                let wd_path = wd.join(&run_file);
+                if let Some(parent) = wd_path.parent() {
+                    if !parent.exists() {
+                        fs::create_dir_all(&parent)?;
+                    }
                 }
+    
+                let file_path = context.join(&run_file);
+                fs::copy(&file_path, &wd_path)
+                    .with_context(|| format!("Couldn't find {:?} within the build context.", file_path))?;
+                    
+                debug!("Copied {:?} to working directory", file_path);
             } else {
                 return Err(anyhow!("Can't find workfow step file: {:?}", run_file));
             }
         }
     }
 
-    // Write package.yml to package directory
-    let mut buffer = File::create(package_dir.join("package.yml"))?;
-    write!(buffer, "{}", serde_yaml::to_string(&package_info)?)?;
+    // Archive the working directory and remove the original.
+    let output = Command::new("tar")
+        .arg("-zcf")
+        .arg("wd.tar.gz")
+        .arg("wd")
+        .current_dir(&package_dir)
+        .output()
+        .expect("Couldn't run 'tar' command.");
+
+    if !output.status.success() {
+        return Err(anyhow!("Failed to prepare working directory archive."));
+    }
+
+    let output = Command::new("rm")
+        .arg("-rf")
+        .arg("wd")
+        .current_dir(&package_dir)
+        .output()
+        .expect("Couldn't run 'rm' command.");
+
+    if !output.status.success() {
+        warn!("Failed to cleanup working directory.");
+    }
+    
+    Ok(())
+}
+
+///
+///
+///
+fn build_docker_image(
+    package_dir: &PathBuf,
+    tag: String,
+) -> Result<()> {
+    let buildx = Command::new("docker")
+        .arg("buildx")
+        .output()
+        .expect("Couldn't run 'docker' command.");
+
+    if !buildx.status.success() {
+        return Err(anyhow!("Failed to build Docker image. Is BuildKit enabled (see documentation)?"));
+    }
+
+    let output = Command::new("docker")
+        .arg("buildx")
+        .arg("build")
+        .arg("--output")
+        .arg("type=docker,dest=image.tar")
+        .arg("--tag")
+        .arg(tag)
+        .arg(".")
+        .current_dir(&package_dir)
+        .status()
+        .expect("Couldn't run 'docker' command.");
+
+    if !output.success() {
+        return Err(anyhow!("Failed to build Docker image. See Docker output above for more information."));
+    }
 
     Ok(())
 }

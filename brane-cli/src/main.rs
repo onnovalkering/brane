@@ -157,7 +157,7 @@ async fn run(options: CLI) -> Result<()> {
             };
 
             match kind.as_str() {
-                "cwl" => build_cwl::handle(context, file)?,
+                "cwl" => build_cwl::handle(context, file, init)?,
                 "dsl" => build_dsl::handle(context, file).await?,
                 "ecu" => build_ecu::handle(context, file, init)?,
                 "oas" => build_oas::handle(context, file)?,
