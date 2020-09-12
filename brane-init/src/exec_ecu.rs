@@ -10,32 +10,32 @@ type Map<T> = std::collections::HashMap<String, T>;
 ///
 ///
 ///
-pub async fn handle(
-    action: &String,
-    arguments: &Map<Value>,
-    container_info: ContainerInfo,
+pub fn handle(
+    function: String,
+    arguments: Map<Value>,
     working_dir: PathBuf,
 ) -> Result<Value> {
-    debug!("Executing '{}' using arguments:\n{:#?}", action, arguments);
+    debug!("Executing '{}' (ECU) using arguments:\n{:#?}", function, arguments);
 
-    let action = container_info.actions
-        .get(action)
-        .with_context(|| format!("Action '{}' not found.", action))?;
+    let container_info = ContainerInfo::from_path(working_dir.join("container.yml"))?;
+    let functions = container_info.actions;
+    let function = functions.get(&function).expect(&format!("Function '{}' not found", function));    
 
-    // Validate and prepare action execution
-    assert_input(&action.input, arguments)?;
+    assert_input(&function.input, &arguments)?;
     initialize(&working_dir)?;
 
+    // Determine entrypoint and, optionally, command and arguments
     let entrypoint = &container_info.entrypoint.exec;
-    let command = action.command.clone().unwrap_or_else(|| ActionCommand {
+    let command = function.command.clone().unwrap_or_else(|| ActionCommand {
         args: Default::default(),
         capture: None,
     });
 
-    let stdout = execute(entrypoint, &command.args, arguments, &working_dir)?;
-    let output = capture_output(stdout, &action.output, &command.capture, &container_info.types)?;
+    // Output variables are captured from the stdout
+    let stdout = execute(entrypoint, &command.args, &arguments, &working_dir)?;
+    let output = capture_output(stdout, &function.output, &command.capture, &container_info.types)?;
 
-    if let Some(parameter) = action.output.first() {
+    if let Some(parameter) = function.output.first() {
         let value = output
             .get(&parameter.name)
             .with_context(|| format!("Output '{}' not found.", parameter.name))?;
