@@ -1,6 +1,6 @@
 use crate::packages;
 use anyhow::Result;
-use brane_exec::{docker, openapi, ExecuteInfo};
+use brane_exec::{docker, ExecuteInfo};
 use brane_vm::machine::Machine;
 use brane_vm::environment::InMemoryEnvironment;
 use brane_vm::vault::InMemoryVault;
@@ -9,7 +9,6 @@ use console::style;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input as Prompt, Select};
 use fs_extra::{copy_items, dir::CopyOptions};
-use openapiv3::OpenAPI;
 use serde_json::{json, Value as JValue};
 use serde_yaml;
 use specifications::common::{Function, Parameter, Type, Value};
@@ -102,7 +101,7 @@ async fn test_cwl(
         String::from("input.json"),
     ];
 
-    let exec = ExecuteInfo::new(image, None, Some(mounts), Some(working_dir_str), Some(command));
+    let exec = ExecuteInfo::new(image, None, Some(mounts), Some(command));
 
     let (stdout, stderr) = docker::run_and_wait(exec).await?;
     if stderr.len() > 0 {
@@ -249,7 +248,7 @@ async fn test_ecu(
     let command = vec![String::from("exec"), base64::encode(serde_json::to_string(&payload)?)];
     debug!("{:?}", command);
 
-    let exec = ExecuteInfo::new(image, image_file, None, None, Some(command));
+    let exec = ExecuteInfo::new(image, image_file, None, Some(command));
 
     let (stdout, stderr) = docker::run_and_wait(exec).await?;
     if stderr.len() > 0 {
@@ -268,30 +267,32 @@ async fn test_ecu(
 ///
 ///
 async fn test_oas(
-    package_dir: PathBuf,
-    package_info: PackageInfo,
+    _package_dir: PathBuf,
+    _package_info: PackageInfo,
 ) -> Result<()> {
-    let functions = package_info.functions.unwrap();
-    let types = package_info.types.unwrap();
-    let (function_name, arguments) = prompt_for_input(&functions, &types)?;
+    unimplemented!();
 
-    let oas_reader = BufReader::new(File::open(&package_dir.join("document.yml"))?);
-    let oas_document: OpenAPI = serde_yaml::from_reader(oas_reader)?;
+    // let functions = package_info.functions.unwrap();
+    // let types = package_info.types.unwrap();
+    // let (function_name, arguments) = prompt_for_input(&functions, &types)?;
 
-    let json = openapi::execute(&function_name, arguments, &oas_document).await?;
+    // let oas_reader = BufReader::new(File::open(&package_dir.join("document.yml"))?);
+    // let oas_document: OpenAPI = serde_yaml::from_reader(oas_reader)?;
 
-    let function = functions.get(&function_name).unwrap();
-    let output_type = types.get(&function.return_type).unwrap();
+    // let json = openapi::execute(&function_name, arguments, &oas_document).await?;
 
-    for property in &output_type.properties {
-        println!(
-            "{}:\n{}\n",
-            style(&property.name).bold().cyan(),
-            json[&property.name].as_str().unwrap()
-        );
-    }
+    // let function = functions.get(&function_name).unwrap();
+    // let output_type = types.get(&function.return_type).unwrap();
 
-    Ok(())
+    // for property in &output_type.properties {
+    //     println!(
+    //         "{}:\n{}\n",
+    //         style(&property.name).bold().cyan(),
+    //         json[&property.name].as_str().unwrap()
+    //     );
+    // }
+
+    // Ok(())
 }
 
 ///
