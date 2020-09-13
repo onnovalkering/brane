@@ -5,7 +5,9 @@ COPY renderer /renderer
 
 USER root
 
-COPY brane-cli /usr/local/bin
+ADD https://github.com/onnovalkering/brane/releases/download/v0.1.0/brane-cli /usr/local/bin
+RUN chmod +x /usr/local/bin/brane-cli
+RUN brane-cli -s login http://brane-api:8080 --username jovyan
 
 WORKDIR /kernel
 RUN python setup.py install \ 
