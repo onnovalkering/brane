@@ -207,15 +207,20 @@ pub async fn push(
     let request = request.multipart(form);
     let response = request.send().await?;
 
+    let response_status = response.status();
+
     progress.finish();
 
-    debug!("{:?}", response.text().await?);
-
-    println!(
-        "\nSuccessfully pushed version {} of package {}.",
-        style(&version).bold().cyan(),
-        style(&name).bold().cyan(),
-    );
+    if response_status.is_success() {
+        println!(
+            "\nSuccessfully pushed version {} of package {}.",
+            style(&version).bold().cyan(),
+            style(&name).bold().cyan(),
+        );
+    } else {
+        let response_text = response.text().await?;
+        println!("\nFailed to push package: {}", response_text)
+    }
 
     Ok(())
 }
