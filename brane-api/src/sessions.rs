@@ -1,5 +1,5 @@
-use crate::models::{Session, NewSession, Variable};
-use crate::schema::{self, sessions::dsl as db};
+use crate::models::{Session, NewSession, Variable, NewVariable};
+use crate::schema::{self, sessions::dsl as db, variables::dsl as var_db};
 use actix_web::Scope;
 use actix_web::{web, HttpRequest, HttpResponse};
 use diesel::prelude::*;
@@ -28,9 +28,8 @@ pub fn scope() -> Scope {
 
 #[derive(Deserialize)]
 pub struct CreateSession {
-    pub name: Option<String>,
-    pub arguments: Map<Value>,
-    pub instructions: Vec<Instruction>,
+    pub arguments: Option<Map<Value>>,
+    pub parent: Option<i32>,
 }
 
 ///
@@ -39,20 +38,36 @@ pub struct CreateSession {
 async fn create_session(
     _req: HttpRequest,
     pool: web::Data<DbPool>,
+    json: web::Json<CreateSession>,
 ) -> HttpResponse { 
     let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
 
-    // Store invocation information in database
-    let new_session = NewSession::new().unwrap();
-    let session = web::block(move || {
-        diesel::insert_into(schema::sessions::table)
-            .values(&new_session)
-            .get_result::<Session>(&conn)
-    })
-    .await;
+    // Store session information in database
+    let new_session = NewSession::new(json.parent).unwrap();
+    let session = diesel::insert_into(schema::sessions::table)
+        .values(&new_session)
+        .get_result::<Session>(&conn);
 
-    if session.is_ok() {
-        HttpResponse::Ok().json(session.unwrap())
+    if let Ok(session) = session {
+        // Store arguments as session variables, if any
+        if let Some(arguments) = &json.arguments {
+            for (key, value) in arguments.iter() {
+                let value_json = serde_json::to_string(value).unwrap();
+                let new_variable = NewVariable::new(
+                    session.id, 
+                    key.clone(), 
+                    value.data_type().to_string(), 
+                    Some(value_json.clone())
+                ).unwrap();
+
+                diesel::insert_into(var_db::variables)
+                    .values(&new_variable)
+                    .execute(&conn)
+                    .unwrap();
+            }
+        }
+
+        HttpResponse::Ok().json(session)
     } else {
         HttpResponse::InternalServerError().body("")
     }

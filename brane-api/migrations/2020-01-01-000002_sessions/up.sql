@@ -6,6 +6,7 @@ CREATE TABLE "sessions" (
   , "uuid" VARCHAR NOT NULL
 
   -- content
+  , "parent" INTEGER
   , "status" VARCHAR NOT NULL
 );
 

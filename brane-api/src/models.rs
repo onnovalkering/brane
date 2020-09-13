@@ -151,6 +151,7 @@ pub struct Session {
     pub created: NaiveDateTime,
     pub uuid: String,
     // Content
+    pub parent: Option<i32>,
     pub status: String,
 }
 
@@ -161,11 +162,12 @@ pub struct NewSession {
     pub created: NaiveDateTime,
     pub uuid: String,
     // Content
+    pub parent: Option<i32>,
     pub status: String,
 }
 
 impl NewSession {
-    pub fn new() -> FResult<Self> {
+    pub fn new(parent: Option<i32>) -> FResult<Self> {
         let created = Utc::now().naive_utc();
         let uuid = Uuid::new_v4().to_string();
         let status = String::from("active");
@@ -173,6 +175,7 @@ impl NewSession {
         Ok(NewSession {
             created,
             uuid,
+            parent,
             status,
         })
     }
