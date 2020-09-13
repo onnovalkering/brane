@@ -156,7 +156,7 @@ def create_session():
     """
     Creates a new session, and marks it as the active session.
     """
-    response = post(SESSIONS_ENDPOINT)
+    response = post(SESSIONS_ENDPOINT, json={})
     content = response.json()
 
     return content["uuid"]
