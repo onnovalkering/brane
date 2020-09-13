@@ -175,13 +175,13 @@ async fn upload_package(
     }
 
     match new_package.kind.as_str() {
-        "cwl" => {
-            let cwl_document = temp_workdir.join("document.cwl");
-            if cwl_document.exists() {
-                new_package.source = Some(fs::read_to_string(cwl_document).unwrap());
+        "dsl" => {
+            let instructions = temp_workdir.join("instructions.yml");
+            if instructions.exists() {
+                new_package.source = Some(fs::read_to_string(instructions).unwrap());
             }
         }
-        "ecu" => {
+        "cwl" | "ecu" | "oas" => {
             // In the case of a container package, store image in Docker registry
             // TODO: make seperate function
             let image_tar = temp_workdir.join("image.tar");
@@ -202,18 +202,6 @@ async fn upload_package(
                 if push.is_err() {
                     return HttpResponse::InternalServerError().body(MSG_FAILED_TO_PUSH);
                 }
-            }
-        }
-        "dsl" => {
-            let instructions = temp_workdir.join("instructions.yml");
-            if instructions.exists() {
-                new_package.source = Some(fs::read_to_string(instructions).unwrap());
-            }
-        }
-        "oas" => {
-            let oas_document = temp_workdir.join("document.yml");
-            if oas_document.exists() {
-                new_package.source = Some(fs::read_to_string(oas_document).unwrap());
             }
         }
         _ => unreachable!(),
