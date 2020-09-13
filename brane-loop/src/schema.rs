@@ -36,6 +36,7 @@ table! {
         id -> Int4,
         created -> Timestamp,
         uuid -> Varchar,
+        parent -> Nullable<Int4>,
         status -> Varchar,
     }
 }

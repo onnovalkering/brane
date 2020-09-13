@@ -16,6 +16,7 @@ use redis::AsyncCommands;
 use specifications::common::Value;
 use specifications::instructions::Instruction;
 use std::env;
+use serde_json::json;
 
 type DbPool = Pool<ConnectionManager<PgConnection>>;
 type Event = (String, String);
@@ -128,9 +129,10 @@ async fn on_complete(context: String, _payload: JValue, db: &DbPool, rd: &Client
             .get_result::<Invocation>(&db_conn)?;   
     }
 
+    let terminate = variables.get("terminate").unwrap_or(&Value::Unit).clone();
     let variables = variables.iter().filter(|(k, _)| !k.starts_with("_"));
+    
     // Only variables that are new or updated: after each set, append key to Redis set. 
-
     for (key, value) in variables {
         if key == "terminate" {
             continue;
@@ -142,7 +144,7 @@ async fn on_complete(context: String, _payload: JValue, db: &DbPool, rd: &Client
             key.clone(), 
             value.data_type().to_string(), 
             Some(value_json.clone())
-        );
+        ).unwrap();
 
         diesel::insert_into(var_db::variables)
             .values(&new_variable)
@@ -158,7 +160,20 @@ async fn on_complete(context: String, _payload: JValue, db: &DbPool, rd: &Client
         .set(inv_db::stopped.eq(stopped))
         .get_result::<Invocation>(&db_conn)?;    
     
-    Ok(vec!())
+    let session = ses_db::sessions.find(invocation.session).first::<Session>(&db_conn)?;
+    debug!("session: {:?}", session.parent);
+
+    if let Some(parent) = session.parent {
+        let context = format!("inv-{}", parent);
+        let payload = json!({
+            "event": "callback",
+            "value": terminate,
+        }).to_string();
+
+        Ok(vec!((context, payload)))
+    } else {
+        Ok(vec!())
+    }
 }
 
 ///
