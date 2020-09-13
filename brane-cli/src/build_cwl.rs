@@ -395,7 +395,7 @@ fn generate_dockerfile(
         writeln!(contents, "ADD init /init")?;
     } else {
         writeln!(contents, "ADD {} /init", INIT_URL)?;
-        writeln!(contents, "RUN chmod +x init")?;
+        writeln!(contents, "RUN chmod +x /init")?;
     }
 
     // Copy files
