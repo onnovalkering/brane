@@ -392,9 +392,9 @@ fn generate_dockerfile(
 
     // Add default init library
     if override_init {
-        writeln!(contents, "ADD init init")?;
+        writeln!(contents, "ADD init /init")?;
     } else {
-        writeln!(contents, "ADD {} init", INIT_URL)?;
+        writeln!(contents, "ADD {} /init", INIT_URL)?;
         writeln!(contents, "RUN chmod +x init")?;
     }
 

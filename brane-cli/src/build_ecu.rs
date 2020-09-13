@@ -37,7 +37,7 @@ pub fn handle(
     let dockerfile = generate_dockerfile(&ecu_document, init_path.is_some())?;
     let package_info = generate_package_info(&ecu_document)?;
     let package_dir = packages::get_package_dir(&package_info.name, Some(&package_info.version))?;
-    prepare_directory(&ecu_document, dockerfile, init_path, &context, &package_info, &package_dir)?;
+    prepare_directory(&ecu_document, &ecu_file, dockerfile, init_path, &context, &package_info, &package_dir)?;
 
     debug!("Successfully prepared package directory.");
 
@@ -150,6 +150,7 @@ fn generate_dockerfile(
 ///
 fn prepare_directory(
     ecu_document: &ContainerInfo,
+    ecu_file: &PathBuf,
     dockerfile: String,
     init_path: Option<PathBuf>,
     context: &PathBuf,
@@ -178,6 +179,14 @@ fn prepare_directory(
 
     // Create the working directory and copy required files.
     let wd = package_dir.join("wd");
+    if !wd.exists() {
+        fs::create_dir(&wd)?;
+    }
+    
+    // Always copy these two files, required by convention
+    fs::copy(ecu_file, wd.join("container.yml"))?;
+    fs::copy(package_dir.join("package.yml"), wd.join("package.yml"))?;
+
     if let Some(files) = &ecu_document.files {
         for file in files {
             let wd_path = wd.join(file);

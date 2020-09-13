@@ -1,0 +1,38 @@
+openapi: 3.0.0
+info:
+  title: GitHub
+  version: 1.0.0
+
+servers:
+  - url: https://api.github.com
+
+paths:
+  '/repos/{owner}/{repo}/readme':
+    get:
+      operationId: getreadme
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Information about the README
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - name
+                  - content
+                properties:
+                  name:
+                    type: string
+                  content:
+                    type: string

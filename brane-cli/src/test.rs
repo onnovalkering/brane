@@ -9,7 +9,7 @@ use console::style;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input as Prompt, Select};
 use fs_extra::{copy_items, dir::CopyOptions};
-use serde_json::{json, Value as JValue};
+use serde_json::Value as JValue;
 use serde_yaml;
 use specifications::common::{Function, Parameter, Type, Value};
 use specifications::instructions::Instruction;
@@ -64,60 +64,38 @@ async fn test_cwl(
     package_info: PackageInfo,
 ) -> Result<()> {
     let functions = package_info.functions.unwrap();
-    let types = package_info.types.unwrap();
-    let (_, arguments) = prompt_for_input(&functions, &types)?;
+    let types = package_info.types.unwrap_or_default();
+    let (function, arguments) = prompt_for_input(&functions, &types)?;
 
-    // Create (temporary) working directory
-    let working_dir = tempfile::tempdir()?.into_path();
-    let working_dir_str = working_dir.to_string_lossy().to_string();
+    let image = format!("{}:{}", package_info.name, package_info.version);
+    let image_file = Some(package_dir.join("image.tar"));
 
-    // Copy package directory to working dir
-    let package_content = fs::read_dir(package_dir)?
-        .map(|e| e.unwrap().path())
-        .collect::<Vec<PathBuf>>();
-
-    copy_items(&package_content, &working_dir, &CopyOptions::new())?;
-
-    // Create file containing input arguments
-    let mut input = Map::<JValue>::new();
-    for (name, value) in arguments.iter() {
-        input.insert(name.clone(), value.as_json());
-    }
-
-    let input_path = working_dir.join("input.json");
-    let mut input_file = File::create(input_path)?;
-    writeln!(input_file, "{}", &serde_json::to_string(&input)?)?;
-
-    // Setup execution
-    let image = String::from("commonworkflowlanguage/cwltool");
     let mounts = vec![
         String::from("/var/run/docker.sock:/var/run/docker.sock"),
         String::from("/tmp:/tmp"),
-        format!("{}:{}", working_dir_str, working_dir_str),
-    ];
-    let command = vec![
-        String::from("--quiet"),
-        String::from("document.cwl"),
-        String::from("input.json"),
     ];
 
-    let exec = ExecuteInfo::new(image, None, Some(mounts), Some(command));
+    let command = vec![
+        String::from("cwl"), 
+        function, 
+        base64::encode(serde_json::to_string(&arguments)?)
+    ];
+
+    debug!("{:?}", command);
+
+    let exec = ExecuteInfo::new(image, image_file, Some(mounts), Some(command));
 
     let (stdout, stderr) = docker::run_and_wait(exec).await?;
     if stderr.len() > 0 {
         warn!("{}", stderr);
     }
 
-    let output: Map<JValue> = serde_json::from_str(&stdout)?;
-    for (name, value) in output.iter() {
-        let mut value_file = File::open(value["path"].as_str().unwrap())?;
-        let mut value = String::new();
-        value_file.read_to_string(&mut value)?;
+    debug!("stdout: {}", stdout);
 
-        println!("{}:\n{}\n", style(&name).bold().cyan(), value);
-    }
+    let output: Value = serde_json::from_str(&stdout)?;
+    println!("{}", style(&output).bold().cyan());
 
-    Ok(())
+    Ok(())    
 }
 
 ///
@@ -236,16 +214,17 @@ async fn test_ecu(
 ) -> Result<()> {
     let functions = package_info.functions.unwrap();
     let types = package_info.types.unwrap_or_default();
-    let (function_name, arguments) = prompt_for_input(&functions, &types)?;
+    let (function, arguments) = prompt_for_input(&functions, &types)?;
 
     let image = format!("{}:{}", package_info.name, package_info.version);
     let image_file = Some(package_dir.join("image.tar"));
-    let payload = json!({
-        "identifier": String::from("test"),
-        "action": function_name,
-        "arguments": arguments,
-    });
-    let command = vec![String::from("exec"), base64::encode(serde_json::to_string(&payload)?)];
+
+    let command = vec![
+        String::from("ecu"), 
+        function, 
+        base64::encode(serde_json::to_string(&arguments)?)
+    ];
+
     debug!("{:?}", command);
 
     let exec = ExecuteInfo::new(image, image_file, None, Some(command));
@@ -267,32 +246,37 @@ async fn test_ecu(
 ///
 ///
 async fn test_oas(
-    _package_dir: PathBuf,
-    _package_info: PackageInfo,
+    package_dir: PathBuf,
+    package_info: PackageInfo,
 ) -> Result<()> {
-    unimplemented!();
+    let functions = package_info.functions.unwrap();
+    let types = package_info.types.unwrap_or_default();
+    let (function, arguments) = prompt_for_input(&functions, &types)?;
 
-    // let functions = package_info.functions.unwrap();
-    // let types = package_info.types.unwrap();
-    // let (function_name, arguments) = prompt_for_input(&functions, &types)?;
+    let image = format!("{}:{}", package_info.name, package_info.version);
+    let image_file = Some(package_dir.join("image.tar"));
 
-    // let oas_reader = BufReader::new(File::open(&package_dir.join("document.yml"))?);
-    // let oas_document: OpenAPI = serde_yaml::from_reader(oas_reader)?;
+    let command = vec![
+        String::from("oas"),
+        function, 
+        base64::encode(serde_json::to_string(&arguments)?)
+    ];
+    
+    debug!("{:?}", command);
 
-    // let json = openapi::execute(&function_name, arguments, &oas_document).await?;
+    let exec = ExecuteInfo::new(image, image_file, None, Some(command));
 
-    // let function = functions.get(&function_name).unwrap();
-    // let output_type = types.get(&function.return_type).unwrap();
+    let (stdout, stderr) = docker::run_and_wait(exec).await?;
+    if stderr.len() > 0 {
+        warn!("{}", stderr);
+    }
 
-    // for property in &output_type.properties {
-    //     println!(
-    //         "{}:\n{}\n",
-    //         style(&property.name).bold().cyan(),
-    //         json[&property.name].as_str().unwrap()
-    //     );
-    // }
+    debug!("stdout: {}", stdout);
 
-    // Ok(())
+    let output: Value = serde_json::from_str(&stdout)?;
+    println!("{}", style(&output).bold().cyan());
+
+    Ok(())
 }
 
 ///
