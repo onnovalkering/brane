@@ -6,7 +6,6 @@ use diesel::prelude::*;
 use diesel::{r2d2, r2d2::ConnectionManager};
 use serde::Deserialize;
 use specifications::common::Value;
-use specifications::instructions::Instruction;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 type Map<T> = std::collections::HashMap<String, T>;
@@ -27,9 +26,10 @@ pub fn scope() -> Scope {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateSession {
     pub arguments: Option<Map<Value>>,
-    pub parent: Option<i32>,
+    pub invocation_id: Option<i32>,
 }
 
 ///
@@ -43,7 +43,7 @@ async fn create_session(
     let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
 
     // Store session information in database
-    let new_session = NewSession::new(json.parent).unwrap();
+    let new_session = NewSession::new(json.invocation_id).unwrap();
     let session = diesel::insert_into(schema::sessions::table)
         .values(&new_session)
         .get_result::<Session>(&conn);
