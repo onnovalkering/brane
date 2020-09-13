@@ -279,9 +279,10 @@ fn setup_system(session_uuid: String) -> Result<Box<dyn System>> {
 ///
 fn setup_vault() -> Result<Box<dyn Vault>> {
     if let Ok(vault_host) = env::var("VAULT_HOST") {
+        let vault_url = format!("http://{}", vault_host);
         let vault_token = env::var("VAULT_TOKEN")?;
 
-        Ok(Box::new(HashiVault::new(vault_host, vault_token)))
+        Ok(Box::new(HashiVault::new(vault_url, vault_token)))
     } else {
         Ok(Box::new(InMemoryVault::new(Default::default())))
     }
