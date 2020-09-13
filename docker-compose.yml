@@ -1,28 +1,10 @@
 version: '3'
 
 services:
-  brane-api:
-    build: ./brane-api
-    depends_on:
-      - kafka
-      - postgres
+  adminer:
+    image: adminer
     ports:
-      - 8080:8080
-
-  brane-loop:
-    build: ./brane-loop
-    depends_on:
-      - kafka
-      - postgres
-    volumes:
-      - /tmp:/tmp
-      - /var/run/docker.sock:/var/run/docker.sock
-
-  jupyterlab:
-    build: ./brane-ide/jupyterlab
-    command: ["jupyter", "lab", "--allow-root", "--LabApp.token=''"]
-    ports:
-      - 8888:8888
+      - 8070:8080
 
   kafka:
     image: confluentinc/cp-kafka:5.5.0
