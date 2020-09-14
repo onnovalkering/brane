@@ -36,15 +36,15 @@ $ chmod +x brane && mv brane /usr/local/bin/
 Alternatively, you can install the CLI from the [source code](https://github.com/onnovalkering/brane/tree/master/brane-cli) using [Cargo](https://doc.rust-lang.org/stable/cargo).
 
 ## Instance
-Instances can be deployed with Docker or with Kubernetes (recommended).
+Brane instances can be deployed with Docker or with Kubernetes (recommended).
 
 For both deployments, you need a copy of the Brane repository:
 
 ```shell
-git clone https://github.com/onnovalkering/brane.git
+$ git clone https://github.com/onnovalkering/brane.git
 ```
 
-An instance is a composite of several services, these are:
+Each instance is a composite of several services, these are:
 
 | Service   | Port      | Public |
 |:----------|:----------|:-------|
@@ -59,17 +59,35 @@ An instance is a composite of several services, these are:
 | [Redis](https://redis.io)     | 6379      | No     |
 
 ### Docker
-The Docker deployment makes use of [Docker Compose](https://docs.docker.com/compose). Depending on your plaform, you might need to install it separately from Docker. Please see Docker's [documentation](https://docs.docker.com/compose/install/#install-compose) for installation instructions.
+The Docker deployment makes use of [Docker Compose](https://docs.docker.com/compose). Depending on your plaform, it might not be included in your Docker installation. Please see Docker's [documentation](https://docs.docker.com/compose/install/#install-compose) for installation instructions.
 
 From the root of the Brane repository, run:
 ```shell
-docker-compose -f deployment/docker/docker-compose.yml up -d
+$ docker-compose -f deployment/docker/docker-compose.yml up -d
 ```
 
 Then check if the deployment is successfull using:
 ```shell
-curl `hostname`:8080/health
+$ curl `hostname`:8080/health
 ```
 
 ### Kubernetes
-...
+Brane's Kubernetes deployment relies on [Helm](https://helm.sh) – _"The package manager for Kubernetes"_. Please see Helm's [documentation](https://helm.sh/docs/intro/install/) for the appropriate installation instructions for your platform.
+
+First, create a namespace for the Brane instance:
+
+```shell
+$ kubectl create namespace "brane"
+$ kubectl config set-context $(kubectl config current-context) --namespace "brane"
+```
+
+To start the deployment, run the following from the root of the repository:
+```shell
+$ export HOSTNAME="<insert public K8s hostname or IP address>"
+$ helm install brane deployment/kubernetes --set global.hostname=$HOSTNAME
+```
+
+Check if the deployment is successfull:
+```shell
+$ curl $HOSTNAME:8080/health
+```

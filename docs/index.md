@@ -8,10 +8,10 @@ permalink: /
 
 # The Brane Framework
 
-Programmatic workflows and research infrastructures for extreme-scale data processing on top of heterogeneous and dispersed resource pools.
+Programmable Orchestration of Applications and Networking
 {: .fs-6 .fw-300 }
 
-[Get started now](/brane/guide/guide.html){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 } 
+[Get started now](/brane/quickstart.html){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 } 
 [See it in action](#demonstration){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
