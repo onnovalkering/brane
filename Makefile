@@ -1,19 +1,18 @@
 .PHONY: all
 
-all: brane-api brane-cli brane-init brane-loop brane-jupyter
+all: api cli init loop jupyter
 
-brane-api:
+api:
 	docker build -t onnovalkering/brane-api brane-api
 
-brane-cli:
+cli:
 	cargo build --release --package brane-cli
 
-brane-init:
+init:
 	cargo build --release --package brane-init --target x86_64-unknown-linux-musl
 
-brane-jupyter:
+jupyter:
 	docker build -t onnovalkering/brane-jupyterlab brane-ide/jupyterlab
 
-brane-loop:
+loop:
 	docker build -t onnovalkering/brane-loop brane-loop
-
