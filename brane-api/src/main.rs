@@ -22,6 +22,7 @@ use structopt::StructOpt;
 use redis::Client;
 
 mod callback;
+mod health;
 mod invocations;
 mod models;
 mod packages;
@@ -108,6 +109,7 @@ async fn main() -> std::io::Result<()> {
             .data(rd_pool.clone())
             .data(producer.clone())
             .service(callback::scope())
+            .service(health::scope())
             .service(invocations::scope())
             .service(packages::scope())
             .service(sessions::scope())
