@@ -41,10 +41,12 @@ def download():
 
 
 def files():
+    username = os.environ["USERNAME"]
+    password = os.environ["PASSWORD"]
     observation_id = os.environ["OBSERVATION_ID"]
 
     from common.config.Profile import profiles
-    profile = profiles.create_profile(USERNAME, PASSWORD)
+    profile = profiles.create_profile(username, password)
 
     from awlofar.database.Context import context
     from awlofar.main.aweimports import CorrelatedDataProduct as cdp, FileObject, BeamFormedDataProduct, Observation
