@@ -23,22 +23,31 @@ Since we, currently and in the short-term, cannot make use of centralized exasca
 
 With the Brane framework we address these shortcomings. It features a programmatic approach to constructing workflows and research infrastructures that is intuitive and easy to use, yet is expressive and enough to capture and control the entire, distributed, technical stack. The programming model is based on the separation of concerns principle. For each level of the technical stack different tooling and abstractions are provided. As a result, workflows can be written in a high-level language directly by domain scientists, while optimizations can be implemented separately by the relevant expert(s).
 
-## Architecture
-...
+** figure
+
+Learn more about how Brane works on the [Architecture](/brane/architecture.html) page.
 
 ## Demonstration
-...
+In this two-part screencast, Brane is used to develop a workflow based on the [LOFAR](http://lofar.org) project. The first video demonstrates how packages are created. The second video, in turn, shows how these packages are used as workflow building blocks. All the code is available on GitHub [here](https://github.com/onnovalkering/brane/tree/master/examples/lofar) and [here](https://github.com/EOSC-LOFAR/prefactor-cwl). 
 
-## Releases
-...
+** video 1
+
+** video 2
 
 ---
 
 ## About the project
+[![Release](https://img.shields.io/github/release/onnovalkering/brane.svg)](https://github.com/onnovalkering/brane/releases/latest)
 [![DOI](https://zenodo.org/badge/258514017.svg)](https://zenodo.org/badge/latestdoi/258514017)
 {: .no-lnk }
 
 Brane &copy; 2020 University of Amsterdam
+
+<a class="no" href="https://mns-research.nl" target="_blank">
+    <img src="/brane/assets/img/mns.png" width="150px" alt="MNS">
+</a>
+
+_The Brane framework has been developed as part of [PROCESS](https://www.process-project.eu), which has received funding from the European Union's Horizon 2020 research and innovation programme under grant agreement 777533._
 
 ### License
 
