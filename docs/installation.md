@@ -33,10 +33,10 @@ $ curl -L github.com/onnovalkering/brane/releases/download/v0.1.0/brane-`uname` 
 $ chmod +x brane && mv brane /usr/local/bin/
 ```
 
-Alternatively, you can install the CLI from the [source code](https://github.com/onnovalkering/brane/tree/master/brane-cli) using [Cargo](https://doc.rust-lang.org/stable/cargo).
+Alternatively, you can compile and install the CLI from the [source code](https://github.com/onnovalkering/brane/tree/master/brane-cli) using [Cargo](https://doc.rust-lang.org/stable/cargo).
 
 ## Instance
-Brane instances can be deployed with Docker or with Kubernetes (recommended).
+Brane instances are composites of several services, deployable using Docker or Kubernetes.
 
 For both deployments, you need a copy of the Brane repository:
 
@@ -44,7 +44,7 @@ For both deployments, you need a copy of the Brane repository:
 $ git clone https://github.com/onnovalkering/brane.git
 ```
 
-Each instance is a composite of several services, these are:
+The services that make up a Brane instance:
 
 | Service   | Port      | Public |
 |:----------|:----------|:-------|
@@ -72,9 +72,9 @@ $ curl `hostname`:8080/health
 ```
 
 ### Kubernetes
-Brane's Kubernetes deployment relies on [Helm](https://helm.sh) – _"The package manager for Kubernetes"_. Please see Helm's [documentation](https://helm.sh/docs/intro/install/) for the appropriate installation instructions for your platform.
+Brane's Kubernetes deployment relies on [Helm](https://helm.sh) – _"The package manager for Kubernetes"_. Please see Helm's [documentation](https://helm.sh/docs/intro/install/) for the installation instructions appropriate for your platform.
 
-First, create a namespace for the Brane instance:
+First, create and switch to a new namespace for the Brane instance:
 
 ```shell
 $ kubectl create namespace "brane"
