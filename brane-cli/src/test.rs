@@ -6,6 +6,7 @@ use brane_vm::environment::InMemoryEnvironment;
 use brane_vm::vault::InMemoryVault;
 use brane_sys::local::LocalSystem;
 use console::style;
+use dialoguer::Password;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input as Prompt, Select};
 use fs_extra::{copy_items, dir::CopyOptions};
@@ -316,7 +317,13 @@ fn prompt_for_input(
             }
             "string" => {
                 let default = p.clone().default.map(|d| d.as_string().unwrap());
-                Value::Unicode(prompt(&p, default)?)
+                let value = if p.name == "password" {
+                    prompt_password(&p, default)?
+                } else {
+                    prompt(&p, default)?
+                };
+
+                Value::Unicode(value)
             }
             _ => {
                 if let Some(input_type) = types.get(data_type) {
@@ -388,6 +395,22 @@ where
     if let Some(default) = default {
         prompt.default(default);
     }
+
+    prompt.interact()
+}
+
+///
+///
+///
+fn prompt_password(
+    parameter: &Parameter,
+    default: Option<String>,
+) -> std::io::Result<String> {
+    let colorful = ColorfulTheme::default();
+    let mut prompt = Password::with_theme(&colorful);
+    prompt
+        .with_prompt(&format!("{} ({})", parameter.name, parameter.data_type))
+        .allow_empty_password(parameter.optional.unwrap_or_default());
 
     prompt.interact()
 }

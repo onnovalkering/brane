@@ -289,26 +289,35 @@ fn construct_wf_properties(wf: &Workflow) -> Result<(String, Vec<Property>, Vec<
         return Err(anyhow!(CWL_ADD_LABEL));
     };
 
-    let inputs = if let WorkflowInputs::ParameterMap(inputs) = &wf.inputs {
-        inputs
-    } else {
-        return Err(anyhow!(CWL_ONLY_PMAP_INPUT));
-    };
+    // Construct input properties
+    let mut input_properties = vec![];
+    match &wf.inputs {
+        WorkflowInputs::ParameterMap(inputs) => {
+            for (p_name, p_param) in inputs.iter() {
+                if let WorkflowInputParameterType::Type(p_type) = &p_param.r#type {
+                    let property = construct_wf_input_prop2(p_name, p_type)?;
+                    input_properties.push(property);
+                } else { 
+                    unimplemented!()
+                }
+            }
+        },
+        WorkflowInputs::TypeMap(inputs) => { 
+            for (p_name, p_type) in inputs.iter() {
+                let property = construct_wf_input_prop2(p_name, p_type)?;
+                input_properties.push(property);
+            }
+        },
+        _ => unimplemented!()
+    }
 
+    // Construct output properties
     let outputs = if let WorkflowOutputs::ParameterMap(outputs) = &wf.outputs {
         outputs
     } else {
         return Err(anyhow!(CWL_ONLY_PMAP_OUTPUT));
     };
 
-    // Construct input properties
-    let mut input_properties = vec![];
-    for (p_name, p) in inputs.iter() {
-        let property = construct_wf_input_prop(p_name.to_string(), p)?;
-        input_properties.push(property);
-    }
-
-    // Construct output properties
     let mut output_properties = vec![];
     for (p_name, p) in outputs.iter() {
         let property = construct_wf_output_prop(p_name.to_string(), p)?;
@@ -321,15 +330,13 @@ fn construct_wf_properties(wf: &Workflow) -> Result<(String, Vec<Property>, Vec<
 ///
 ///
 ///
-fn construct_wf_input_prop(
-    name: String,
-    input_paramter: &WorkflowInputParameter,
+fn construct_wf_input_prop2(
+    name: &String,
+    p_type: &WorkflowInputType,
 ) -> Result<Property> {
-    if let WorkflowInputParameterType::Type(p_type) = &input_paramter.r#type {
-        if let WorkflowInputType::CwlType(cwl_type) = p_type {
-            if let CwlType::Str(data_type) = cwl_type {
-                return Ok(Property::new_quick(&name, data_type));
-            }
+    if let WorkflowInputType::CwlType(cwl_type) = p_type {
+        if let CwlType::Str(data_type) = cwl_type {
+            return Ok(Property::new_quick(name, data_type));
         }
     }
 
@@ -455,20 +462,19 @@ fn prepare_directory(
         debug!("runs: {:?}", runs);
 
         for run in runs {
-            let run_file = PathBuf::from(run);
+            let run_file = context.join(&run);
             if run_file.exists() {
-                let wd_path = wd.join(&run_file);
+                let wd_path = wd.join(&run);
                 if let Some(parent) = wd_path.parent() {
                     if !parent.exists() {
                         fs::create_dir_all(&parent)?;
                     }
                 }
     
-                let file_path = context.join(&run_file);
-                fs::copy(&file_path, &wd_path)
-                    .with_context(|| format!("Couldn't find {:?} within the build context.", file_path))?;
+                fs::copy(&run_file, &wd_path)
+                    .with_context(|| format!("Couldn't find {:?} within the build context.", run_file))?;
                     
-                debug!("Copied {:?} to working directory", file_path);
+                debug!("Copied {:?} to working directory", run_file);
             } else {
                 return Err(anyhow!("Can't find workfow step file: {:?}", run_file));
             }
