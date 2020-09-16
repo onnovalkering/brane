@@ -43,11 +43,23 @@ export class OutputWidget extends Widget implements IRenderMime.IRenderer {
         const variant = value["v"];
         const content = value["c"];
         switch (variant) {
-          case "unicode":
-          case "integer":
           case "boolean":
+          case "integer":
           case "real":
+          case "unicode":
             output = `${content}`
+            break;
+          case "struct":
+            const type = content["type"];
+            switch (type) {
+              case "Directory":
+              case "File":
+                output = content["properties"]["url"]["c"]
+                break;
+              default:
+                output = JSON.stringify(content)
+                break;
+            }
             break;
           default:
             output = JSON.stringify(content)
@@ -55,7 +67,6 @@ export class OutputWidget extends Widget implements IRenderMime.IRenderer {
         }
       }
 
-      // const spinnerRef = React.createRef<HTMLDivElement>();
       ReactDOM.render(
         <Tabs>
           <TabList>
