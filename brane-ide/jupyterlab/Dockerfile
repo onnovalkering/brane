@@ -1,6 +1,7 @@
 FROM jupyter/minimal-notebook
 
 COPY kernel /kernel
+COPY registry /registry
 COPY renderer /renderer
 
 USER root
@@ -13,7 +14,7 @@ WORKDIR /kernel
 RUN python setup.py install \ 
  && python install.py
 
-WORKDIR /renderer
+RUN jupyter labextension install /registry
 RUN jupyter labextension install /renderer
 
 # Switch back to jovyan to avoid accidental container runs as root
