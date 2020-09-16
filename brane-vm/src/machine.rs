@@ -3,7 +3,6 @@ use crate::vault::Vault;
 use anyhow::Result;
 use brane_sys::System;
 use flate2::read::GzDecoder;
-use futures::executor::block_on;
 use semver::Version;
 use specifications::common::Value;
 use specifications::instructions::ActInstruction;

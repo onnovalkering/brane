@@ -67,7 +67,7 @@ impl AsyncMachine {
                         let function = brane_std::FUNCTIONS.get(package).unwrap().get(&act.name).unwrap();
                         
                         let output = function(&arguments, &self.system)?;
-                        self.callback(output);
+                        self.callback(output)?;
                     } else {
                         match kind.as_str() {
                             "cwl" => schedule::cwl(&act, arguments, self.invocation_id).await?,
