@@ -7,6 +7,7 @@ extern crate diesel_migrations;
 #[macro_use]
 extern crate log;
 
+use actix_cors::Cors;
 use actix_web::middleware;
 use actix_web::{App, HttpServer};
 use diesel::pg::PgConnection;
@@ -101,7 +102,10 @@ async fn main() -> std::io::Result<()> {
 
     // Configure the HTTP server
     let server = HttpServer::new(move || {
+        let cors = Cors::new().finish();
+
         App::new()
+            .wrap(cors)
             .wrap(middleware::Logger::default())
             .wrap(middleware::NormalizePath)
             .data(config.clone())
