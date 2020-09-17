@@ -35,13 +35,16 @@
   },
   "dependencies": {
     "@jupyterlab/application": "2.1.2",
-    "@jupyterlab/apputils": "^2.0.0",
+    "@jupyterlab/apputils": "2.1.1",
     "@jupyterlab/launcher": "^2.1.1",
     "@jupyterlab/settingregistry": "^2.2.4",
     "@lumino/messaging": "^1.2.3",
-    "@lumino/widgets": "^1.14.0"
+    "@lumino/widgets": "^1.14.0",
+    "react-accessible-accordion": "^3.3.3",
+    "react-dom": "^16.9.0"
   },
   "devDependencies": {
+    "@types/react-dom": "^16.9.8",
     "@typescript-eslint/eslint-plugin": "^2.25.0",
     "@typescript-eslint/parser": "^2.25.0",
     "eslint": "^6.8.0",
