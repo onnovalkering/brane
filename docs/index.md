@@ -11,8 +11,8 @@ permalink: /
 Programmable Orchestration of Applications and Networking
 {: .fs-6 .fw-300 }
 
-[Get started now](/brane/quickstart.html){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 } 
-[See it in action](#demonstration){: .btn .fs-5 .mb-4 .mb-md-0 }
+[Get started now](/brane/quickstart/quickstart.html){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 } 
+[See it in action](/brane/demonstration.html){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
 
@@ -23,16 +23,15 @@ Since we, currently and in the short-term, cannot make use of centralized exasca
 
 With the Brane framework we address these shortcomings. It features a programmatic approach to constructing workflows and research infrastructures that is intuitive and easy to use, yet is expressive and enough to capture and control the entire, distributed, technical stack. The programming model is based on the separation of concerns principle. For each level of the technical stack different tooling and abstractions are provided. As a result, workflows can be written in a high-level language directly by domain scientists, while optimizations can be implemented separately by the relevant expert(s).
 
-** figure
-
 Learn more about how Brane works on the [Architecture](/brane/architecture.html) page.
 
-## Demonstration
-In this two-part screencast, Brane is used to develop a workflow based on the [LOFAR](http://lofar.org) project. The first video demonstrates how packages are created. The second video, in turn, shows how these packages are used as workflow building blocks. All the code is available on GitHub [here](https://github.com/onnovalkering/brane/tree/master/examples/lofar) and [here](https://github.com/EOSC-LOFAR/prefactor-cwl). 
+## Features
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/jGzz1BoM5nc" frameborder="0" allowfullscreen></iframe>
+- a
+- b
+- c
 
-** video 2
+(screenshots, gifs ?)
 
 ---
 

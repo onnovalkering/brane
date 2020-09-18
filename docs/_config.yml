@@ -1,6 +1,6 @@
 title: "Brane"
 description: "Programmable construction of applications, networks, and infrastructures."
-baseurl: "/"
+baseurl: "/brane"
 url: "https://onnovalkering.github.io"
 
 remote_theme: pmarsceill/just-the-docs

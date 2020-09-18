@@ -7,10 +7,10 @@ permalink: /architecture
 ---
 
 # Architecture
-Brane consists of two parts: a programming model (Fig. 1) and a runtime system (Fig. 4).
+Conceptually, Brane consists of two parts: a __programming model__ and a __runtime system__.
 
-## Programming Model
-Initially, the runtime system, i.e. a [Brane instance](/brane/installation#instance), starts out with only a minimal set of functionalities. 
+## Programming model
+Initially, the runtime system starts out as a barebone with only a minimal set of functionalities. 
 With the tools provided by the programming model, the runtime system can, programmatically, be molded based on use-case specific requirements. This is done by populating the runtime system's registry with custom functions. And, after that, (interactively) developing workflows and/or services.
 
 During the above, the programming model assumes a separation of concerns between users based on their role. Typically we distinguish the following roles: domain experts, domain scientists, research engineers, and system engineers. Domain experts and system engineers will contribute lower-level functions, e.g. algorithms and (optimized) data transfers. The research engineers are responsible for the higher-level functions, possibly reusing one ore more lower-level functions. Once a sufficient set of functions is available, the domain scientists will use these as building blocks for workflows and/or services. This seperation is not cut into stone nor in any way enforced, any variation is possible.
@@ -23,7 +23,7 @@ Through usage of Brane's tooling, the interoperability between contributed funct
     <sup>Figure 1: the elements of the Brane programming model.</sup>
 </p>
 
-In the next sections, four elements of the programming model will be discussed in more detail: packages, Bakery, instructions, and Jupyter notebooks. The <abbr title="Command-Line Interface">CLI</abbr> and <abbr title="Read-eval-print loop">REPL</abbr> are described as part of the [quickstart](/brane/quickstart). Docker images are used as provided by Docker, described [here](https://docs.docker.com/get-started/overview/#docker-objects). The interoperability layer is a conceptual distinction: above is for users, below is what the runtime system operates on.
+In the next sections, four elements of the programming model will be discussed in more detail: packages, Bakery, instructions, and Jupyter notebooks. The <abbr title="Command-Line Interface">CLI</abbr> and <abbr title="Read-eval-print loop">REPL</abbr> are described as part of the [quickstart](/brane/quickstart/quickstart.html). Docker images are used as provided by Docker, described [here](https://docs.docker.com/get-started/overview/#docker-objects). The interoperability layer is a conceptual distinction: above is for users, below is what the runtime system operates on.
 
 ### Packages
 Packages are used to bundle functions and as a carrier towards the runtime system. Docker images are used to make packages self-contained, i.e. they contain the required system dependencies, files and metadata. Several distinct builders are available to create packages, resulting in packages of a different kind. However, when it comes to functions, all packages share the same uniform interface.
@@ -44,7 +44,7 @@ The exception being <abbr title="Domain-specific Language">DSL</abbr> packages, 
 See the [Packages](/brane/packages) page for more information.
 
 ### Bakery
-Bakery is Brane's <abbr title="Domain-specific Language">DSL</abbr>. It has been designed, influenced by [Cookery](https://github.com/mikolajb/cookery), to have a low learning curve and to read as an easy to follow recipe. This makes Bakery programs easy to reason about and accessible for users with no or limited programming experience. Bakery supports variables (typed), conditionals, loops and function calls. Statements follow a sentence-like structure, and typically take only one line.
+Bakery is Brane's <abbr title="Domain-specific Language">DSL</abbr>. It has been designed, influenced by [Cookery](https://github.com/mikolajb/cookery), to have a low learning curve and to read as easy to follow recipes. This makes Bakery programs easy to reason about and accessible for users with no or limited programming experience. Bakery supports variables (typed), conditionals, loops and function calls. Statements follow a sentence-like structure, and typically take only one line.
 
 The syntax of a function call is specified by the author of the target function. The author specifies a pattern using a pre-/in-/postfix notation. The same pattern can be used by different functions as long as the arguments have different types, i.e. overloading. This syntax mechanism substantiates the sentence-like statements, and allows Bakery to be customized towards domain-specific jargon.
 
@@ -77,12 +77,14 @@ Notebooks are the recommended way of writing Bakery programs. It is likely to be
     <sup>Figure 3: exemplary Jupyter notebook.</sup>
 </p>
 
-## Runtime System
-...
+## Runtime system
 
-- execute where ever: guaranteed under certain constrains
-- when it runs locally, it should run everywhere... contrains: only one port
-- run time interoperability
+
+- as mentioned before ... this is what "runs" workflows and services
+- it aims to: when it runs locally, it runs elsewhere too: constrains / interop. (one port)
+- run Docker images -> conver to container runtime in place.
+- event-driven architecture based on Kafka.
+- package of different type: remote, compute, determines where to execute
 
 <p style="text-align: center">
     <img src="/brane/assets/img/runtime-system.svg" width="500px" alt="The Brane runtime system.">
@@ -90,17 +92,34 @@ Notebooks are the recommended way of writing Bakery programs. It is likely to be
     <sup>Figure 4: the elements of the Brane runtime system.</sup>
 </p>
 
-In the next sections, four elements of the runtime system will be described in more detail.
+- text
+- text 
+- text
+
+- sequence diagram
+
+In the next sections, four elements of the runtime system will be described in more detail: API, relay, vault and the VM. The other elements are documented elsewhere. The registry, used to store Docker images, is provided by Docker and documented [here](https://docs.docker.com/registry). The [Singularity](https://sylabs.io/guides/3.6/user-guide) and [Charliecloud](https://hpc.github.io/charliecloud) runtimes are supported as provided by their respective vendors. The [Xenon](https://xenon-middleware.github.io/xenon/) middleware is developed by <abbr title="Netherlands eScience Center">NLeSC</abbr>.
 
 ### API
 ...
 
+- entrypoint for runtime system
+- session with one ore more invocations, instructions (diagram)
+- persistence is stored in PostgreSQL
+
 ### Relay
 ...
+
+- used for callbacks to the runtime system, e.g. outputs from the proxy, i.e. functions.
 
 ### Vault
 ...
 
+- stores secrets etc, side-loading / implicit variables.
+
 ### VM
 ...
 
+- executes the instruction graph
+- uses Redis for working copy variables, temps
+- diagram with libraries: brane-sys for diff. environments, swaps out for others.
