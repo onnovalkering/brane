@@ -9,15 +9,12 @@ use console::style;
 use dialoguer::Password;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input as Prompt, Select};
-use fs_extra::{copy_items, dir::CopyOptions};
-use serde_json::Value as JValue;
 use serde_yaml;
 use specifications::common::{Function, Parameter, Type, Value};
 use specifications::instructions::Instruction;
 use specifications::package::PackageInfo;
-use std::fs::{self, File};
-use std::io::prelude::*;
-use std::io::{BufReader, Write};
+use std::fs::File;
+use std::io::{BufReader};
 use std::path::PathBuf;
 use std::{
     fmt::{Debug, Display},
@@ -46,15 +43,19 @@ pub async fn handle(
     }
 
     let package_info = PackageInfo::from_path(package_dir.join("package.yml"))?;
-    match package_info.kind.as_str() {
-        "cwl" => test_cwl(package_dir, package_info).await,
-        "dsl" => test_dsl(package_dir, package_info),
-        "ecu" => test_ecu(package_dir, package_info).await,
-        "oas" => test_oas(package_dir, package_info).await,
+    let output = match package_info.kind.as_str() {
+        "cwl" => test_cwl(package_dir, package_info).await?,
+        "dsl" => test_dsl(package_dir, package_info)?,
+        "ecu" => test_ecu(package_dir, package_info).await?,
+        "oas" => test_oas(package_dir, package_info).await?,
         _ => {
             return Err(anyhow!(UNSUPPORTED_PACKAGE_KIND));
         }
-    }
+    };
+
+    print_output(&output);
+
+    Ok(())
 }
 
 ///
@@ -63,7 +64,7 @@ pub async fn handle(
 async fn test_cwl(
     package_dir: PathBuf,
     package_info: PackageInfo,
-) -> Result<()> {
+) -> Result<Value> {
     let functions = package_info.functions.unwrap();
     let types = package_info.types.unwrap_or_default();
     let (function, arguments) = prompt_for_input(&functions, &types)?;
@@ -92,11 +93,7 @@ async fn test_cwl(
     }
 
     debug!("stdout: {}", stdout);
-
-    let output: Value = serde_json::from_str(&stdout)?;
-    println!("{}", style(&output).bold().cyan());
-
-    Ok(())    
+    Ok(serde_json::from_str(&stdout)?)    
 }
 
 ///
@@ -105,7 +102,7 @@ async fn test_cwl(
 fn test_dsl(
     package_dir: PathBuf,
     _package_info: PackageInfo,
-) -> Result<()> {
+) -> Result<Value> {
     let instructions_file = package_dir.join("instructions.yml");
     ensure!(instructions_file.exists(), "No instructions found.");
 
@@ -136,11 +133,10 @@ fn test_dsl(
     });
 
     if let Some(value) = output {
-        println!();
-        println!("{}:\n{}\n", style("output").bold().cyan(), value);
+        Ok(value)
+    } else {
+        Ok(Value::Unit)
     }
-
-    Ok(())
 }
 
 ///
@@ -212,7 +208,7 @@ fn test_dsl_preprocess_instructions(
 async fn test_ecu(
     package_dir: PathBuf,
     package_info: PackageInfo,
-) -> Result<()> {
+) -> Result<Value> {
     let functions = package_info.functions.unwrap();
     let types = package_info.types.unwrap_or_default();
     let (function, arguments) = prompt_for_input(&functions, &types)?;
@@ -236,11 +232,7 @@ async fn test_ecu(
     }
 
     debug!("stdout: {}", stdout);
-
-    let output: Value = serde_json::from_str(&stdout)?;
-    println!("{}", style(&output).bold().cyan());
-
-    Ok(())
+    Ok(serde_json::from_str(&stdout)?)
 }
 
 ///
@@ -249,7 +241,7 @@ async fn test_ecu(
 async fn test_oas(
     package_dir: PathBuf,
     package_info: PackageInfo,
-) -> Result<()> {
+) -> Result<Value> {
     let functions = package_info.functions.unwrap();
     let types = package_info.types.unwrap_or_default();
     let (function, arguments) = prompt_for_input(&functions, &types)?;
@@ -273,11 +265,7 @@ async fn test_oas(
     }
 
     debug!("stdout: {}", stdout);
-
-    let output: Value = serde_json::from_str(&stdout)?;
-    println!("{}", style(&output).bold().cyan());
-
-    Ok(())
+    Ok(serde_json::from_str(&stdout)?)
 }
 
 ///
@@ -429,4 +417,33 @@ where
     Prompt::with_theme(&ColorfulTheme::default())
         .with_prompt(&format!("{} ({})", name, data_type))
         .interact()
+}
+
+///
+///
+///
+fn print_output(
+    value: &Value
+) -> () {
+    match value {
+        Value::Array { entries, .. } => {
+            println!("{}", style("[").bold().cyan());
+            for entry in entries {
+                println!("   {}", style(entry).bold().cyan());
+            }
+            println!("{}", style("]").bold().cyan());
+        }
+        Value::Boolean(boolean) => println!("{}", style(boolean).bold().cyan()),
+        Value::Integer(integer) => println!("{}", style(integer).bold().cyan()),
+        Value::Real(real) => println!("{}", style(real).bold().cyan()),
+        Value::Unicode(unicode) => println!("{}", style(unicode).bold().cyan()),
+        Value::Unit => println!("_ (unit)"),
+        Value::Pointer { .. } => unreachable!(),
+        Value::Struct { properties, .. } => {
+            for (name, value) in properties.iter() {
+                println!("{}:", style(name).bold().cyan());
+                println!("{}", style(value).cyan());
+            }
+        }
+    }
 }
