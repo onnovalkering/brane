@@ -210,7 +210,7 @@ $ brane build cowsay.cwl
 ### Publishing packages
 We can publish packages by pushing them to the registry of a Brane instance. But first we have to pair the CLI to the brane instance. This is done by logging in (use the hostname of your instance):
 ```shell
-$ brane login localhost:8080 --username joyvan
+$ brane login http://localhost:8080 --username joyvan
 ```
 
 After logging in, we can push the packages:
