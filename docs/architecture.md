@@ -7,7 +7,7 @@ permalink: /architecture
 ---
 
 # Architecture
-Brane consists of two parts: a programming model (Fig. 1) and a runtime system (Fig. 2).
+Brane consists of two parts: a programming model (Fig. 1) and a runtime system (Fig. 4).
 
 ## Programming Model
 Initially, the runtime system, i.e. a [Brane instance](/brane/installation#instance), starts out with only a minimal set of functionalities. 
@@ -23,12 +23,12 @@ Through usage of Brane's tooling, the interoperability between contributed funct
     <sup>Figure 1: the elements of the Brane programming model.</sup>
 </p>
 
-In the next sections, four elements of the programming model will be discussed in more detail: packages, Bakery, instructions, and Jupyter notebooks. The CLI and REPL are described as part of the [quickstart](/brane/quickstart). Docker images are used as provided by Docker, described [here](https://docs.docker.com/get-started/overview/#docker-objects). The interoperability layer is a conceptual distinction: above is for users, below is what the runtime system operates on.
+In the next sections, four elements of the programming model will be discussed in more detail: packages, Bakery, instructions, and Jupyter notebooks. The <abbr title="Command-Line Interface">CLI</abbr> and <abbr title="Read-eval-print loop">REPL</abbr> are described as part of the [quickstart](/brane/quickstart). Docker images are used as provided by Docker, described [here](https://docs.docker.com/get-started/overview/#docker-objects). The interoperability layer is a conceptual distinction: above is for users, below is what the runtime system operates on.
 
 ### Packages
 Packages are used to bundle functions and as a carrier towards the runtime system. Docker images are used to make packages self-contained, i.e. they contain the required system dependencies, files and metadata. Several distinct builders are available to create packages, resulting in packages of a different kind. However, when it comes to functions, all packages share the same uniform interface.
 
-The package builders are (please see their respective pages for more information):
+The package builders are:
 
 | Kind  | Description                                     | 
 |:------|:------------------------------------------------|
@@ -37,30 +37,45 @@ The package builders are (please see their respective pages for more information
 | [ECU](/brane/packages/ecu.html)    | Builds packages based on arbitrary code. |
 | [OAS](/brane/packages/oas.html)    | Builds packages for Web APIs described with the [OpenAPI](http://spec.openapis.org/oas/v3.0.3) specification. |
  
-To be able to execute a function from a package, Brane adds a proxy (`brane-init`) to the package, i.e. Docker image. This proxy acts as a bridge between the package's content and the runtime system. 
+To be able to execute a function from a package, Brane adds a proxy (`brane-init`) to the package, i.e. Docker image. This proxy acts as a bridge between the package's functions and the runtime system. 
 It is responsible for invoking the function's code, depending on the package, with the right arguments and returning the output to the runtime system.
-The exception being DSL packages, these packages do not require a self-containted Docker image, they can be run directly within the runtime system.
+The exception being <abbr title="Domain-specific Language">DSL</abbr> packages, these packages do not require a self-containted Docker image: they can be run directly within the runtime system.
+
+See the [Packages](/brane/packages) page for more information.
 
 ### Bakery
-... 
+Bakery is Brane's <abbr title="Domain-specific Language">DSL</abbr>. It has been designed, influenced by [Cookery](https://github.com/mikolajb/cookery), to have a low learning curve and to read as an easy to follow recipe. This makes Bakery programs easy to reason about and accessible for users with no or limited programming experience. Bakery supports variables (typed), conditionals, loops and function calls. Statements follow a sentence-like structure, and typically take only one line.
 
-- prefix, infix, postfix notation
-- output is instructions
-- compile time checks of the workflow and services (prevents expensive runs)
-- standard library
+The syntax of a function call is specified by the author of the target function. The author specifies a pattern using a pre-/in-/postfix notation. The same pattern can be used by different functions as long as the arguments have different types, i.e. overloading. This syntax mechanism substantiates the sentence-like statements, and allows Bakery to be customized towards domain-specific jargon.
 
-See the [Bakery](/brane/bakery) page for 
-
-Bakery is described 
+See the [Bakery](/brane/bakery) page for more information about syntax and semantics.
 
 ### Instructions
-...
+The compilation output of a Bakery program is a graph of instructions (Fig. 2). These instructions are an intermediate representation that the runtime system understands. It decouples the programming model from the runtime system, paving the way for alternative, third-party, programming models.
 
-- i.e. bytecode
-- allows the runtime system to be used by other languages too, e.g.
+<p style="text-align: center">
+    <img src="/brane/assets/img/instructions.svg" width="400px" alt="Exemplary graph of instructions.">
+    <br/>
+    <sup>Figure 2: exemplary graph of instructions.</sup>
+</p>
 
-### Jupyter Notebooks
-...
+Four kinds of instructions exists:
+
+| Kind  | Description                                     | 
+|:------|:------------------------------------------------|
+| Act   | Performs a function, optionally assigning the output to a variable. |
+| Mov   | Performs, conditionally, a move other than the default forward. |
+| Sub   | Steps into a substructure, i.e. a nested graph of instructions. |
+| Var   | Performs basic variable manipulation, i.e. assignment and retreival. |
+
+### Jupyter notebooks
+Notebooks are the recommended way of writing Bakery programs. It is likely to be a familiar <abbr title="Integrated development environment">IDE</abbr> for domain scientists. Moreover, it allows the utilization of rich widgets for interaction with the runtime system, visualization of progress, and the display of monitoring statistics. The programming model includes a custom version of [JupyterLab](https://jupyterlab.readthedocs.io/en/stable), with a Bakery [kernel](https://jupyter.readthedocs.io/en/latest/projects/kernels.html) and registry browser installed (Fig. 3).
+
+<p style="text-align: center">
+    <img src="/brane/assets/img/notebook.png" style="margin-bottom: -25px" width="600px" alt="Exemplary Jupyter notebook.">
+    <br/>
+    <sup>Figure 3: exemplary Jupyter notebook.</sup>
+</p>
 
 ## Runtime System
 ...
@@ -72,7 +87,7 @@ Bakery is described
 <p style="text-align: center">
     <img src="/brane/assets/img/runtime-system.svg" width="500px" alt="The Brane runtime system.">
     <br/>
-    <sup>Figure 2: the elements of the Brane runtime system.</sup>
+    <sup>Figure 4: the elements of the Brane runtime system.</sup>
 </p>
 
 In the next sections, four elements of the runtime system will be described in more detail.
