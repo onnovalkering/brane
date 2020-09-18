@@ -168,16 +168,33 @@ pub fn get_operation(
 fn capture_output(
     stdout: &String,
     return_type: &String,
-    _c_types: &Option<Map<Type>>,
+    c_types: &Option<Map<Type>>,
 ) -> Result<Option<Value>> {
     let json = serde_json::from_str(stdout)?;
     let output = Value::from_json(&json);
 
     match &output {
         Value::Struct { properties, .. } => {
+            let properties = if let Some(c_types) = c_types {
+                let mut filtered = Map::<Value>::new();
+                let c_type = c_types.get(return_type)
+                    .with_context(|| format!("Cannot find {} in custom types.", return_type))?;
+                
+                for p in &c_type.properties {
+                    let property = properties.get(&p.name)
+                        .with_context(|| format!("Cannot find {} in output (required)", p.name))?;
+
+                    filtered.insert(p.name.to_string(), property.clone());
+                }
+
+                filtered
+            } else {
+                properties.clone()
+            };
+
             Ok(Some(Value::Struct {
                 data_type: return_type.clone(),
-                properties: properties.clone(),
+                properties: properties,
             }))
         }
         Value::Unit => Ok(None),
