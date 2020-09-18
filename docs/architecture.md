@@ -15,7 +15,7 @@ With the tools provided by the programming model, the runtime system can, progra
 
 During the above, the programming model assumes a separation of concerns between users based on their role. Typically we distinguish the following roles: domain experts, domain scientists, research engineers, and system engineers. Domain experts and system engineers will contribute lower-level functions, e.g. algorithms and (optimized) data transfers. The research engineers are responsible for the higher-level functions, possibly reusing one ore more lower-level functions. Once a sufficient set of functions is available, the domain scientists will use these as building blocks for workflows and/or services. This seperation is not cut into stone nor in any way enforced, any variation is possible.
 
-Through usage of Brane's tooling, the interoperability between contributed functions, which may be heterogenous in implementation, is guaranteed automatically. To ensure this, the programming model imposes a set of constrains. For instance, the input and output parameters of functions must conform to Brane's (extendable) type system. Also, how to execute a particular function must be made explicit for Brane. More constrains apply, these will be mentioned in the relevant sections. This approach to interoperability is not only beneficial technically, i.e. it relieves developers of a tedious task. But, since functions can be developed independently, also organizationally. When organizations collaboratively build infrastructures based on the Brane framework, each can contribute functions based on their expertise, in an isolated manner if desired, using the technologies that they find most appropriate.
+Through usage of Brane's tooling, the interoperability between contributed functions, which may be heterogenous in implementation, is guaranteed automatically. To ensure this, the programming model imposes a set of constrains. For instance, the input and output parameters of functions must conform to Brane's (extendable) type system. Also, how to execute a particular function must be made explicit for Brane. More constrains apply, these will be mentioned in the relevant sections. This approach to interoperability is not only beneficial technically, i.e. it relieves developers of a tedious task. But, since functions can be developed independently, also organizationally. When organizations collaboratively build infrastructures based on the Brane framework, each can contribute functions based on their expertise, in an isolated manner if desired, with the technology stack that they find most appropriate.
 
 <p style="text-align: center">
     <img src="/brane/assets/img/programming-model.svg" width="500px" alt="The Brane programming model.">
@@ -23,20 +23,23 @@ Through usage of Brane's tooling, the interoperability between contributed funct
     <sup>Figure 1: the elements of the Brane programming model.</sup>
 </p>
 
-In the next sections, four elements of the programming model will be described in more detail, namely packages, Bakery, instructions, and Jupyter notebooks. The CLI and REPL are discussed as part of the [quickstart](/brane/quickstart). Docker images are used as provided by Docker, described [here](https://docs.docker.com/get-started/overview/#docker-objects). The interoperability layer is a conceptual distinction: above is for users, below is what the runtime system operates on.
+In the next sections, four elements of the programming model will be discussed in more detail: packages, Bakery, instructions, and Jupyter notebooks. The CLI and REPL are described as part of the [quickstart](/brane/quickstart). Docker images are used as provided by Docker, described [here](https://docs.docker.com/get-started/overview/#docker-objects). The interoperability layer is a conceptual distinction: above is for users, below is what the runtime system operates on.
 
 ### Packages
+Packages are used to bundle functions and as a carrier towards the runtime system. Docker images are used to make packages self-contained, i.e. they contain the required system dependencies, files and metadata. Several distinct builders are available to create packages, resulting in packages of a different kind. However, when it comes to functions, all packages share the same uniform interface.
 
+The package builders are (please see their respective pages for more information):
 
-
-The runtime system is extended with functionality through packages. Each package adds one or more functions to the system, functions to the system
-
-- different types
-- packaged as Docker images: allows signing and deployment + ease of use for dev side.
-- registry
-- executing packages 
-
-See the [Packages](/brane/packages/packages.html) page for in-depth guides for each kind of package.
+| Kind  | Description                                     | 
+|:------|:------------------------------------------------|
+| [CWL](/brane/packages/cwl.html)    | Builds packages for workflows described with the [CWL](https://www.commonwl.org/v1.1/) specification. |
+| [DSL](/brane/packages/dsl.html)    | Builds packages based on [Bakery](/brane/bakery) scripts. |
+| [ECU](/brane/packages/ecu.html)    | Builds packages based on arbitrary code. |
+| [OAS](/brane/packages/oas.html)    | Builds packages for Web APIs described with the [OpenAPI](http://spec.openapis.org/oas/v3.0.3) specification. |
+ 
+To be able to execute a function from a package, Brane adds a proxy (`brane-init`) to the package, i.e. Docker image. This proxy acts as a bridge between the package's content and the runtime system. 
+It is responsible for invoking the function's code, depending on the package, with the right arguments and returning the output to the runtime system.
+The exception being DSL packages, these packages do not require a self-containted Docker image, they can be run directly within the runtime system.
 
 ### Bakery
 ... 
@@ -44,6 +47,7 @@ See the [Packages](/brane/packages/packages.html) page for in-depth guides for e
 - prefix, infix, postfix notation
 - output is instructions
 - compile time checks of the workflow and services (prevents expensive runs)
+- standard library
 
 See the [Bakery](/brane/bakery) page for 
 
@@ -61,6 +65,8 @@ Bakery is described
 ## Runtime System
 ...
 
+- execute where ever: guaranteed under certain constrains
+- when it runs locally, it should run everywhere... contrains: only one port
 - run time interoperability
 
 <p style="text-align: center">
