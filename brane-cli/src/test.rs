@@ -442,7 +442,7 @@ fn print_output(
         Value::Struct { properties, .. } => {
             for (name, value) in properties.iter() {
                 println!("{}:", style(name).bold().cyan());
-                println!("{}", style(value).cyan());
+                println!("{}\n", style(value).cyan());
             }
         }
     }
