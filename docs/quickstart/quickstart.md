@@ -26,4 +26,4 @@ The steps of this quickstart are categorized based on the tasks performed, and (
 
 The code and files used can be found in the [examples](https://github.com/onnovalkering/brane/tree/master/examples/wordcount) directory of Brane's GitHub repository.
 
-[Next](/brane/quickstart/1-retreive-readme.html){: .btn .btn-outline }
+[Next](/brane/quickstart/1-retreive-readme.html){: .btn .btn-outline .flex-justify-end }
