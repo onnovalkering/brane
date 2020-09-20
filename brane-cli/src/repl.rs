@@ -1,9 +1,10 @@
 use crate::{packages, registry};
 use anyhow::Result;
 use brane_dsl::compiler::{Compiler, CompilerOptions};
-use brane_vm::machine::Machine;
+use brane_vm::sync_machine::SyncMachine;
 use brane_vm::environment::InMemoryEnvironment;
 use brane_vm::vault::InMemoryVault;
+use brane_vm::cursor::InMemoryCursor;
 use brane_sys::local::LocalSystem;
 use futures::executor::block_on;
 use linefeed::{Interface, ReadResult};
@@ -11,7 +12,6 @@ use specifications::common::Value;
 use specifications::instructions::Instruction;
 use std::fs::File;
 use std::io::BufReader;
-use std::rc::Rc;
 use std::path::PathBuf;
 use serde_yaml;
 use uuid::Uuid;
@@ -49,7 +49,12 @@ pub async fn start(
     let environment = InMemoryEnvironment::new(None, None);
     let system = LocalSystem::new(session_id);
     let vault = InMemoryVault::new(secrets);
-    let mut machine = Machine::new(Box::new(environment), Rc::new(system), Rc::new(vault), Some(packages::get_packages_dir()));
+
+    let mut machine = SyncMachine::new(
+        Box::new(environment),
+        Box::new(system),
+        Box::new(vault),
+    );
 
     while let ReadResult::Input(line) = interface.read_line()? {
         if !line.trim().is_empty() {
@@ -61,16 +66,8 @@ pub async fn start(
 
         match instructions {
             Ok(instructions) => {
-                let instructions = preprocess_instructions(&instructions).await?;
-                let output = machine.interpret(instructions)?;
-
-                if let Some(value) = output {
-                    let value = if let Value::Pointer { ref variable, .. } = value {
-                        machine.environment.get(variable)
-                    } else {
-                        value
-                    };
-
+                let instructions = preprocess_instructions(&instructions)?;
+                if let Some(value) = machine.walk(&instructions)? {
                     print(&value, false);
                 }
             }
@@ -138,7 +135,7 @@ async fn start_compile_service(co_address: PathBuf) -> Result<()> {
 ///
 ///
 ///
-async fn preprocess_instructions(instructions: &Vec<Instruction>) -> Result<Vec<Instruction>> {
+fn preprocess_instructions(instructions: &Vec<Instruction>) -> Result<Vec<Instruction>> {
     let mut instructions = instructions.clone();
 
     for instruction in &mut instructions {
@@ -149,32 +146,18 @@ async fn preprocess_instructions(instructions: &Vec<Instruction>) -> Result<Vec<
                 let kind = act.meta.get("kind").expect("No `kind` property in metadata.");
 
                 match kind.as_str() {
-                    "cwl" => {
-                        let cwl_file = block_on(registry::get_package_source(&name, &version, &kind))?;
-                        if cwl_file.exists() {
-                            act.meta
-                                .insert(String::from("cwl_file"), String::from(cwl_file.to_string_lossy()));
-                        }
-                    }
                     "dsl" => {
                         let instr_file = block_on(registry::get_package_source(&name, &version, &kind))?;
                         if instr_file.exists() {
                             act.meta
                                 .insert(String::from("instr_file"), String::from(instr_file.to_string_lossy()));
                         }
-                    }
-                    "ecu" => {
+                    },
+                    "cwl" | "ecu" | "oas" => {
                         let image_file = block_on(registry::get_package_source(&name, &version, &kind))?;
                         if image_file.exists() {
                             act.meta
                                 .insert(String::from("image_file"), String::from(image_file.to_string_lossy()));
-                        }
-                    }
-                    "oas" => {
-                        let oas_file = block_on(registry::get_package_source(&name, &version, &kind))?;
-                        if oas_file.exists() {
-                            act.meta
-                                .insert(String::from("oas_file"), String::from(oas_file.to_string_lossy()));
                         }
                     }
                     _ => {}
@@ -193,7 +176,7 @@ async fn preprocess_instructions(instructions: &Vec<Instruction>) -> Result<Vec<
                 }
 
                 debug!("Preprocess nested sub instrucations.");
-                sub.instructions = block_on(preprocess_instructions(&sub.instructions))?;
+                sub.instructions = preprocess_instructions(&sub.instructions)?;
             }
             _ => continue,
         }

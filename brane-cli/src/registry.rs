@@ -311,26 +311,6 @@ pub async fn get_package_source(
     let temp_dir = PathBuf::from("/tmp"); // TODO: get from OS
 
     let path = match kind.as_str() {
-        "cwl" => {
-            let cwl_file = package_dir.join("document.cwl");
-            if cwl_file.exists() {
-                cwl_file
-            } else {
-                let cwl_file = temp_dir.join(format!("{}-{}-document.cwl", name, version));
-                if !cwl_file.exists() {
-                    let url = get_registry_endpoint(format!("/{}/{}/source", name, version))?;
-                    let mut source = reqwest::get(&url).await?;
-
-                    // Write package archive to temporary file
-                    let mut source_file = File::create(&cwl_file)?;
-                    while let Some(chunk) = source.chunk().await? {
-                        source_file.write_all(&chunk)?;
-                    }
-                }
-
-                cwl_file
-            }
-        }
         "dsl" => {
             let instructions = package_dir.join("instructions.yml");
             if instructions.exists() {
@@ -350,8 +330,8 @@ pub async fn get_package_source(
 
                 instructions
             }
-        }
-        "ecu" => {
+        },
+        "cwl" | "ecu" | "oas" => {
             let image_file = package_dir.join("image.tar");
             if image_file.exists() {
                 image_file
@@ -379,27 +359,7 @@ pub async fn get_package_source(
 
                 image_file
             }
-        }
-        "oas" => {
-            let oas_file = package_dir.join("document.yml");
-            if oas_file.exists() {
-                oas_file
-            } else {
-                let oas_file = temp_dir.join(format!("{}-{}-document.yml", name, version));
-                if !oas_file.exists() {
-                    let url = get_registry_endpoint(format!("/{}/{}/source", name, version))?;
-                    let mut source = reqwest::get(&url).await?;
-
-                    // Write package archive to temporary file
-                    let mut source_file = File::create(&oas_file)?;
-                    while let Some(chunk) = source.chunk().await? {
-                        source_file.write_all(&chunk)?;
-                    }
-                }
-
-                oas_file
-            }
-        }
+        },
         _ => unreachable!(),
     };
 
