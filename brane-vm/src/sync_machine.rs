@@ -172,29 +172,8 @@ fn prepare_arguments(
                 if *secret {
                     let value = vault.get(variable)?;
                     arguments.insert(name.clone(), value.clone());
-                } else if variable.contains(".") {
-                    let segments: Vec<_> = variable.split(".").collect();
-                    let arch_value = environment.get(segments[0]);
-
-                    match arch_value {
-                        Value::Array { entries, .. } => {
-                            if segments[1] == "length" {
-                                arguments.insert(name.clone(), Value::Integer(entries.len() as i64));
-                            } else {
-                                panic!("Trying to access undeclared variable.");
-                            }
-                        }
-                        Value::Struct { properties, .. } => {
-                            if let Some(value) = properties.get(segments[1]) {
-                                arguments.insert(name.clone(), value.clone());
-                            } else {
-                                panic!("Trying to access undeclared variable.");
-                            }
-                        }
-                        _ => unreachable!(),
-                    };
                 } else {
-                    let value = environment.get(variable);
+                    let value = resolve_variable(variable, environment);
                     arguments.insert(name.clone(), value);
                 }
             }
@@ -379,7 +358,7 @@ fn handle_var(
     for variable in &var.set {
         if let Some(value) = &variable.value {
             if let Value::Pointer { variable: p_variable, .. } = value {
-                let value = environment.get(p_variable);
+                let value = resolve_variable(p_variable, environment);
                 environment.set(&variable.name, &value);
             } else {
                 environment.set(&variable.name, &value);
