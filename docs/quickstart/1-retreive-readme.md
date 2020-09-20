@@ -53,10 +53,10 @@ paths:
                   content:
                     type: string
 ```
-Based on this specifiction, a function named `getreadme` will be generated. The function will have two parameters: `owner` and `repo`. And the output will be a [struct](/brane/bakery) with two properties: `name` and `content`.
+Based on this specifiction, a function named `getreadme` will be generated. The function will have two parameters: `owner` and `repo`. And the output will be a [object](/brane/bakery) with two properties: `name` and `content`.
 All of the `string` type. The package will be named `github`, with version `1.0.0` (see `info` properties).
 
-Save the specifiction as `github.yml`, and build the package using the <abbr title="Command-Line Interface">CLI</abbr> (Fig. 1):
+Save the specifiction as `github.yml`, and build the package using the <abbr title="Command-line interface">CLI</abbr> (Fig. 1):
 ```shell
 $ brane build github.yml
 ```
@@ -67,7 +67,7 @@ $ brane build github.yml
     <sup>Figure 1: package builder output.</sup>
 </p>
 
-Using the <abbr title="Command-Line Interface">CLI</abbr>, we can test the `getreadme` function that has been generated for us (Fig. 2):
+Using the <abbr title="Command-line interface">CLI</abbr>, we can test the `getreadme` function that has been generated for us (Fig. 2):
 ```shell
 $ brane test github
 ```

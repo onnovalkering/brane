@@ -29,7 +29,7 @@ def encode(s: str) -> str:
 
 if __name__ == "__main__":
   command = sys.argv[1]
-  argument = sys.argv[2].strip()
+  argument = sys.argv[2]
   functions = {
     "decode": decode,
     "encode": encode,
@@ -37,10 +37,10 @@ if __name__ == "__main__":
   print(functions[command](argument))
 ```
 
-After saving this code as `run.py`, we can call the functions as follows:
+After saving this code as `run.py` (with execute permission), we can call the functions as follows:
 ```shell
-$ python3 run.py encode 'Hello, world!'
-$ python3 run.py decode 'SGVsbG8sIHdvcmxkIQ=='
+$ ./run.py encode 'Hello, world!'
+$ ./run.py decode 'SGVsbG8sIHdvcmxkIQ=='
 ```
 
 To make these two functions available to Brane, we have to do the following:
@@ -101,8 +101,6 @@ import os
 import sys
 import yaml
 
-INPUT = os.environ["INPUT"]
-
 def decode(s: str) -> str:
   s = s.replace("\n", "")
   b = base64.b64decode(s)
@@ -115,7 +113,7 @@ def encode(s: str) -> str:
 
 if __name__ == "__main__":
   command = sys.argv[1]
-  argument = INPUT.strip()
+  argument = os.environ["INPUT"]
   functions = {
     "decode": decode,
     "encode": encode,
@@ -124,11 +122,13 @@ if __name__ == "__main__":
   print(yaml.dump({"output": output}))
 ```
 
-Now, if we would want to, we can call the functions as follows:
+We, and now also Brane, can call the functions as follows:
 ```shell
-$ INPUT='Hello, world!' python3 run.py encode 
-$ INPUT='SGVsbG8sIHdvcmxkIQ==' python3 run.py decode
+$ INPUT='Hello, world!' ./run.py encode 
+$ INPUT='SGVsbG8sIHdvcmxkIQ==' ./run.py decode
 ```
+__TIP__: When it is not possible to directly modify the target code, consider creating a wrapper script.
+
 
 Before we build our package, we'll make a few last adjustments to our final configuration:
 
@@ -175,11 +175,11 @@ actions:
       - type: string
         name: output
 ```
-We've added the `name`, `version` and `kind` metadata properties. Specify an additional dependency: `python3-yaml`. And we've added a call pattern for both functions, more on this later in this quickstart.
+We've added the `name`, `version` and `kind` metadata properties. Specified an additional dependency: `python3-yaml`. And we've added a call pattern for both functions, more on this later in this quickstart.
 
-See the [ECU](/brane/packages/ecu.html) page for more details about this configuration file, and all the available options.
+See the [ECU](/brane/packages/ecu.html) page for more details about the `container.yml` file, and all the configuration options.
 
-Build the package using the <abbr title="Command-Line Interface">CLI</abbr>, targeting the configuration file:
+Build the package using the <abbr title="Command-line interface">CLI</abbr>, targeting the configuration file:
 ```shell
 $ brane build container.yml
 ```
@@ -192,7 +192,7 @@ $ brane list
 <p style="text-align: center">
     <img src="/brane/assets/img/brane-list.png" style="margin-bottom: -35px" alt="list of local packages">
     <br/>
-    <sup>Figure 2: list of local packages</sup>
+    <sup>Figure 2: list (local) packages</sup>
 </p>
 
 [Previous](/brane/quickstart/1-retreive-readme.html){: .btn .btn-outline }

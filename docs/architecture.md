@@ -23,7 +23,7 @@ Through usage of Brane's tooling, the interoperability between contributed funct
     <sup>Figure 1: the elements of the Brane programming model.</sup>
 </p>
 
-In the next sections, four elements of the programming model will be discussed in more detail: packages, Bakery, instructions, and Jupyter notebooks. The <abbr title="Command-Line Interface">CLI</abbr> and <abbr title="Read-eval-print loop">REPL</abbr> are described as part of the [quickstart](/brane/quickstart/quickstart.html). Docker images are used as provided by Docker, described [here](https://docs.docker.com/get-started/overview/#docker-objects). The interoperability layer is a conceptual distinction: above is for users, below is what the runtime system operates on.
+In the next sections, four elements of the programming model will be discussed in more detail: packages, Bakery, instructions, and Jupyter notebooks. The <abbr title="Command-line interface">CLI</abbr> and <abbr title="Read-eval-print loop">REPL</abbr> are described as part of the [quickstart](/brane/quickstart/quickstart.html). Docker images are used as provided by Docker, described [here](https://docs.docker.com/get-started/overview/#docker-objects). The interoperability layer is a conceptual distinction: above is for users, below is what the runtime system operates on.
 
 ### Packages
 Packages are used to bundle functions and as a carrier towards the runtime system. Docker images are used to make packages self-contained, i.e. they contain the required system dependencies, files and metadata. Several distinct builders are available to create packages, resulting in packages of a different kind. However, when it comes to functions, all packages share the same uniform interface.
