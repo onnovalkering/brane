@@ -11,9 +11,9 @@ Conceptually, Brane consists of two parts: a __programming model__ and a __runti
 
 ## Programming model
 Initially, the runtime system starts out as a barebone with only a minimal set of functionalities. 
-With the tools provided by the programming model, the runtime system can, programmatically, be molded based on use-case specific requirements. This is done by populating the runtime system's registry with custom functions. And, after that, (interactively) developing workflows and/or services.
+With the tools provided by the programming model, the runtime system can, programmatically, be molded based on use-case specific requirements. This is done by populating the runtime system's registry with custom functions. And, after that, (interactively) develop applications using these functions.
 
-During the above, the programming model assumes a separation of concerns between users based on their role. Typically we distinguish the following roles: domain experts, domain scientists, research engineers, and system engineers. Domain experts and system engineers will contribute lower-level functions, e.g. algorithms and (optimized) data transfers. The research engineers are responsible for the higher-level functions, possibly reusing one ore more lower-level functions. Once a sufficient set of functions is available, the domain scientists will use these as building blocks for workflows and/or services. This seperation is not cut into stone nor in any way enforced, any variation is possible.
+During the above, the programming model assumes a separation of concerns between users based on their role. Typically we distinguish the following roles: domain experts, domain scientists, research engineers, and system engineers. Domain experts and system engineers will contribute lower-level functions, e.g. algorithms and (optimized) data transfers. The research engineers are responsible for the higher-level functions, possibly reusing one ore more lower-level functions. Once a sufficient set of functions is available, the domain scientists will use these to develop applications, i.e. workflows or services. This seperation is not cut into stone nor in any way enforced, any variation is possible.
 
 Through usage of Brane's tooling, the interoperability between contributed functions, which may be heterogenous in implementation, is guaranteed automatically. To ensure this, the programming model imposes a set of constrains. For instance, the input and output parameters of functions must conform to Brane's (extendable) type system. Also, how to execute a particular function must be made explicit for Brane. More constrains apply, these will be mentioned in the relevant sections. This approach to interoperability is not only beneficial technically, i.e. it relieves developers of a tedious task. But, since functions can be developed independently, also organizationally. When organizations collaboratively build infrastructures based on the Brane framework, each can contribute functions based on their expertise, in an isolated manner if desired, with the technology stack that they find most appropriate.
 
@@ -80,7 +80,7 @@ Notebooks are the recommended way of writing Bakery programs. It is likely to be
 ## Runtime system
 
 
-- as mentioned before ... this is what "runs" workflows and services
+- as mentioned before ... this is what "runs" applications
 - it aims to: when it runs locally, it runs elsewhere too: constrains / interop. (one port)
 - run Docker images -> conver to container runtime in place.
 - event-driven architecture based on Kafka.
