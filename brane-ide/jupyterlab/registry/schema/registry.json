@@ -7,7 +7,7 @@
         "type": "string",
         "title": "apiHost",
         "description": "The host of the Brane API.",
-        "default": "brane-api:8080"
+        "default": "localhost:8080"
       }
     }
   }
