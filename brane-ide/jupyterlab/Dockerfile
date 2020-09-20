@@ -6,7 +6,7 @@ COPY renderer /renderer
 
 USER root
 
-ADD https://github.com/onnovalkering/brane/releases/download/v0.1.0/brane-cli /usr/local/bin
+ADD https://github.com/onnovalkering/brane/releases/download/v0.1.0/brane-linux /usr/local/bin/brane-cli
 RUN chmod +x /usr/local/bin/brane-cli
 RUN brane-cli -s login http://brane-api:8080 --username jovyan
 
