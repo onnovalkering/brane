@@ -1,7 +1,7 @@
 use crate::packages;
 use anyhow::Result;
+use brane_vm::sync_machine::{self, SyncMachine};
 use brane_exec::{docker, ExecuteInfo};
-use brane_vm::machine::Machine;
 use brane_vm::environment::InMemoryEnvironment;
 use brane_vm::vault::InMemoryVault;
 use brane_sys::local::LocalSystem;
@@ -101,105 +101,35 @@ async fn test_cwl(
 ///
 fn test_dsl(
     package_dir: PathBuf,
-    _package_info: PackageInfo,
+    package_info: PackageInfo,
 ) -> Result<Value> {
     let instructions_file = package_dir.join("instructions.yml");
     ensure!(instructions_file.exists(), "No instructions found.");
 
+    let functions = package_info.functions.unwrap();
+    let types = package_info.types.unwrap_or_default();
+    let (_, arguments) = prompt_for_input(&functions, &types)?;
+
     // Load instructions
     let buf_reader = BufReader::new(File::open(instructions_file)?);
-    let mut instructions: Vec<Instruction> = serde_yaml::from_reader(buf_reader)?;
+    let instructions: Vec<Instruction> = serde_yaml::from_reader(buf_reader)?;
+    let instructions = sync_machine::preprocess_instructions(&instructions)?;
 
-    let mut arguments = Map::<Value>::new();
-    test_dsl_preprocess_instructions(&mut instructions, &mut arguments)?;
+    debug!("preprocessed: {:#?}", instructions);
 
     let session_id = Uuid::new_v4();
 
-    let secrets = Map::<Value>::new();
-    let vault = InMemoryVault::new(secrets);
-
     let environment = InMemoryEnvironment::new(Some(arguments), None);
     let system = LocalSystem::new(session_id);
+    let vault = InMemoryVault::new(Default::default());
 
-    let mut machine = Machine::new(Box::new(environment), Rc::new(system), Rc::new(vault), Some(packages::get_packages_dir()));
-    let output = machine.interpret(instructions)?;
+    let mut machine = SyncMachine::new(
+        Box::new(environment),
+        Box::new(system),
+        Box::new(vault),
+    );
 
-    let output = output.map(|o| {
-        if let Value::Pointer { variable, .. } = o {
-            machine.environment.get(&variable)
-        } else {
-            o
-        }
-    });
-
-    if let Some(value) = output {
-        Ok(value)
-    } else {
-        Ok(Value::Unit)
-    }
-}
-
-///
-///
-///
-fn test_dsl_preprocess_instructions(
-    instructions: &mut Vec<Instruction>,
-    arguments: &mut Map<Value>,
-) -> Result<()> {
-    for instruction in instructions {
-        match instruction {
-            Instruction::Act(act) => {
-                let name = act.meta.get("name").expect("No `name` property in metadata.");
-                let version = act.meta.get("version").expect("No `version` property in metadata.");
-                let kind = act.meta.get("kind").expect("No `kind` property in metadata.");
-
-                let package_dir = packages::get_package_dir(&name, Some(version))?;
-                match kind.as_str() {
-                    "cwl" => {
-                        let cwl_file = package_dir.join("document.cwl");
-                        if cwl_file.exists() {
-                            act.meta
-                                .insert(String::from("cwl_file"), String::from(cwl_file.to_string_lossy()));
-                        }
-                    }
-                    "ecu" => {
-                        let image_file = package_dir.join("image.tar");
-                        if image_file.exists() {
-                            act.meta
-                                .insert(String::from("image_file"), String::from(image_file.to_string_lossy()));
-                        }
-                    }
-                    "oas" => {
-                        let oas_file = package_dir.join("document.yml");
-                        if oas_file.exists() {
-                            act.meta
-                                .insert(String::from("oas_file"), String::from(oas_file.to_string_lossy()));
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            Instruction::Sub(sub) => {
-                test_dsl_preprocess_instructions(&mut sub.instructions, arguments)?;
-            }
-            Instruction::Var(var) => {
-                for get in &var.get {
-                    let value = match get.data_type.as_str() {
-                        "boolean" => Value::Boolean(prompt_var(&get.name, &get.data_type)?),
-                        "integer" => Value::Integer(prompt_var(&get.name, &get.data_type)?),
-                        "real" => Value::Real(prompt_var(&get.name, &get.data_type)?),
-                        "string" => Value::Unicode(prompt_var(&get.name, &get.data_type)?),
-                        _ => unimplemented!(),
-                    };
-
-                    arguments.insert(get.name.clone(), value);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    Ok(())
+    machine.walk(&instructions)
 }
 
 ///

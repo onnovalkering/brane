@@ -4,7 +4,6 @@ use brane_dsl::compiler::{Compiler, CompilerOptions};
 use brane_vm::sync_machine::SyncMachine;
 use brane_vm::environment::InMemoryEnvironment;
 use brane_vm::vault::InMemoryVault;
-use brane_vm::cursor::InMemoryCursor;
 use brane_sys::local::LocalSystem;
 use futures::executor::block_on;
 use linefeed::{Interface, ReadResult};
@@ -16,6 +15,7 @@ use std::path::PathBuf;
 use serde_yaml;
 use uuid::Uuid;
 use serde_json::json;
+use console::style;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -67,8 +67,11 @@ pub async fn start(
         match instructions {
             Ok(instructions) => {
                 let instructions = preprocess_instructions(&instructions)?;
-                if let Some(value) = machine.walk(&instructions)? {
-                    print(&value, false);
+                let output = machine.walk(&instructions)?;
+
+                match output {
+                    Value::Unit => {},
+                    _ => print(&output, false),
                 }
             }
             Err(err) => {
@@ -206,10 +209,10 @@ fn print(
             }
             println!("]")
         }
-        Value::Boolean(b) => println!("{}", b),
-        Value::Integer(i) => println!("{}", i),
-        Value::Real(r) => println!("{}", r),
-        Value::Unicode(s) => println!("{}", s),
+        Value::Boolean(b) => println!("{}", style(b).cyan()),
+        Value::Integer(i) => println!("{}", style(i).cyan()),
+        Value::Real(r) => println!("{}", style(r).cyan()),
+        Value::Unicode(s) => println!("{}", style(s).cyan()),
         _ => println!("{:#?}", value),
     }
 }
