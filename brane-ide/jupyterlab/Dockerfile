@@ -1,4 +1,5 @@
-FROM jupyter/minimal-notebook
+# 612aa5710bf9: updated Sept 2020
+FROM jupyter/minimal-notebook:612aa5710bf9
 
 COPY kernel /kernel
 COPY registry /registry
