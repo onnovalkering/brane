@@ -43,6 +43,7 @@ $ ./run.py encode 'Hello, world!'
 $ ./run.py decode 'SGVsbG8sIHdvcmxkIQ=='
 ```
 
+## Building a ECU package
 To make these two functions available to Brane, we have to do the following:
 
 1. Make it explicit for Brane how to run the underlying code of the functions.
@@ -184,6 +185,7 @@ Build the package using the <abbr title="Command-line interface">CLI</abbr>, tar
 $ brane build container.yml
 ```
 
+## View local packages
 We're done creating functions and building packages. Let's view the packages that we have (Fig. 1):
 ```
 $ brane list
