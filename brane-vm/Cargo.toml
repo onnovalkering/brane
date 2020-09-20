@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0"
 appdirs = "0.2"
+base64 = "0.12"
 brane-exec = { path = "../brane-exec" }
 brane-sys = { path = "../brane-sys" }
 brane-std = { path = "../brane-std" }

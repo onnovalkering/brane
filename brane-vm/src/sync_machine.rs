@@ -2,48 +2,36 @@ use crate::environment::Environment;
 use crate::vault::Vault;
 use anyhow::Result;
 use brane_sys::System;
+use brane_exec::{ExecuteInfo, docker};
 use specifications::common::Value;
 use specifications::instructions::{Instruction, Instruction::*, Move::*, Operator::*};
-use specifications::instructions::{MovInstruction, SubInstruction, VarInstruction};
-use crate::cursor::Cursor;
-use brane_exec::schedule;
+use specifications::instructions::*;
+use crate::cursor::{Cursor, InMemoryCursor};
+use std::path::PathBuf;
+use futures::executor::block_on;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
-pub enum MachineResult {
-    Waiting,
-    Complete
-}
-
 ///
 ///
 ///
-pub struct AsyncMachine {
-    pub cursor: Box<dyn Cursor>,
+pub struct SyncMachine {
     pub environment: Box<dyn Environment>,
-    pub instructions: Vec<Instruction>,
-    pub invocation_id: i32,
     pub system: Box<dyn System>,
     pub vault: Box<dyn Vault>,
 }
 
-impl AsyncMachine {
+impl SyncMachine {
     ///
     ///
     ///
     pub fn new(
-        instructions: Vec<Instruction>,
-        invocation_id: i32,
-        cursor: Box<dyn Cursor>,
         environment: Box<dyn Environment>,
         system: Box<dyn System>,
         vault: Box<dyn Vault>,
     ) -> Self {
-        AsyncMachine {
-            cursor,
+        SyncMachine {
             environment,
-            instructions,
-            invocation_id,
             system,
             vault,
         }
@@ -52,42 +40,57 @@ impl AsyncMachine {
     ///
     ///
     ///
-    pub async fn walk(
+    pub fn walk(
         &mut self,
-    ) -> Result<MachineResult> {
-        while let Some(instruction) = get_current_instruction(&self.instructions, &self.cursor) {
+        instructions: &Vec<Instruction>,
+    ) -> Result<Option<Value>> {
+        debug!("instructions: {:?}", instructions);
+    
+        let mut cursor: Box<dyn Cursor> = Box::new(InMemoryCursor::new());
+
+        while let Some(instruction) = get_current_instruction(instructions, &cursor) {
             match instruction {
                 Act(act) => {
                     let arguments = prepare_arguments(&act.input, &self.environment, &self.vault)?;
                     let kind = act.meta.get("kind").expect("Missing `kind` metadata property.");
 
                     // Run standard library functions in-place, other ACTs will be scheduled.
-                    if kind == "std" {
+                    let output = if kind == "std" {
                         let package = act.meta.get("name").expect("No `name` property in metadata.");
                         let function = brane_std::FUNCTIONS.get(package).unwrap().get(&act.name).unwrap();
                         
-                        let output = function(&arguments, &self.system)?;
-                        self.callback(output)?;
+                        function(&arguments, &self.system)?
                     } else {
                         match kind.as_str() {
-                            "cwl" => schedule::cwl(&act, arguments, self.invocation_id).await?,
-                            "dsl" => schedule::src(&act, arguments, self.invocation_id).await?,
-                            "ecu" => schedule::ecu(&act, arguments, self.invocation_id).await?,
-                            "oas" => schedule::oas(&act, arguments, self.invocation_id).await?,
+                            "cwl" => handle_act(&act, arguments, kind)?,
+                            "dsl" => handle_act_dsl(&act, arguments)?,
+                            "ecu" => handle_act(&act, arguments, kind)?,
+                            "oas" => handle_act(&act, arguments, kind)?,
                             _ => unreachable!()
-                        };
+                        }
+                    };
 
-                        // This will put the current machine in a waiting state
-                        return Ok(MachineResult::Waiting);
-                    }
+                    self.callback(instructions, output, &mut cursor)?;
                 },
-                Mov(mov) => handle_mov(&mov, &mut self.cursor, &self.environment),
-                Sub(sub) => handle_sub(&sub, &mut self.cursor),
-                Var(var) => handle_var(&var, &mut self.cursor, &mut self.environment),
+                Mov(mov) => handle_mov(&mov, &mut cursor, &self.environment),
+                Sub(sub) => handle_sub(&sub, &mut cursor),
+                Var(var) => handle_var(&var, &mut cursor, &mut self.environment),
             }
         }
 
-        Ok(MachineResult::Complete)
+        debug!("env: {:#?}", self.environment.variables());
+
+        if self.environment.exists("terminate") {
+            let mut value = self.environment.get("terminate");
+            if let Value::Pointer { ref variable, .. } = value {
+                value = self.environment.get(variable);
+            }
+
+            self.environment.remove("terminate");
+            Ok(Some(value))
+        } else {
+            Ok(None)
+        }
     }
 
     ///
@@ -95,9 +98,11 @@ impl AsyncMachine {
     ///
     pub fn callback(
         &mut self,
+        instructions: &Vec<Instruction>,
         value: Value,
+        cursor: &mut Box<dyn Cursor>,
     ) -> Result<()> {
-        let instruction = get_current_instruction(&self.instructions, &self.cursor).unwrap();
+        let instruction = get_current_instruction(instructions, &cursor).unwrap();
         let act = if let Act(act) = instruction {
             act
         } else {
@@ -120,7 +125,7 @@ impl AsyncMachine {
             self.environment.set(assignment, &value);
         }
 
-        self.cursor.go(Forward);
+        cursor.go(Forward);
         Ok(())
     }
 }
@@ -197,6 +202,52 @@ fn prepare_arguments(
     }
 
     Ok(arguments)
+}
+
+///
+///
+///
+fn handle_act_dsl(
+    act: &ActInstruction,
+    arguments: Map<Value>,
+) -> Result<Value> {
+    unimplemented!()
+}
+
+///
+///
+///
+fn handle_act(
+    act: &ActInstruction,
+    arguments: Map<Value>,
+    kind: &str
+) -> Result<Value> {
+    let image = act.meta.get("image").expect("Missing `image` metadata property.").clone();
+    let image_file = act.meta.get("image_file").map(PathBuf::from).expect("Missing `image_file` metadata property.");
+
+    let mounts = vec![
+        String::from("/tmp:/tmp"),
+        String::from("/var/run/docker.sock:/var/run/docker.sock"),
+    ];
+
+    let arguments = base64::encode(serde_json::to_string(&arguments)?);
+    let command = vec![
+        String::from(kind),
+        String::from(&act.name),
+        arguments,
+    ];
+
+    let exec = ExecuteInfo::new(image, Some(image_file), Some(mounts), Some(command));
+    let (stdout, stderr) = block_on(docker::run_and_wait(exec))?;
+
+    if stderr.len() > 0 {
+        error!("stderr: {}", stderr);
+    }
+
+    debug!("stdout: {}", stdout);
+
+    let output: Value = serde_json::from_str(&stdout)?;
+    Ok(output)
 }
 
 ///

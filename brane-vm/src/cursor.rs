@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use redis::{Connection, Client};
 use redis::Commands;
 use specifications::instructions::Move;
+use std::collections::HashMap;
 
 pub trait Cursor {
     fn get_position(
@@ -10,7 +11,7 @@ pub trait Cursor {
     ) -> usize;
 
     fn set_position(
-        &self,
+        &mut self,
         value: usize,
     ) -> usize;
 
@@ -19,7 +20,7 @@ pub trait Cursor {
     ) -> usize;
 
     fn set_depth(
-        &self,
+        &mut self,
         value: usize,
     ) -> usize;
 
@@ -29,24 +30,216 @@ pub trait Cursor {
     ) -> usize;
 
     fn set_subposition(
-        &self,
+        &mut self,
         depth: usize,
         value: usize,
     ) -> usize;
 
     fn go(
-        &self,
+        &mut self,
         movement: Move,
     ) -> ();
 
     fn enter_sub(
-        &self,
+        &mut self,
         max_subposition: usize,
     ) -> ();
 
     fn exit_sub(
-        &self,
+        &mut self,
     ) -> ();
+}
+
+///
+///
+///
+#[derive(Clone)]
+pub struct InMemoryCursor {
+    depth: usize,
+    position: usize,
+    subpositions: HashMap<usize, usize>,
+    subpositions_max: HashMap<usize, usize>,
+}
+
+impl InMemoryCursor {
+    ///
+    ///
+    ///
+    pub fn new() -> Self {
+        InMemoryCursor {
+            depth: 0,
+            position: 0,
+            subpositions: Default::default(),
+            subpositions_max: Default::default(),
+        }
+    }
+
+    ///
+    ///
+    ///
+    fn get_subposition_max(
+        &self, 
+        depth: usize
+    ) -> usize {
+        self.subpositions_max.get(&depth).unwrap_or(&(0 as usize)).clone()
+    }
+
+    ///
+    ///
+    ///
+    fn set_subposition_max(
+        &mut self,
+        depth: usize,
+        value: usize,
+    ) -> () {
+        self.subpositions.insert(depth, value);
+    }
+}
+
+impl Cursor for InMemoryCursor {
+    ///
+    ///
+    ///
+    fn get_position(
+        &self,
+    ) -> usize {
+        self.position
+    }
+
+    ///
+    ///
+    ///
+    fn set_position(
+        &mut self,
+        value: usize,
+    ) -> usize {
+        self.position = value;
+        self.get_position()
+    }
+
+    ///
+    ///
+    ///    
+    fn get_depth(
+        &self,
+    ) -> usize {
+        self.depth
+    }
+
+    ///
+    ///
+    ///    
+    fn set_depth(
+        &mut self,
+        value: usize,
+    ) -> usize {
+        self.depth = value;
+        self.get_depth()
+    }
+
+    ///
+    ///
+    ///    
+    fn get_subposition(
+        &self,
+        depth: usize,
+    ) -> usize {
+        self.subpositions.get(&depth).unwrap_or(&(0 as usize)).clone()
+    }
+
+    ///
+    ///
+    ///    
+    fn set_subposition(
+        &mut self,
+        depth: usize,
+        value: usize,
+    ) -> usize {
+        self.subpositions.insert(depth, value);
+        self.get_subposition(depth)
+    }
+
+    ///
+    ///
+    ///
+    fn go(
+        &mut self,
+        movement: Move,
+    ) -> () {
+        let depth = self.get_depth();
+        let position = self.get_position();
+        let subposition = self.get_subposition(depth);
+
+        match movement {
+            Move::Backward => {
+                if depth == 0 {
+                    self.set_position(position - 1);
+                } else {
+                    self.set_subposition(depth, subposition - 1);
+                }
+            },
+            Move::Forward => {
+                if depth == 0 {
+                    self.set_position(position + 1);
+                } else {
+                    let max_subposition = self.get_subposition_max(depth);
+                    let new_subposition = subposition + 1;
+
+                    if new_subposition <= max_subposition {
+                        self.set_subposition(depth, new_subposition);
+                    } else {
+                        self.exit_sub();
+                    }
+                }              
+            },
+            Move::Skip => {
+                if depth == 0 {
+                    self.set_position(position + 2);
+                } else {
+                    let max_subposition = self.get_subposition_max(depth);
+                    let new_subposition = subposition + 2;
+
+                    if new_subposition <= max_subposition {
+                        self.set_subposition(depth, new_subposition);
+                    } else {
+                        self.exit_sub();
+                    }
+                }
+            },
+        }        
+    }
+    
+    ///
+    ///
+    ///
+    fn enter_sub(
+        &mut self,
+        max_subposition: usize,
+    ) -> () {
+        let depth = self.get_depth();
+        let new_depth = depth + 1;
+
+        debug!("Enter subroutine: {} -> {}", depth, new_depth);
+
+        self.set_depth(new_depth);
+        self.set_subposition(new_depth, 0);
+        self.set_subposition_max(new_depth, max_subposition);
+    }
+
+    ///
+    ///
+    ///
+    fn exit_sub(
+        &mut self,
+    ) -> () {
+        let depth = self.get_depth();
+        let new_depth = depth - 1;
+
+        debug!("Exit subroutine: {} -> {}", depth, new_depth);
+
+        self.set_depth(new_depth);
+        self.go(Move::Forward)
+    }
 }
 
 ///
@@ -106,7 +299,7 @@ impl Cursor for RedisCursor {
     ///
     ///
     fn set_position(
-        &self,
+        &mut self,
         value: usize,
     ) -> usize {
         self.set("position", value);
@@ -126,7 +319,7 @@ impl Cursor for RedisCursor {
     ///
     ///    
     fn set_depth(
-        &self,
+        &mut self,
         value: usize,
     ) -> usize {
         self.set("depth", value);
@@ -147,7 +340,7 @@ impl Cursor for RedisCursor {
     ///
     ///    
     fn set_subposition(
-        &self,
+        &mut self,
         depth: usize,
         value: usize,
     ) -> usize {
@@ -159,7 +352,7 @@ impl Cursor for RedisCursor {
     ///
     ///
     fn go(
-        &self,
+        &mut self,
         movement: Move,
     ) -> () {
         let depth = self.get_depth();
@@ -209,7 +402,7 @@ impl Cursor for RedisCursor {
     ///
     ///
     fn enter_sub(
-        &self,
+        &mut self,
         max_subposition: usize,
     ) -> () {
         let depth = self.get_depth();
@@ -226,7 +419,7 @@ impl Cursor for RedisCursor {
     ///
     ///
     fn exit_sub(
-        &self,
+        &mut self,
     ) -> () {
         let depth = self.get_depth();
         let new_depth = depth - 1;
