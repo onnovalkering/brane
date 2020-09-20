@@ -7,6 +7,8 @@ use uuid::Uuid;
 pub trait System {
     fn get_session_id(&self) -> Uuid;
 
+    fn clone(&self) -> Box<dyn System>;
+
     ///
     ///
     ///

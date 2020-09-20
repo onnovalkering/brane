@@ -24,6 +24,12 @@ impl LocalSystem {
 }
 
 impl System for LocalSystem {
+    fn clone(&self) -> Box<dyn System> {
+        let system = LocalSystem { uuid: self.uuid.clone() };
+
+        Box::new(system)
+    }
+
     fn get_session_id(&self) -> Uuid {
         self.uuid.clone()
     }
