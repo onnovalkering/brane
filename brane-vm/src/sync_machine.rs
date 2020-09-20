@@ -1,5 +1,5 @@
-use crate::environment::Environment;
-use crate::vault::Vault;
+use crate::environment::{InMemoryEnvironment, Environment};
+use crate::vault::{InMemoryVault, Vault};
 use anyhow::Result;
 use brane_sys::System;
 use brane_exec::{ExecuteInfo, docker};
@@ -9,6 +9,9 @@ use specifications::instructions::*;
 use crate::cursor::{Cursor, InMemoryCursor};
 use std::path::PathBuf;
 use futures::executor::block_on;
+use std::fs::{self, File};
+use std::io::prelude::*;
+use std::io::{BufReader, Write};
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -43,7 +46,7 @@ impl SyncMachine {
     pub fn walk(
         &mut self,
         instructions: &Vec<Instruction>,
-    ) -> Result<Option<Value>> {
+    ) -> Result<Value> {
         debug!("instructions: {:?}", instructions);
     
         let mut cursor: Box<dyn Cursor> = Box::new(InMemoryCursor::new());
@@ -63,7 +66,7 @@ impl SyncMachine {
                     } else {
                         match kind.as_str() {
                             "cwl" => handle_act(&act, arguments, kind)?,
-                            "dsl" => handle_act_dsl(&act, arguments)?,
+                            "dsl" => handle_act_dsl(&act, arguments, self.system.clone())?,
                             "ecu" => handle_act(&act, arguments, kind)?,
                             "oas" => handle_act(&act, arguments, kind)?,
                             _ => unreachable!()
@@ -87,9 +90,9 @@ impl SyncMachine {
             }
 
             self.environment.remove("terminate");
-            Ok(Some(value))
+            Ok(value)
         } else {
-            Ok(None)
+            Ok(Value::Unit)
         }
     }
 
@@ -210,8 +213,25 @@ fn prepare_arguments(
 fn handle_act_dsl(
     act: &ActInstruction,
     arguments: Map<Value>,
+    system: Box<dyn System>,
 ) -> Result<Value> {
-    unimplemented!()
+    let instr_file = act.meta.get("instr_file").map(PathBuf::from).expect("Missing `instr_file` metadata property").clone();
+    let buf_reader = BufReader::new(File::open(instr_file)?);
+    let instructions: Vec<Instruction> = serde_yaml::from_reader(buf_reader)?;
+    let instructions = preprocess_instructions(&instructions)?;
+
+    debug!("preprocessed: {:#?}", instructions);
+
+    let environment = InMemoryEnvironment::new(Some(arguments), None);
+    let vault = InMemoryVault::new(Default::default());
+
+    let mut machine = SyncMachine::new(
+        Box::new(environment),
+        system,
+        Box::new(vault),
+    );
+
+    machine.walk(&instructions)
 }
 
 ///
@@ -269,12 +289,12 @@ fn handle_mov(
     for (i, condition) in mov.conditions.iter().enumerate() {
         // Get values from environment, in the case of variables
         let lhs = if let Value::Pointer { variable, .. } = &condition.left {
-            environment.get(variable)
+            resolve_variable(variable, &environment)
         } else {
             condition.left.clone()
         };
         let rhs = if let Value::Pointer { variable, .. } = &condition.right {
-            environment.get(variable)
+            resolve_variable(variable, &environment)
         } else {
             condition.right.clone()
         };
@@ -295,6 +315,39 @@ fn handle_mov(
     }
 
     cursor.go(movement);
+}
+
+///
+///
+///
+fn resolve_variable(
+    variable: &String,
+    environment: &Box<dyn Environment>,
+) -> Value {
+    if variable.contains(".") {
+        let segments: Vec<_> = variable.split(".").collect();
+        let arch_value = environment.get(segments[0]);
+    
+        match arch_value {
+            Value::Array { entries, .. } => {
+                if segments[1] == "length" {
+                    Value::Integer(entries.len() as i64)
+                } else {
+                    panic!("Trying to access undeclared variable.");
+                }
+            }
+            Value::Struct { properties, .. } => {
+                if let Some(value) = properties.get(segments[1]) {
+                    value.clone()
+                } else {
+                    panic!("Trying to access undeclared variable.");
+                }
+            }
+            _ => unreachable!(),
+        }
+    } else {
+        environment.get(variable)
+    }
 }
 
 ///
@@ -335,4 +388,71 @@ fn handle_var(
     }
 
     cursor.go(Forward);
+}
+
+///
+///
+///
+pub fn preprocess_instructions(
+    instructions: &Vec<Instruction>,
+) -> Result<Vec<Instruction>> {
+    let mut instructions = instructions.clone();
+
+    for instruction in &mut instructions {
+        match instruction {
+            Instruction::Act(act) => {
+                let name = act.meta.get("name").expect("No `name` property in metadata.");
+                let version = act.meta.get("version").expect("No `version` property in metadata.");
+                let kind = act.meta.get("kind").expect("No `kind` property in metadata.");
+
+                match kind.as_str() {
+                    "dsl" => {
+                        let instr_file = get_package_source(&name, &version, &kind)?;
+                        if instr_file.exists() {
+                            act.meta
+                                .insert(String::from("instr_file"), String::from(instr_file.to_string_lossy()));
+                        }
+                    }
+                    "cwl" | "ecu" | "oas" => {
+                        let image_file = get_package_source(&name, &version, &kind)?;
+                        if image_file.exists() {
+                            act.meta
+                                .insert(String::from("image_file"), String::from(image_file.to_string_lossy()));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Instruction::Sub(sub) => {
+                sub.instructions = preprocess_instructions(&sub.instructions)?;
+            }
+            _ => continue,
+        }
+    }
+
+    debug!("{:#?}", instructions);
+
+    Ok(instructions)
+}
+
+///
+///
+///
+pub fn get_package_source(
+    name: &String,
+    version: &String,
+    kind: &String,
+) -> Result<PathBuf> {
+    let packages_dir = appdirs::user_data_dir(Some("brane"), None, false)
+        .expect("Couldn't determine Brane data directory.")
+        .join("packages");
+    let package_dir = packages_dir.join(name).join(version);
+
+    let path = match kind.as_str() {
+        "dsl" => package_dir.join("instructions.yml"),
+        "cwl" | "ecu" | "oas" => package_dir.join("image.tar"),
+        _ => unreachable!(),
+    };
+
+    Ok(path)
 }

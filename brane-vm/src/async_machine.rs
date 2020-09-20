@@ -218,12 +218,12 @@ fn handle_mov(
     for (i, condition) in mov.conditions.iter().enumerate() {
         // Get values from environment, in the case of variables
         let lhs = if let Value::Pointer { variable, .. } = &condition.left {
-            environment.get(variable)
+            resolve_variable(variable, &environment)
         } else {
             condition.left.clone()
         };
         let rhs = if let Value::Pointer { variable, .. } = &condition.right {
-            environment.get(variable)
+            resolve_variable(variable, &environment)
         } else {
             condition.right.clone()
         };
@@ -244,6 +244,39 @@ fn handle_mov(
     }
 
     cursor.go(movement);
+}
+
+///
+///
+///
+fn resolve_variable(
+    variable: &String,
+    environment: &Box<dyn Environment>,
+) -> Value {
+    if variable.contains(".") {
+        let segments: Vec<_> = variable.split(".").collect();
+        let arch_value = environment.get(segments[0]);
+    
+        match arch_value {
+            Value::Array { entries, .. } => {
+                if segments[1] == "length" {
+                    Value::Integer(entries.len() as i64)
+                } else {
+                    panic!("Trying to access undeclared variable.");
+                }
+            }
+            Value::Struct { properties, .. } => {
+                if let Some(value) = properties.get(segments[1]) {
+                    value.clone()
+                } else {
+                    panic!("Trying to access undeclared variable.");
+                }
+            }
+            _ => unreachable!(),
+        }
+    } else {
+        environment.get(variable)
+    }
 }
 
 ///
