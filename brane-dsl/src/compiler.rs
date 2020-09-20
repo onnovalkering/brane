@@ -128,6 +128,13 @@ impl Compiler {
         if terms.len() == 1 {
             match &terms[0] {
                 AstTerm::Name(variable) => {
+                    let variable = if variable.contains(".") {
+                        let segments: Vec<_> = variable.split('.').collect();
+                        segments[0]
+                    } else {
+                        variable
+                    };
+
                     if self.state.variables.contains_key(variable) {
                         return self.handle_assignment_value_node(name, &terms[0]);
                     }
@@ -152,7 +159,38 @@ impl Compiler {
         let (value, data_type) = match value {
             AstTerm::Value(value) => (Some(value.clone()), value.data_type().to_string()),
             AstTerm::Name(variable) => {
-                let data_type = self.state.variables.get(variable).unwrap();
+                debug!("name: {}", variable);
+
+                let data_type = if variable.contains(".") {
+                    let segments: Vec<_> = variable.split('.').collect();
+                    if let Some(arch_type) = self.state.variables.get(segments[0]) {
+                        if arch_type.ends_with("[]") && segments[1] == "length" {
+                            String::from("integer")
+                        } else {
+                            debug!("Resolving {} within type {}", variable, arch_type);
+                            if let Some(arch_type) = self.state.types.get(arch_type) {
+                                // TODO: use hashmap in Type struct
+                                let mut properties = Map::<Property>::new();
+                                for p in &arch_type.properties {
+                                    properties.insert(p.name.clone(), p.clone());
+                                }
+    
+                                if let Some(p) = properties.get(segments[1]) {
+                                    p.data_type.clone()
+                                } else {
+                                    bail!("Property {} doesn't exist on type {}", segments[1], arch_type.name);
+                                }
+                            } else {
+                                bail!("Cannot find type information for {}. If it is custom type, please bring it into scope.", arch_type);
+                            }
+                        }
+                    } else {
+                        bail!("Cannot find variable: {}", segments[0]);
+                    }
+                } else {
+                    self.state.variables.get(variable).unwrap().clone()
+                };
+
                 let value = Value::Pointer {
                     variable: variable.clone(),
                     data_type: data_type.clone(),
@@ -207,6 +245,9 @@ impl Compiler {
         if_exec: AstNode,
         el_exec: Option<AstNode>,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
+
+        debug!("{:?}", predicate);
+
         let (poll, condition) = match predicate {
             AstPredicate::Call { terms } => {
                 let (variable, poll) = self.handle_assignment_node(create_temp_var(false), terms)?;
