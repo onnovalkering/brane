@@ -14,12 +14,12 @@ entrypoint:
   exec: run.py
 
 actions:
-  'b64decode':
+  'decode':
     command:
       args:
         - decode
     pattern:
-      prefix: b64decode
+      postfix: decoded
     input:
       - type: string
         name: input
@@ -27,12 +27,12 @@ actions:
       - type: string
         name: output
 
-  'b64encode':
+  'encode':
     command:
       args:
         - encode
     pattern:
-      prefix: b64encode
+      postfix: encoded        
     input:
       - type: string
         name: input

@@ -9,4 +9,4 @@ owner := ?? as String
 repo := ?? as String
 
 readme := getreadme owner repo
-return b64decode readme.content
+return readme.content decoded
