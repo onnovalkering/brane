@@ -2,7 +2,7 @@ version: '3'
 
 services:
   brane-api:
-    image: onnovalkering/brane-api
+    image: onnovalkering/brane-api:0.1.0
     hostname: brane-api
     depends_on:
       - kafka
@@ -13,7 +13,7 @@ services:
       HOST: 0.0.0.0
 
   brane-loop:
-    image: onnovalkering/brane-loop
+    image: onnovalkering/brane-loop:0.1.0
     hostname: brane-loop
     depends_on:
       - kafka
@@ -27,7 +27,7 @@ services:
       VAULT_TOKEN: mytoken
 
   jupyterlab:
-    image: onnovalkering/brane-jupyterlab
+    image: onnovalkering/brane-jupyterlab:0.1.0
     command: ["jupyter", "lab", "--allow-root", "--LabApp.token=''"]
     ports:
       - 8888:8888
