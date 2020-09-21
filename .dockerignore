@@ -1,0 +1,13 @@
+.github/
+brane-api/packages
+brane-api/temporary
+brane-cli/
+brane-dsl/
+brane-exec/resources
+brane-ide/jupyterlab/registry/node_modules
+brane-ide/jupyterlab/renderer/node_modules
+brane-init/
+deployment/
+docs/
+examples/
+target/

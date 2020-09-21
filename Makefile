@@ -3,7 +3,7 @@
 all: api cli init loop jupyter
 
 api:
-	docker build -t onnovalkering/brane-api brane-api
+	docker build -t onnovalkering/brane-api -f Dockerfile.api .
 
 cli:
 	cargo build --release --package brane-cli
@@ -15,7 +15,7 @@ jupyter:
 	docker build -t onnovalkering/brane-jupyterlab brane-ide/jupyterlab
 
 loop:
-	docker build -t onnovalkering/brane-loop brane-loop
+	docker build -t onnovalkering/brane-loop -f Dockerfile.loop .
 
 start:
 	docker-compose -f deployment/docker/docker-compose.yml up -d
