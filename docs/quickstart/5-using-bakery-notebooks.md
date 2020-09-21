@@ -21,11 +21,11 @@ words := split readme
 message := "This README.md has " + words.length + " words. Threshold met? "
 
 if words.length > 100: message := message + " Yes."
-else: message := + " No."
+else: message := message + " No."
 
 return message
 ```
-We use the `getreadme` package that we created in the previous step. This package in turn makes use of the `github` and `base64` packages. The `split` function is provided by the `text` package, part of the [standard library](/brane/standard-library/standard-library.html). This function splits a `string` based on whitespace, returning an `string[]` array. On this array is a `length` property that gets the number of array entries, i.e. the number of words in the README.md file. By checking if this meets a certain threshold a certian message is displayed.
+We use the `getreadme` package that we created in the previous step. This package in turn makes use of the `github` and `base64` packages. The `split` function is provided by the `text` package, part of the [standard library](/brane/standard-library/standard-library.html). This function splits a `string` based on whitespace, returning an `string[]` array. On this array is a `length` property that contains the number of array entries, i.e. the number of words in the README.md file. By checking if this meets a certain threshold a certian message is displayed.
 
 
 <p style="text-align: center">

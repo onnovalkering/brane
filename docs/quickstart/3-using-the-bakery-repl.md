@@ -49,14 +49,14 @@ repo := ?? as String
 readme := getreadme owner repo
 return readme.content decoded
 ```
-We specify the name and the version in the header. We bring the packages that we want to use into scope with the `import` keyword. Input parameters are specified by creating a `??` (unkown) variables. Bakery variables need to have an associated type. Therefore, we indicate how to treat the unkowns using the `as` keyword. At runtime, these unkowns will be replaced with the specific arguments. Then we execute the functions, as before. The `return` keyword is to mark the output, its type is inferred.
+We specify the name and the version in the header. We bring the packages that we want to use into scope with the `import` keyword. Input parameters are specified by creating `??` (unkown) variables. Bakery variables need to have an associated type. Therefore, we indicate how to treat the unkowns using the `as` keyword. At runtime, these unkowns will be replaced with the specific arguments. Then, we execute the functions, like before. The `return` keyword is to mark the output, its type is inferred.
 
 We can build a package based on this script, and start using it as a function, using the <abbr title="Command-line interface">CLI</abbr>:
 ```shell
 $ brane build readme.bk
 ```
 
-Our new `getreadme` function can be used as any other function (Fig. 2):
+Our new `getreadme` function can be used just as any other function (Fig. 2):
 ```shell
 $ brane test getreadme
 ```

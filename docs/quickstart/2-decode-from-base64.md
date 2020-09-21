@@ -37,8 +37,9 @@ if __name__ == "__main__":
   print(functions[command](argument))
 ```
 
-After saving this code as `run.py` (with execute permission), we can call the functions as follows:
+After saving this code as `run.py`, we can call the functions as follows:
 ```shell
+$ chmod +x ./run.py
 $ ./run.py encode 'Hello, world!'
 $ ./run.py decode 'SGVsbG8sIHdvcmxkIQ=='
 ```
@@ -186,7 +187,7 @@ $ brane build container.yml
 ```
 
 ## View local packages
-We're done creating functions and building packages. Let's view the packages that we have (Fig. 1):
+Let's view the packages that we have created so far (Fig. 1):
 ```
 $ brane list
 ```

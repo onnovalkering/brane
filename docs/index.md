@@ -19,19 +19,20 @@ Programmable Orchestration of Applications and Networking
 ## Introduction
 Scientific endeavors are demanding, with acceleration, ever more storage and computing capabilities. Projects exist that even desire the next frontier of computing: exascale (10<sup>18</sup> FLOPS). Still, at present, the first supercomputer capable of exascale computing has yet to become operational. It will certainly take years before exascale becomes the widespread norm for high-performance computing (HPC).
 
-Since we, currently and in the short-term, cannot make use of centralized exascale capabilities, we need to resort to a hybrid of HPC clusters, the Cloud and distributed data stores to meet the demand for exascale as much as possible. This brings myriad challenges, not only at all levels of the technical stack but also organizationally, e.g. due to distributed collaboration with divided responsibilities. The existing solutions, i.e. the typical web portal backed by a workflow management system (WfMS), do not provide sufficient control to address all of the aforementioned challenges. For the most part, this is because these WfMSs do not let us model and/or optimize the underlying physical infrastructure(s) and network(s) directly, which is crucial in establishing extreme-scale deployments. Moreover, with these semi-static web portals, domain scientists are often dependent on others for maintaining their workflows. This results in tedious development iterations, which in turn hampers scientific progress.
+Since we, currently and in the short-term, cannot make use of centralized exascale capabilities, we need to resort to a hybrid of HPC clusters, the Cloud and distributed data stores to meet the demand for exascale as much as possible. This brings myriad challenges, not only at all levels of the technical stack but also organizationally, e.g. due to distributed collaboration with divided responsibilities. The existing solutions, i.e. the typical web portal backed by a workflow management system (WfMS), do not provide sufficient control to address all of the aforementioned challenges. For the most part, this is because these WfMSs do not let us model and/or optimize the underlying physical infrastructure(s) and network(s) directly, which is crucial in establishing extreme-scale deployments. Moreover, with these semi-static web portals, domain scientists are often dependent on others for maintaining their applications. This often results in long development cycles, which in turn hampers scientific progress.
 
-With the Brane framework we address these shortcomings. It features a programmatic approach to constructing workflows and research infrastructures that is intuitive and easy to use, yet is expressive and enough to capture and control the entire, distributed, technical stack. The programming model is based on the separation of concerns principle. For each level of the technical stack different tooling and abstractions are provided. As a result, workflows can be written in a high-level language directly by domain scientists, while optimizations can be implemented separately by the relevant expert(s).
+With the Brane framework we address these shortcomings. It features a programmatic approach to constructing research infrastructures that is intuitive and easy to use, yet is expressive enough to capture and control the entire, distributed, technical stack. The programming model is based on the separation of concerns principle. For each level of the technical stack, and associated roles, different tooling and abstractions are provided. As a result, top-level applications can be written in a <abbr title="Domain-specific language">DSL</abbr> by domain scientists, while underlying (optimized) routines are implemented by the relevant experts.
 
 Learn more about how Brane works on the [Architecture](/brane/architecture.html) page.
 
 ## Features
 
-- a
-- b
-- c
+Brane features...
 
-(screenshots, gifs ?)
+- a simple <abbr title="Domain-specific language">DSL</abbr> that can be used with limited to none programming experience;
+- a programmatic approach to constructing research infrastructures;
+- interactive computing, with a detach/attach mechanisms and visual monitoring.
+- a performant event-driven runtime, based on microservices;
 
 ---
 
