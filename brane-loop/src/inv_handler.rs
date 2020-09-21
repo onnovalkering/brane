@@ -3,7 +3,7 @@ use serde_json::Value as JValue;
 use diesel::prelude::*;
 use chrono::Utc;
 use brane_sys::{System, local::LocalSystem};
-use brane_vm::async_machine::{AsyncMachine, MachineResult};
+use brane_vm::machine::{AsyncMachine, MachineResult};
 use brane_vm::vault::{Vault, HashiVault, InMemoryVault};
 use diesel::pg::PgConnection;
 use diesel::r2d2::{Pool, ConnectionManager};

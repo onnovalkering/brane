@@ -7,7 +7,7 @@ use cwl::v11_clt::{
     CommandLineToolOutput, CommandLineToolOutputType, CommandOutputParameter, CommandOutputParameterType,
 };
 use cwl::v11_wf::{
-    WorkflowInputParameter, WorkflowInputParameterType, WorkflowInputType, WorkflowInputs, WorkflowOutputParameter,
+    WorkflowInputParameterType, WorkflowInputType, WorkflowInputs, WorkflowOutputParameter,
     WorkflowOutputParameterType, WorkflowOutputType, WorkflowOutputs, WorkflowSteps,
 };
 use cwl::{v11::CwlDocument, v11_clt::CommandLineTool, v11_cm::Any, v11_cm::CwlType, v11_wf::Workflow};

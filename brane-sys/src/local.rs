@@ -21,6 +21,49 @@ impl LocalSystem {
     pub fn new(uuid: Uuid) -> Self {
         LocalSystem { uuid }
     }
+
+    ///
+    ///
+    /// 
+    fn determine_parent(
+        &self,
+        uuid: &Uuid,
+        parent: Option<&Url>,
+        temp: bool,
+    ) -> Result<PathBuf> {
+        let parent = if let Some(parent) = parent {
+            url_to_path(parent)?
+        } else if temp {
+            self.get_temp_dir(uuid)
+        } else {
+            self.get_session_dir(uuid)
+        };
+
+        Ok(parent)
+    }
+
+    ///
+    ///
+    ///
+    fn get_session_dir(
+        &self,
+        uuid: &Uuid
+    ) -> PathBuf {
+        appdirs::user_data_dir(Some("brane"), None, false)
+            .expect("Couldn't determine Brane data directory.")
+            .join("sessions")
+            .join(uuid.to_string())
+    }
+
+    ///
+    ///
+    ///
+    fn get_temp_dir(
+        &self,
+        uuid: &Uuid
+    ) -> PathBuf {
+        env::temp_dir().join(uuid.to_string())
+    }    
 }
 
 impl System for LocalSystem {
@@ -30,17 +73,13 @@ impl System for LocalSystem {
         Box::new(system)
     }
 
-    fn get_session_id(&self) -> Uuid {
-        self.uuid.clone()
-    }
-
     fn create_dir(
         &self,
         name: &str,
         parent: Option<&Url>,
         temp: bool,
     ) -> Result<Url> {
-        let parent = determine_parent(&self.uuid, parent, temp)?;
+        let parent = self.determine_parent(&self.uuid, parent, temp)?;
         fs::create_dir_all(&parent)?;
 
         let dir = parent.join(name);
@@ -55,7 +94,7 @@ impl System for LocalSystem {
         parent: Option<&Url>,
         temp: bool,
     ) -> Result<Url> {
-        let parent = determine_parent(&self.uuid, parent, temp)?;
+        let parent = self.determine_parent(&self.uuid, parent, temp)?;
         fs::create_dir_all(&parent)?;
 
         let file = parent.join(name);
@@ -63,35 +102,18 @@ impl System for LocalSystem {
 
         path_to_url(&file)
     }
-}
 
-///
-///
-///
-fn determine_parent(
-    uuid: &Uuid,
-    parent: Option<&Url>,
-    temp: bool,
-) -> Result<PathBuf> {
-    let parent = if let Some(parent) = parent {
-        url_to_path(parent)?
-    } else if temp {
-        env::temp_dir()
-    } else {
-        get_session_dir(uuid)
-    };
+    fn get_session_id(&self) -> Uuid {
+        self.uuid.clone()
+    }
 
-    Ok(parent)
-}
+    fn get_temp_dir(&self) -> PathBuf {
+        self.get_temp_dir(&self.uuid)
+    }
 
-///
-///
-///
-fn get_session_dir(uuid: &Uuid) -> PathBuf {
-    appdirs::user_data_dir(Some("brane"), None, false)
-        .expect("Couldn't determine Brane data directory.")
-        .join("sessions")
-        .join(uuid.to_string())
+    fn get_session_dir(&self) -> PathBuf {
+        self.get_session_dir(&self.uuid)
+    }
 }
 
 ///

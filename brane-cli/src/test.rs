@@ -1,6 +1,6 @@
 use crate::packages;
 use anyhow::Result;
-use brane_vm::sync_machine::{self, SyncMachine};
+use brane_vm::machine::{self, Machine};
 use brane_exec::{docker, ExecuteInfo};
 use brane_vm::environment::InMemoryEnvironment;
 use brane_vm::vault::InMemoryVault;
@@ -20,7 +20,6 @@ use std::{
     fmt::{Debug, Display},
     str::FromStr,
 };
-use std::rc::Rc;
 use uuid::Uuid;
 
 type Map<T> = std::collections::HashMap<String, T>;
@@ -113,7 +112,7 @@ fn test_dsl(
     // Load instructions
     let buf_reader = BufReader::new(File::open(instructions_file)?);
     let instructions: Vec<Instruction> = serde_yaml::from_reader(buf_reader)?;
-    let instructions = sync_machine::preprocess_instructions(&instructions)?;
+    let instructions = machine::preprocess_instructions(&instructions)?;
 
     debug!("preprocessed: {:#?}", instructions);
 
@@ -123,7 +122,7 @@ fn test_dsl(
     let system = LocalSystem::new(session_id);
     let vault = InMemoryVault::new(Default::default());
 
-    let mut machine = SyncMachine::new(
+    let mut machine = Machine::new(
         Box::new(environment),
         Box::new(system),
         Box::new(vault),
@@ -322,7 +321,7 @@ where
 ///
 fn prompt_password(
     parameter: &Parameter,
-    default: Option<String>,
+    _default: Option<String>,
 ) -> std::io::Result<String> {
     let colorful = ColorfulTheme::default();
     let mut prompt = Password::with_theme(&colorful);
@@ -331,22 +330,6 @@ fn prompt_password(
         .allow_empty_password(parameter.optional.unwrap_or_default());
 
     prompt.interact()
-}
-
-///
-///
-///
-fn prompt_var<T>(
-    name: &str,
-    data_type: &str,
-) -> std::io::Result<T>
-where
-    T: Clone + FromStr + Display,
-    T::Err: Display + Debug,
-{
-    Prompt::with_theme(&ColorfulTheme::default())
-        .with_prompt(&format!("{} ({})", name, data_type))
-        .interact()
 }
 
 ///

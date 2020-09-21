@@ -1,7 +1,7 @@
 use crate::{packages, registry};
 use anyhow::Result;
 use brane_dsl::compiler::{Compiler, CompilerOptions};
-use brane_vm::sync_machine::SyncMachine;
+use brane_vm::machine::Machine;
 use brane_vm::environment::InMemoryEnvironment;
 use brane_vm::vault::InMemoryVault;
 use brane_sys::local::LocalSystem;
@@ -50,7 +50,7 @@ pub async fn start(
     let system = LocalSystem::new(session_id);
     let vault = InMemoryVault::new(secrets);
 
-    let mut machine = SyncMachine::new(
+    let mut machine = Machine::new(
         Box::new(environment),
         Box::new(system),
         Box::new(vault),

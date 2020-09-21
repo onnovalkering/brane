@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::env;
 use reqwest::Client;
 use serde_json::{json, Value as JValue};
+use brane_sys::System;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -22,9 +23,10 @@ pub async fn cwl(
     act: &ActInstruction,
     arguments: Map<Value>,
     invocation_id: i32,
+    system: &Box::<dyn System>,
 ) -> Result<()> {
     let (image, image_file) = determine_image(&act)?;
-    let mounts = determine_mounts(vec!["/var/run/docker.sock:/var/run/docker.sock"]);
+    let mounts = determine_mounts(vec!["/var/run/docker.sock:/var/run/docker.sock"], system);
     let command = determine_command(invocation_id, "cwl", &act.name, &arguments)?;
 
     let exec = ExecuteInfo::new(image, image_file, mounts, command);
@@ -36,7 +38,7 @@ pub async fn cwl(
 ///
 ///
 ///
-pub async fn src(
+pub async fn dsl(
     act: &ActInstruction,
     arguments: Map<Value>,
     invocation_id: i32,
@@ -94,9 +96,10 @@ pub async fn ecu(
     act: &ActInstruction,
     arguments: Map<Value>,
     invocation_id: i32,
+    system: &Box::<dyn System>,
 ) -> Result<()> {
     let (image, image_file) = determine_image(&act)?;
-    let mounts = determine_mounts(vec![]);
+    let mounts = determine_mounts(vec![], system);
     let command = determine_command(invocation_id, "ecu", &act.name, &arguments)?;
 
     let exec = ExecuteInfo::new(image, image_file, mounts, command);
@@ -112,9 +115,10 @@ pub async fn oas(
     act: &ActInstruction,
     arguments: Map<Value>,
     invocation_id: i32,
+    system: &Box::<dyn System>,
 ) -> Result<()> {
     let (image, image_file) = determine_image(&act)?;
-    let mounts = determine_mounts(vec![]);
+    let mounts = determine_mounts(vec![], system);
     let command = determine_command(invocation_id, "oas", &act.name, &arguments)?;
 
     let exec = ExecuteInfo::new(image, image_file, mounts, command);
@@ -144,9 +148,14 @@ fn determine_image(
 ///
 fn determine_mounts(
     mounts: Vec<&str>,
+    system: &Box::<dyn System>,
 ) -> Option<Vec<String>> {
+    let temp_dir = system.get_temp_dir();
+    let session_dir = system.get_session_dir();
+
     let default = vec![
-        String::from("/tmp:/tmp"),
+        format!("{0}:{0}", temp_dir.into_os_string().into_string().unwrap()),
+        format!("{0}:{0}", session_dir.into_os_string().into_string().unwrap()),
     ];
 
     let mut mounts: Vec<String> = mounts
