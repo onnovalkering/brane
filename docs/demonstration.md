@@ -6,6 +6,8 @@ description: "demonstration"
 permalink: /demonstration
 ---
 
+<link href="https://vjs.zencdn.net/7.8.4/video-js.css" rel="stylesheet" />
+
 # Demonstration
 This demonstration is based on a real-world data pipeline (Fig. 1) from the [LOFAR](http://lofar.org/about-lofar/general-information/introduction.html). This data pipeline generates, or rather calibrates, sky maps based on astronomical observations stored in LOFAR's <abbr title="Long-term archive">LTA</abbr>. Sky maps are images of the sky that aren't focused on a specific target. Astronomers use these sky maps for exploratory research and serendipitous discoveries. However, the pipeline is rather complex [[spreeuw2019lta](#)]. Partly because the typical sizes of astronomical observations, up to TBs, are non-trivial to handle. But also because running the necessary compute routines require domain knowledge and experience with <abbr title="High-performance computing">HPC</abbr> clusters. Due to this complexity, the utilization of the pipeline is minimal. 
 
@@ -42,34 +44,82 @@ import "prefactor"
 observation := 246403
 ```
 
-... Clip #1
+The `lta` package requires secrets: <abbr title="Long-term archive">LTA</abbr> credentials and a GRID certificate proxy. 
 
-The `lta` package needs certian credentials. We add these credentials to Brane's vault.
+We add these to Brane's vault:
 
-... Clip #2
+<video
+    id="brane-clip-1"
+    class="video-js"
+    controls
+    preload="auto"
+    width="736"
+    height="415"
+    data-setup="{}"
+>
+<source src="/brane/assets/video/brane-clip-1.mp4" type="video/mp4" />
+<p class="vjs-no-js">
+    To view this video please enable JavaScript, and consider upgrading to a web browser that
+    <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>.
+</p>
+</video>
 
-## Staging LTA files
-...
+## Notebook
+For each step of the pipeline, we execute a chunk of Bakery code.
+
+### Staging LTA files
+We perform the first step of the pipeline with the following code:
 
 ```go
 staging := stage observation files
-wait until staging = "complete"
+wait until staging = "success"
 ```
 
-... Clip #3
+<video
+    id="brane-clip-1"
+    class="video-js"
+    controls
+    preload="auto"
+    width="736"
+    height="415"
+    data-setup="{}"
+>
+<source src="/brane/assets/video/brane-clip-2.mp4" type="video/mp4" />
+<p class="vjs-no-js">
+    To view this video please enable JavaScript, and consider upgrading to a web browser that
+    <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>.
+</p>
+</video>
 
-## Downloading LTA files
-...
+### Downloading LTA files
+After the files have been staged, we can proceed to the download:
 
 ```go
-directory := new_temp_directory
-download observation files to directory
+dir := new_temp_directory
+download observation files to dir
 ```
 
-... Clip #4
+<video
+    id="brane-clip-1"
+    class="video-js"
+    controls
+    preload="auto"
+    width="736"
+    height="415"
+    data-setup="{}"
+>
+<source src="/brane/assets/video/brane-clip-3.mp4" type="video/mp4" />
+<p class="vjs-no-js">
+    To view this video please enable JavaScript, and consider upgrading to a web browser that
+    <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>.
+</p>
+</video>
 
 ## Running calibration tasks
 ...
 
 ## Displaying output
 ...
+
+
+<script src="https://vjs.zencdn.net/7.8.4/video.js"></script>
