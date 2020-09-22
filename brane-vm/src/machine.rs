@@ -11,6 +11,8 @@ use std::path::PathBuf;
 use futures::executor::block_on;
 use std::fs::File;
 use std::io::BufReader;
+use humantime::Duration;
+use std::thread;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -386,6 +388,11 @@ fn handle_mov(
         if truthy {
             movement = mov.branches.get(i).unwrap().clone();
             break;
+        } else {
+            if let Some(sleep_after_false) = mov.meta.get("sleep_after_false") {
+                let duration: Duration = sleep_after_false.parse().unwrap();
+                thread::sleep(duration.into());
+            }
         }
     }
 
