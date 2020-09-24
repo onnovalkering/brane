@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xenon
+  labels:
+    app: xenon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xenon
+  template:
+    metadata:
+      labels:
+        app: xenon
+    spec:
+      containers:
+        - name: xenon
+          image: onnovalkering/xenon-grpc
+          ports:
+            - containerPort: 50051

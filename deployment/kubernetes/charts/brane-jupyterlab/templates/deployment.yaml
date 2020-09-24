@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brane-jupyterlab
+  labels:
+    app: brane-jupyterlab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: brane-jupyterlab
+  template:
+    metadata:
+      labels:
+        app: brane-jupyterlab
+    spec:
+      containers:
+        - name: brane-loop
+          image: onnovalkering/brane-jupyterlab:0.1.0
+          command: ["jupyter", "lab", "--allow-root", "--LabApp.token=''"]
+          ports:
+            - containerPort: 8888

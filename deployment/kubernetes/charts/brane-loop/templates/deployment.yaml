@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brane-loop
+  labels:
+    app: brane-loop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: brane-loop
+  template:
+    metadata:
+      labels:
+        app: brane-loop
+    spec:
+      containers:
+        - name: brane-loop
+          image: onnovalkering/brane-loop:0.1.0
+          ports:
+            - containerPort: 8080
+          env:
+            - name: API_HOST
+              value: "{{ .Values.hostname }}:31990"
+            - name: DOCKER_HOST
+              value: "{{ .Values.hostname }}:31992"
+            - name: KAFKA_BROKERS
+              value: confluent:9092
+            - name: RUNTIME
+              value: kubernetes
+            - name: VAULT_HOST
+              value: vault:8200
+            - name: VAULT_TOKEN
+              value: mytoken

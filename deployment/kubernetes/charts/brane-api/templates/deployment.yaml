@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brane-api
+  labels:
+    app: brane-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: brane-api
+  template:
+    metadata:
+      labels:
+        app: brane-api
+    spec:
+      containers:
+        - name: brane-api
+          image: onnovalkering/brane-api:0.1.0
+          ports:
+            - containerPort: 8080
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+            - name: KAFKA_BROKERS
+              value: confluent:9092

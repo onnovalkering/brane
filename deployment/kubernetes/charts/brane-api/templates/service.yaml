@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: brane-api
+  labels:
+    app: brane-api
+spec:
+  selector:
+    app: brane-api
+  ports:
+    - port: 8080
+      targetPort: 8080
+--- 
+apiVersion: v1
+kind: Service
+metadata:
+  name: brane-api-ext
+  labels:
+    app: brane-api
+spec:
+  type: NodePort
+  selector:
+    app: brane-api
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 31990
