@@ -8,8 +8,7 @@ parent: Quickstart
 # 5. Using Bakery notebooks
 <span class="label label-green">USERS</span>
 
-Now we've published our package to the Brane backend, we can write the final application using JupyterLab (Fig. 1), part of the backend installation (defaults to port `8888`, e.g. [http://localhost:8888](http://localhost:8888)).
-
+After publishing the packages, the domain scientist can use them as building blocks for the final application. Which he can write using Bakery and JupyterLab notebooks (Fig. 1).
 
 ```go
 import "getreadme"

@@ -8,13 +8,15 @@ parent: Quickstart
 # 4. Publishing packages
 <span class="label label-blue">APPLICATION</span> <span class="label label-red">SYSTEM</span>
 
-We can publish packages by pushing them to the registry of the backend deployment. But first we have to pair the CLI to the backend. Point the `login` command to the API of your backend installation:
+Before the domain scientist can write the final application, i.e. word count, all the created packages have to be published. This is done by pushing (uploading) them to the runtime system's registry.
+
+First we have to pair the CLI to the backend. Point the `login` command to your backend installation:
 
 ```shell
 $ brane login 'http://localhost:8080' --username joyvan
 ```
 
-After logging in, we can push the packages:
+After logging in, we can push the packages (Fig. 1):
 ```shell
 $ brane push "github" 1.0.0
 $ brane push "base64" 1.0.0

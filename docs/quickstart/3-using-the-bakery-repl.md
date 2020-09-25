@@ -16,7 +16,7 @@ We'll use [Bakery](/brane/bakery) for this, Brane's <abbr title="Domain-specific
 $ brane repl
 ```
 
-Enter the following statements, one by one, in the REPL shell. It will dowload the README.md file from a GitHub repository using `github` package, and decode its content using the `base64` package (Fig. 1):
+Enter the following statements, one by one, in the REPL shell. It will dowload the README.md file from a GitHub repository using the `github` package, and decode its content using the `base64` package:
 
 ```go
 brane> import "github"
@@ -34,7 +34,10 @@ brane> readme.content decoded
 Remember the (postfix) call pattern that we added to the `container.yml` in the previous step? Because of this pattern, we can call the decode function as we did: ```<argument> decoded```. This pre-/in-/postfix mechanism allows us to create sentence-like statements. For more details see the [Bakery](/brane/bakery) page.
 
 ## Building a DSL package
-Because we always have to decode a README.md file from Base64, it is handy to create a wrapper function that does this for us. We do this by writing a Bakery script, and turn it into a function later:
+Because we always have to decode a README.md file from Base64, it is handy to create a wrapper function that does this for us. We do this by writing a Bakery script, and turn it into a function later.
+
+This is the third way of creating custom functions for Brane.
+
 ```go
 ---
 name: getreadme
