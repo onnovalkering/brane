@@ -8,9 +8,9 @@ parent: Quickstart
 # 2. Decode from Base64
 <span class="label label-red">SYSTEM</span>
 
-In the previous step our hypothetical application developer created a function that retreives a README.md file. However, the output appeared to be Base64-encoded. In this step the system engineer will develop, and add to Brane, Base64 encoding and decoding functions for him/her.
+In the previous step our hypothetical application developer created a function that retreives a README.md file. However, the output appeared to be Base64-encoded. In this step the system engineer will develop, and add to Brane, the missing Base64 encoding and decoding functions.
 
-A typical implementation in Python can be as follows:
+A typical implementation in Python is:
 
 ```python
 #!/usr/bin/env python3
@@ -45,13 +45,13 @@ $ ./run.py decode 'SGVsbG8sIHdvcmxkIQ=='
 ```
 
 ## Building a ECU package
-To make the encoding/decoding functions available to Brane, we have to perform following steps:
+To make the encoding/decoding functions available to Brane, we have to perform three tasks:
 
 1. Make it explicit for Brane how to run the underlying code of the functions.
 2. Make it explicit for Brane which input parameters to use, and what output to expect.
 3. Make small adjustments to the code to make it compatible with Brane.
 
-To make explicit for Brane how to run the encoding/decoding functions and describe the input/output parameters, we write a configuration file, conventionally name `container.yml`. In the `container.yml` file we define how Brane can run this code, and specify: the list of dependencies that are required (based on the [Ubuntu repository](https://packages.ubuntu.com/focal/)); which files will be used; and what file to consider as entrypoint:
+To make explicit for Brane how to run the encoding/decoding functions and describe the input/output parameters, we write a configuration file, conventionally named `container.yml`. In this file we describe how Brane can run this code, we specify: the list of system dependencies that are required (based on the [Ubuntu repository](https://packages.ubuntu.com/focal/)); which files will be used; and what file to consider the entrypoint:
 
 ```yaml
 dependencies:
@@ -65,7 +65,7 @@ entrypoint:
   exec: run.py
 ```
 
-Next, we specify the functions with their input parameters and output:
+Next, we specify the functions with their input/output parameters:
 
 ```yaml
 actions:
@@ -91,7 +91,7 @@ actions:
       - type: string
         name: output
 ```
-__Note__: we specify the function name (`decode` / `encode`) as as the only command-line argument, while our Python code currently expects two. This is because inputs will be provided through environment variables to our code. This the most uniform way of passing input, and also supports non-command-line applications. The output should be printed as a [YAML mapping](https://yaml.org/spec/1.2/spec.html#mapping) to `stdout`, i.e. as key-value pairs.
+__Note__: We specify the function name (`decode` / `encode`) as as the only command-line argument, while our Python code currently expects two. This is because inputs will be provided through environment variables to our code. This the most uniform way of passing input, and also supports non-command-line applications. The output should be printed as a [YAML mapping](https://yaml.org/spec/1.2/spec.html#mapping) to `stdout`, i.e. as key-value pairs.
 
 Let's adapt our `run.py` code to the above, by making a few small adjustments:
 
@@ -128,7 +128,7 @@ We, and now also Brane, can call the functions as follows:
 $ INPUT='Hello, world!' ./run.py encode 
 $ INPUT='SGVsbG8sIHdvcmxkIQ==' ./run.py decode
 ```
-__TIP__: When it is not possible to directly modify the target code, consider creating a wrapper script.
+__Tip__: When it is not possible to directly modify the target code, consider creating a wrapper script.
 
 
 Before we build our package, we'll make a few last adjustments to our final configuration:
@@ -185,7 +185,7 @@ Build the package using the <abbr title="Command-line interface">CLI</abbr>, tar
 $ brane build container.yml
 ```
 
-This is the second way of creating custom functions for Brane.
+__Note__: This is the second way of creating custom functions for Brane.
 
 ## View local packages
 Let's view the packages that we have created so far (Fig. 1):

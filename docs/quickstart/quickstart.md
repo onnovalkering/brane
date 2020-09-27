@@ -8,7 +8,7 @@ has_children: true
 # Quickstart
 _This quickstart assumes you have [installed](/brane/installation.html) both the <abbr title="Command-line interface">CLI</abbr> and the backend._
 
-In this quickstart you will learn how to add functionalities to the Brane runtime system, and how to use them as building blocks for data processing pipelines. You'll do this while implementing a word count application (Fig. 1). This basic example application retreives the README.md file from a GitHub repository, determines if it meets a certain word count threshold, and then outputs a text accordingly.
+In this quickstart you will learn how to add functionalities to the Brane runtime system, and how to use them as building blocks for data processing pipelines. You'll learn this while implementing a word count application (Fig. 1). This basic example application retreives the README.md file from a GitHub repository, determines if it meets a certain word count threshold, and then outputs a text accordingly.
 
 <p style="text-align: center">
     <img src="/brane/assets/img/word-count.svg" width="400px" alt="The flow of the word counta application.">
@@ -16,7 +16,7 @@ In this quickstart you will learn how to add functionalities to the Brane runtim
     <sup>Figure 1: illustration of the word count application.</sup>
 </p>
 
-We have designed this quickstart to explain the development flow in Brane: first add the required functions to Brane by means of creating packages. Then write the data pipeline in the Bakery <abbr title="Domain-specific language">DSL</abbr>.
+We have designed this quickstart to explain the development flow in Brane: first add the required functions to Brane by means of creating packages. Then write the final application in Bakery <abbr title="Domain-specific language">DSL</abbr>.
 
 The steps of this quickstart are categorized based on the performed tasks, and associated to the typical roles within Brane's [programming model](/brane/architecture#programming-model). There are three categories:
 

@@ -23,7 +23,7 @@ Since we, currently and in the short-term, cannot make use of centralized exasca
 
 With the Brane framework we address these shortcomings. It features a programmatic approach to constructing research infrastructures that is intuitive and easy to use, yet is expressive enough to capture and control the entire, distributed, technical stack. The programming model is based on the separation of concerns principle. For each level of the technical stack, and associated roles, different tooling and abstractions are provided. As a result, top-level applications can be written in a <abbr title="Domain-specific language">DSL</abbr> by domain scientists, while underlying (optimized) routines are implemented by the relevant experts.
 
-Learn more about how Brane works on the [Architecture](/brane/architecture.html) page.
+Learn more about how Brane works on the [Overview](/brane/overview.html) page.
 
 ## Features
 

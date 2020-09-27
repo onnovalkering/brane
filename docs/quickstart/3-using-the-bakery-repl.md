@@ -16,7 +16,7 @@ We'll use [Bakery](/brane/bakery) for this, Brane's <abbr title="Domain-specific
 $ brane repl
 ```
 
-Enter the following statements, one by one, in the REPL shell. It will dowload the README.md file from a GitHub repository using the `github` package, and decode its content using the `base64` package:
+Enter the following statements, one by one, in the <abbr title="Read-eval-print loop">REPL</abbr> shell. It will dowload the README.md file from a GitHub repository using the `github` package, and decode its content using the `base64` package:
 
 ```go
 brane> import "github"
@@ -58,6 +58,8 @@ We can build a package based on this script, and start using it as a function, u
 ```shell
 $ brane build readme.bk
 ```
+
+__Note__: This is the third way of creating custom functions for Brane.
 
 Our new `getreadme` function can be used just as any other function (Fig. 2):
 ```shell

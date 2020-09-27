@@ -14,7 +14,7 @@ Both Linux and macOS are supported. When on Windows, use [Windows Subsystem for 
 
 #### Requirements:
 
-- Docker, version 19.03 or higher, with the [BuildKit](https://github.com/docker/buildx#building) plugin (Tech Preview) enabled.
+- Docker, version 19.03 or higher, with the [BuildKit](https://github.com/docker/buildx#building) plugin (Tech Preview) installed.
 - On Linux, Docker should be [configured](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user) to allow management as a non-root user, i.e. without `sudo`.
 
 Download the pre-built binary for your platform from the [releases](https://github.com/onnovalkering/brane/releases) page and place it in a `$PATH` directory, with execute permission. It's recommended to use `brane` as the binary's name:   
