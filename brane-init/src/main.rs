@@ -29,6 +29,8 @@ enum SubCommand {
         function: String,
         #[structopt(help = "Arguments as Base64 encoded JSON")]
         arguments: String,
+        #[structopt(short, long, name = "PATH", help = "Path to output directory")]
+        output_dir: Option<PathBuf>,
     },
 
     #[structopt(about = "Execute a function, using the ECU package handler")]
@@ -75,8 +77,8 @@ async fn main() -> Result<()> {
 ///
 async fn run(options: CLI) -> Result<()> {
     let output = match options.sub_command {
-        SubCommand::Cwl { function, arguments } => {
-            exec_cwl::handle(function, decode(arguments)?, options.working_dir)?
+        SubCommand::Cwl { function, arguments, output_dir } => {
+            exec_cwl::handle(function, decode(arguments)?, options.working_dir, output_dir)?
         }
         SubCommand::Ecu { function, arguments } => {
             exec_ecu::handle(function, decode(arguments)?, options.working_dir)?        

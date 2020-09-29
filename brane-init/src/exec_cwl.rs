@@ -3,7 +3,7 @@ use specifications::common::{Parameter, Value, Type};
 use specifications::package::PackageInfo;
 use std::path::PathBuf;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::process::Command;
 use serde_json::Value as JValue;
 
@@ -16,6 +16,7 @@ pub fn handle(
     function: String,
     arguments: Map<Value>,
     working_dir: PathBuf,
+    output_dir: Option<PathBuf>,
 ) -> Result<Value> {
     debug!("Executing '{}' (CWL) using arguments:\n{:#?}", function, arguments);
 
@@ -27,7 +28,7 @@ pub fn handle(
     initialize(&arguments, &working_dir)?;
 
     // Output variables are captured from the stdout
-    let stdout = execute(&working_dir)?;
+    let stdout = execute(&working_dir, output_dir)?;
     let output = capture_output(&stdout, &function.return_type, &package_info.types)?;
 
     if let Some(value) = output {
@@ -93,9 +94,13 @@ fn initialize(
 ///
 fn execute(
     working_dir: &PathBuf,
+    output_dir: Option<PathBuf>,
 ) -> Result<String> {
+    let output_dir = output_dir.unwrap_or(working_dir.clone());
+    let output_dir = output_dir.as_os_str().to_string_lossy();
+
     let result = Command::new("cwltool")
-        .args(vec!["--quiet", "document.cwl", "input.json"])
+        .args(vec!["--quiet", "--outdir", &output_dir, "document.cwl", "input.json"])
         .current_dir(&working_dir)
         .output()
         .expect("Couldn't execute cwltool.");
@@ -103,11 +108,9 @@ fn execute(
     let stdout = String::from(String::from_utf8_lossy(&result.stdout));
     let stderr = String::from(String::from_utf8_lossy(&result.stderr));
     
-    debug!("stdout:\n{}", &stdout);
-    debug!("stderr:\n{}", &stderr);
+    debug!("stdout:\n{}\n", &stdout);
+    debug!("stderr:\n{}\n", &stderr);
 
-    ensure!(result.status.success(), "Non-zero exit status for action");
-    
     Ok(stdout)
 }
 
@@ -119,31 +122,37 @@ fn capture_output(
     return_type: &String,
     _c_types: &Option<Map<Type>>,
 ) -> Result<Option<Value>> {
-    let output: Map<JValue> = serde_json::from_str(&stdout)?;
-    if let Some((_, value)) = output.iter().next() {
-        Ok(Some(match return_type.as_str() {
-            "File" => {
-                let location = value["location"].as_str().unwrap().to_string();
+    let outputs: Map<JValue> = serde_json::from_str(&stdout)?;
+    debug!("output: {:#?}", outputs);
 
-                let mut properties = Map::<Value>::new();
+    if outputs.len() == 0 {
+        return Ok(None);
+    }
+
+    let mut output_properties: Map<Value> = Default::default();
+    for (name, output) in outputs {
+        if output.is_null() {
+            continue;
+        }
+
+        let data_type = output["class"].as_str().expect("Missing `class` property on CWL output parameter.");
+        match data_type {
+            "File" => {
+                let location = output["location"].as_str().unwrap().to_string();
+
+                let mut properties: Map<Value> = Default::default();
                 properties.insert("url".to_string(), Value::Unicode(location));
                 
-                Value::Struct {
+                let value = Value::Struct {
                     data_type: String::from("File"),
                     properties
-                }
-            },
-            "string" => {
-                let mut value_file = File::open(value["path"].as_str().unwrap())?;
-                let mut value_content = String::new();
-                value_file.read_to_string(&mut value_content)?;
-                
-                let value_trimmed = value_content.trim().to_string();
-                Value::Unicode(value_trimmed.to_string())
+                };
+
+                output_properties.insert(name, value);
             },
             _ => unimplemented!()
-        }))
-    } else {
-        Ok(None)
+        }
     }
+
+    Ok(Some(Value::Struct { data_type: return_type.clone(), properties: output_properties }))
 }
