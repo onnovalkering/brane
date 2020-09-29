@@ -75,9 +75,11 @@ fn initialize(
     working_dir: &PathBuf
 ) -> Result<()> {
     let mut input = Map::<JValue>::new();
-    for (name, value) in arguments.iter() {
-        input.insert(name.clone(), value.as_json());
-    }
+    if let Some(Value::Struct { properties, .. }) = arguments.get("input") {
+        for (name, value) in properties.iter() {
+            input.insert(name.clone(), value.as_json());
+        }
+    };
 
     let input_path = working_dir.join("input.json");
     let mut input_file = File::create(input_path)?;
