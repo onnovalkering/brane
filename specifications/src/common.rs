@@ -301,12 +301,32 @@ impl Value {
     pub fn as_json(&self) -> JValue {
         use Value::*;
         match self {
-            Array { .. } => unimplemented!(),
+            Array { entries, .. } => {
+                json!(entries.iter().map(|e| e.as_json()).collect::<JValue>())
+            },
             Boolean(b) => json!(b),
             Integer(i) => json!(i),
             Pointer { .. } => unimplemented!(),
             Real(r) => json!(r),
-            Struct { .. } => unimplemented!(),
+            Struct { data_type, properties } => {
+                match data_type.as_str() {
+                    "Directory" | "File" => {
+                        let url = properties.get("url").unwrap();
+                        json!({
+                            "class": data_type,
+                            "path": url.as_json(),
+                        })
+                    },
+                    _ => {
+                        let mut object = Map::<JValue>::new();
+                        for (name, value) in properties {
+                            object.insert(name.clone(), value.as_json());
+                        }
+
+                        json!(object)
+                    }
+                }
+            },
             Unicode(s) => json!(s),
             Unit => json!(null),
         }
