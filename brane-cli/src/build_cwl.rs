@@ -1,7 +1,7 @@
 use crate::{packages, utils};
 use anyhow::{Context, Result};
 use console::style;
-use cwl::v11_cm::Format;
+use cwl::v11_cm::{Any, Format};
 use cwl::v11_clt::{
     CommandInputParameter, CommandInputParameterType, CommandLineToolInput, CommandLineToolInputType,
     CommandLineToolOutput, CommandLineToolOutputType, CommandOutputParameter, CommandOutputParameterType,
@@ -10,7 +10,7 @@ use cwl::v11_wf::{
     WorkflowInputParameterType, WorkflowInputType, WorkflowInputs, WorkflowOutputParameter,
     WorkflowOutputParameterType, WorkflowOutputType, WorkflowOutputs, WorkflowSteps,
 };
-use cwl::{v11::CwlDocument, v11_clt::CommandLineTool, v11_cm::Any, v11_cm::CwlType, v11_wf::Workflow};
+use cwl::{v11::CwlDocument, v11_clt::CommandLineTool, v11_cm::CwlType, v11_wf::Workflow};
 use specifications::common::{CallPattern, Function, Parameter, Property, Type, Value};
 use specifications::package::PackageInfo;
 use std::fmt::Write as FmtWrite;
@@ -295,7 +295,19 @@ fn construct_wf_properties(wf: &Workflow) -> Result<(String, Vec<Property>, Vec<
         WorkflowInputs::ParameterMap(inputs) => {
             for (p_name, p_param) in inputs.iter() {
                 if let WorkflowInputParameterType::Type(p_type) = &p_param.r#type {
-                    let property = construct_wf_input_prop(p_name, p_type)?;
+                    let mut property = construct_wf_input_prop(p_name, p_type)?;
+                    if let Some(Any::Any(yvalue)) = &p_param.default {
+                        let default = match property.data_type.as_str() {
+                            "boolean" => Value::Boolean(yvalue.as_bool().unwrap()),
+                            "integer" => Value::Integer(yvalue.as_i64().unwrap()),
+                            "real" => Value::Real(yvalue.as_f64().unwrap()),
+                            "string" => Value::Unicode(yvalue.as_str().unwrap().to_string()),
+                            _ => unimplemented!()
+                        };
+
+                        property.default = Some(default);
+                    }
+
                     input_properties.push(property);
                 } else { 
                     unimplemented!()

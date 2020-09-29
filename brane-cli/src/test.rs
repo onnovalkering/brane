@@ -20,6 +20,7 @@ use std::{
     fmt::{Debug, Display},
     str::FromStr,
 };
+use url::Url;
 use uuid::Uuid;
 
 type Map<T> = std::collections::HashMap<String, T>;
@@ -56,6 +57,10 @@ pub async fn handle(
     Ok(())
 }
 
+fn url_to_path(url: &Url) -> Result<PathBuf> {
+    Ok(PathBuf::from(url.path()))
+}
+
 ///
 ///
 ///
@@ -70,13 +75,45 @@ async fn test_cwl(
     let image = format!("{}:{}", package_info.name, package_info.version);
     let image_file = Some(package_dir.join("image.tar"));
 
-    let mounts = vec![
+    let mut mounts = vec![
         String::from("/var/run/docker.sock:/var/run/docker.sock"),
         String::from("/tmp:/tmp"),
     ];
 
+    let input = arguments.get("input").expect("Missing `input` argument");
+    if let Value::Struct { properties, .. } = input {
+        for (_, value) in properties.iter() {
+            match value {
+                Value::Array { data_type, entries } => {
+                    if data_type == "Directory" || data_type == "File" {
+                        for entry in entries {
+                            if let Value::Struct { properties, .. } = entry {
+                                let url = properties.get("url").expect(&format!("Missing `url` property on {}", data_type));
+                                let path = url_to_path(&Url::parse(&url.as_string()?)?)?;
+            
+                                mounts.push(format!("{0}:{0}", path.into_os_string().to_string_lossy()));   
+                            }
+                        }
+                    }
+                },
+                Value::Struct { data_type, properties} => {
+                    if data_type == "Directory" || data_type == "File" {
+                        let url = properties.get("url").expect(&format!("Missing `url` property on {}", data_type));
+                        let path = url_to_path(&Url::parse(&url.as_string()?)?)?;
+
+                        mounts.push(format!("{0}:{0}", path.into_os_string().to_string_lossy()));
+                    }
+                },
+                _ => continue
+            }
+        }
+    }
+
+    debug!("Mounts: {:#?}", mounts);
     let command = vec![
-        String::from("cwl"), 
+        String::from("cwl"),
+        String::from("-o"),
+        String::from("/tmp"),
         function, 
         base64::encode(serde_json::to_string(&arguments)?)
     ];
