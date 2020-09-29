@@ -295,7 +295,7 @@ fn construct_wf_properties(wf: &Workflow) -> Result<(String, Vec<Property>, Vec<
         WorkflowInputs::ParameterMap(inputs) => {
             for (p_name, p_param) in inputs.iter() {
                 if let WorkflowInputParameterType::Type(p_type) = &p_param.r#type {
-                    let property = construct_wf_input_prop2(p_name, p_type)?;
+                    let property = construct_wf_input_prop(p_name, p_type)?;
                     input_properties.push(property);
                 } else { 
                     unimplemented!()
@@ -304,7 +304,7 @@ fn construct_wf_properties(wf: &Workflow) -> Result<(String, Vec<Property>, Vec<
         },
         WorkflowInputs::TypeMap(inputs) => { 
             for (p_name, p_type) in inputs.iter() {
-                let property = construct_wf_input_prop2(p_name, p_type)?;
+                let property = construct_wf_input_prop(p_name, p_type)?;
                 input_properties.push(property);
             }
         },
@@ -330,13 +330,19 @@ fn construct_wf_properties(wf: &Workflow) -> Result<(String, Vec<Property>, Vec<
 ///
 ///
 ///
-fn construct_wf_input_prop2(
+fn construct_wf_input_prop(
     name: &String,
     p_type: &WorkflowInputType,
 ) -> Result<Property> {
     if let WorkflowInputType::CwlType(cwl_type) = p_type {
         if let CwlType::Str(data_type) = cwl_type {
-            return Ok(Property::new_quick(name, data_type));
+            let data_type = match data_type.as_str() {
+                "int" => String::from("integer"),
+                "float" => String::from("real"),
+                _ => data_type.clone(),
+            };
+
+            return Ok(Property::new_quick(name, &data_type));
         }
     }
 

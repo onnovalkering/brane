@@ -6,7 +6,7 @@ use brane_vm::environment::InMemoryEnvironment;
 use brane_vm::vault::InMemoryVault;
 use brane_sys::local::LocalSystem;
 use console::style;
-use dialoguer::Password;
+use dialoguer::{Confirm, Password};
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input as Prompt, Select};
 use serde_yaml;
@@ -24,7 +24,6 @@ use uuid::Uuid;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
-const NESTED_OBJ_NOT_SUPPORTED: &str = "Nested parameter objects are not supported";
 const PACKAGE_NOT_FOUND: &str = "Package not found.";
 const UNSUPPORTED_PACKAGE_KIND: &str = "Package kind not supported.";
 
@@ -219,11 +218,79 @@ fn prompt_for_input(
     let mut arguments = Map::<Value>::new();
     for p in &function.parameters {
         let data_type = p.data_type.as_str();
-        let value = match data_type {
+
+        let value = if let Some(input_type) = types.get(data_type) {
+            let mut properties = Map::<Value>::new();
+    
+            for p in &input_type.properties {
+                let p = p.clone().into_parameter();
+                let data_type = p.data_type.as_str();
+
+                let value = prompt_for_value(data_type, &p)?;
+                properties.insert(p.name.clone(), value);
+            }
+
+            Value::Struct {
+                data_type: input_type.name.clone(),
+                properties,
+            }
+        } else {
+            prompt_for_value(data_type, p)?
+        };
+
+        arguments.insert(p.name.clone(), value);
+    }
+
+    debug!("Arguments: {:#?}", arguments);
+
+    println!();
+
+    Ok((function_name.clone(), arguments))
+}
+
+///
+///
+///
+fn prompt_for_value(
+    data_type: &str,
+    p: &Parameter
+) -> Result<Value> {
+    let value = if data_type.ends_with("[]") {
+        let data_type = data_type[..data_type.len()-2].to_string();
+        let mut entries = vec![];
+
+        loop {
+            let mut p = p.clone();
+            p.data_type = format!("{}[{}]", data_type, entries.len());
+            entries.push(prompt_for_value(&data_type, &p)?);
+        
+            if !Confirm::new().with_prompt(format!("Do you want to more items to the {} array?", style(p.name).bold().cyan())).interact()? {
+                break
+            }
+        }
+
+        Value::Array {
+            data_type,
+            entries
+        }
+    } else {
+        match data_type {
             "boolean" => {
                 let default = p.clone().default.map(|d| d.as_bool().unwrap());
                 Value::Boolean(prompt(&p, default)?)
             }
+            "Directory" | "File" => {
+                let default = p.clone().default.map(|d| d.as_string().unwrap());
+                let url = Value::Unicode(format!("file://{}", prompt(&p, default)?));
+
+                let mut properties = Map::<Value>::default();
+                properties.insert(String::from("url"), url);
+
+                Value::Struct {
+                    data_type: String::from(data_type),
+                    properties
+                }
+            },
             "integer" => {
                 let default = p.clone().default.map(|d| d.as_i64().unwrap());
                 Value::Integer(prompt(&p, default)?)
@@ -234,7 +301,7 @@ fn prompt_for_input(
             }
             "string" => {
                 let default = p.clone().default.map(|d| d.as_string().unwrap());
-                let value = if p.name == "password" {
+                let value = if p.name.to_lowercase().contains("password") {
                     prompt_password(&p, default)?
                 } else {
                     prompt(&p, default)?
@@ -242,54 +309,11 @@ fn prompt_for_input(
 
                 Value::Unicode(value)
             }
-            _ => {
-                if let Some(input_type) = types.get(data_type) {
-                    let mut properties = Map::<Value>::new();
+            _ => unreachable!()
+        }
+    };
 
-                    for p in &input_type.properties {
-                        let p = p.clone().into_parameter();
-                        let data_type = p.data_type.as_str();
-                        let value = match data_type {
-                            "boolean" => {
-                                let default = p.clone().default.map(|d| d.as_bool().unwrap());
-                                Value::Boolean(prompt(&p, default)?)
-                            }
-                            "integer" => {
-                                let default = p.clone().default.map(|d| d.as_i64().unwrap());
-                                Value::Integer(prompt(&p, default)?)
-                            }
-                            "real" => {
-                                let default = p.clone().default.map(|d| d.as_f64().unwrap());
-                                Value::Real(prompt(&p, default)?)
-                            }
-                            "string" => {
-                                let default = p.clone().default.map(|d| d.as_string().unwrap());
-                                Value::Unicode(prompt(&p, default)?)
-                            }
-                            _ => {
-                                return Err(anyhow!(NESTED_OBJ_NOT_SUPPORTED));
-                            }
-                        };
-
-                        properties.insert(p.name.clone(), value);
-                    }
-
-                    Value::Struct {
-                        data_type: input_type.name.clone(),
-                        properties,
-                    }
-                } else {
-                    return Err(anyhow!("Unsupported parameter type: {}", data_type));
-                }
-            }
-        };
-
-        arguments.insert(p.name.clone(), value);
-    }
-
-    println!();
-
-    Ok((function_name.clone(), arguments))
+    Ok(value)
 }
 
 ///
