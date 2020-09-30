@@ -157,7 +157,27 @@ impl Compiler {
         value: &AstTerm,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
         let (value, data_type) = match value {
-            AstTerm::Value(value) => (Some(value.clone()), value.data_type().to_string()),
+            AstTerm::Value(value) => {
+                let data_type = value.data_type();
+                if let Value::Struct { data_type, properties } = value {
+                    if let Some(c_type) = self.state.types.get(data_type) {
+                        for property in &c_type.properties {
+                            ensure!(properties.get(&property.name).is_some(), "Missing '{}' in {} object.", property.name, data_type);
+                            let actual_property = properties.get(&property.name).unwrap();
+
+                            ensure!(actual_property.data_type() == property.data_type, "Mismatch in datatype '{}' should be {} but is {}.", property.name, property.data_type, actual_property.data_type());
+                        }
+
+                        ensure!(properties.len() == c_type.properties.len(), "Mismatch in number of actual and expected properties.");
+                    } else {
+                        bail!("Cannot find type information for {}. If it is custom type, please bring it into scope.", data_type);
+                    }
+
+                    (Some(value.clone()), data_type.to_string())
+                } else {
+                    (Some(value.clone()), data_type.to_string())
+                }
+            },
             AstTerm::Name(variable) => {
                 debug!("name: {}", variable);
 

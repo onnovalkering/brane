@@ -4,7 +4,7 @@ COMMENT_BLOCK   = @{ "---" ~ (!"---" ~ ANY)* ~ "---" }
 COMMENT_LINE    = @{ "//" ~ (!("\r" | "\n") ~ ANY)* }
 
 program = _{ SOI ~ "\n"* ~ (statement ~ "\n"+) * ~ statement? ~ EOI }
-reserved = { "??" | "as" | "else" | "false" | "if" | "import" | "true" | "until" | "wait" | "while" | "return" }
+reserved = { "??" | "as" | "else" | "false" | "if" | "import" | "new" | "return" | "true" | "until" | "wait" | "while" }
 
 // Utilities
 WS = _{ WHITESPACE }
@@ -63,5 +63,5 @@ string_body     = _{ (!(NL | PEEK) ~ ANY)+ }
 
 // Structures
 array 		      = { "[" ~ NL* ~ "]" | "[" ~ NL* ~ value ~ ("," ~ NL* ~ value)* ~ NL* ~ "]" }
-object 		      = { "{" ~ NL* ~ "}" | "{" ~ NL* ~ entry ~ ("," ~ NL* ~ entry)* ~ NL* ~ "}" }
+object 		      = { "new" ~ complex ~ ("{" ~ NL* ~ "}" | "{" ~ NL* ~ entry ~ ("," ~ NL* ~ entry)* ~ NL* ~ "}") }
 entry 		      = { name ~ ":" ~ value }

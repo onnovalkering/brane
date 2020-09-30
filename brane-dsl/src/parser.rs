@@ -256,11 +256,14 @@ fn parse_name_rule(rule: Pair<Rule>) -> Result<String> {
 ///
 ///
 ///
-fn parse_object_rule(rule: Pair<Rule>) -> Result<Map<Value>> {
-    let object = rule.into_inner();
+fn parse_object_rule(rule: Pair<Rule>) -> Result<Value> {
+    let mut object = rule.into_inner();
+
+    let complex = object.next().unwrap();
+    let data_type = complex.as_str().to_string();
 
     let mut properties = Map::<Value>::new();
-    for prop in object {
+    while let Some(prop) = object.next() {
         let mut prop_inner = prop.into_inner();
 
         let name = prop_inner.next().unwrap().as_str().to_string();
@@ -269,7 +272,7 @@ fn parse_object_rule(rule: Pair<Rule>) -> Result<Map<Value>> {
         properties.insert(name, parse_value_rule(value)?);
     }
 
-    Ok(properties)
+    Ok(Value::Struct { data_type, properties })
 }
 
 ///
@@ -424,15 +427,16 @@ fn parse_value_rule(rule: Pair<Rule>) -> Result<Value> {
     match value.as_rule() {
         Rule::array => {
             let entries = parse_array_rule(value)?;
-            let data_type = format!("{}[]", entries.first().unwrap().data_type());
+            let data_type = if !entries.is_empty() {
+                format!("{}[]", entries.first().unwrap().data_type())
+            } else {
+                String::from("Array")
+            };
 
             Ok(Value::Array { data_type, entries })
         },
-        Rule::object => Ok(Value::Struct {
-            data_type: "object".to_string(), // TODO: specify actual type
-            properties: parse_object_rule(value)?,
-        }),
-        Rule::literal => Ok(parse_literal_rule(value)?),
+        Rule::object => parse_object_rule(value),
+        Rule::literal => parse_literal_rule(value),
         _ => unreachable!(),
     }
 }
