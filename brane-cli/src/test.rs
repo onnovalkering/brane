@@ -22,6 +22,8 @@ use std::{
 };
 use url::Url;
 use uuid::Uuid;
+use std::env;
+use std::fs;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -109,11 +111,16 @@ async fn test_cwl(
         }
     }
 
+    let mut output_dir = env::temp_dir();
+    output_dir.push(format!("{}", Uuid::new_v4()));
+    fs::create_dir(&output_dir)?;
+
     debug!("Mounts: {:#?}", mounts);
+    
     let command = vec![
         String::from("cwl"),
         String::from("-o"),
-        String::from("/tmp"),
+        String::from(output_dir.as_os_str().to_string_lossy()),
         function, 
         base64::encode(serde_json::to_string(&arguments)?)
     ];
