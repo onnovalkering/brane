@@ -7,7 +7,7 @@ services:
       - 8070:8080
 
   kafka:
-    image: confluentinc/cp-kafka:5.5.0
+    image: confluentinc/cp-kafka:5.5.1
     depends_on:
       - zookeeper
     ports:
@@ -37,9 +37,21 @@ services:
     ports:
       - 5000:5000
 
-  zookeeper:
-    image: confluentinc/cp-zookeeper:5.5.0
+  vault:
+    image: vault:1.5.3
+    cap_add:
+      - IPC_LOCK
     ports:
-      - 2181:2181
+      - 8200:8200
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: mytoken
+
+  xenon:
+    image: onnovalkering/xenon-grpc
+    ports:
+      - 50051:50051
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:5.5.1
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181

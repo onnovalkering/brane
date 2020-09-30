@@ -18,7 +18,7 @@ loop:
 	docker build -t onnovalkering/brane-loop -f Dockerfile.loop .
 
 start:
-	docker-compose -f deployment/docker/docker-compose.yml up -d
+	docker-compose up -d
 
 stop:
-	docker-compose -f deployment/docker/docker-compose.yml down
+	docker-compose down
