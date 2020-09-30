@@ -1,11 +1,10 @@
 .github/
 brane-api/packages
 brane-api/temporary
-brane-cli/
-brane-dsl/
+brane-dsl/resources
 brane-exec/resources
-brane-ide/jupyterlab/registry/node_modules
-brane-ide/jupyterlab/renderer/node_modules
+brane-ide/registry/node_modules
+brane-ide/renderer/node_modules
 brane-init/
 deployment/
 docs/

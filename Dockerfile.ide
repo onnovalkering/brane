@@ -1,0 +1,52 @@
+FROM rust as build
+
+RUN apt-get update && apt-get install -y \
+    cmake \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN USER=root cargo new --bin brane-cli
+WORKDIR /brane-cli
+
+# Copy over project manifests
+COPY ./brane-cli/Cargo.toml ./Cargo.toml
+COPY ./brane-dsl /brane-dsl
+COPY ./brane-exec /brane-exec
+COPY ./brane-std /brane-std
+COPY ./brane-sys /brane-sys
+COPY ./brane-vm /brane-vm
+COPY ./specifications /specifications
+
+# This will prepare dependencies
+RUN cargo build --release
+RUN rm src/*.rs
+
+# Copy over project source code
+COPY ./brane-cli/src ./src
+
+# This will build a release binary
+RUN rm ./target/release/deps/brane_cli*
+RUN cargo build --release
+
+# 612aa5710bf9: updated Sept 2020
+FROM jupyter/minimal-notebook:612aa5710bf9
+
+COPY --from=build /brane-cli/target/release/brane-cli /usr/local/bin/brane-cli
+
+COPY ./brane-ide/kernel /kernel
+COPY ./brane-ide/registry /registry
+COPY ./brane-ide/renderer /renderer
+
+USER root
+
+RUN brane-cli -s login http://brane-api:8080 --username jovyan
+
+WORKDIR /kernel
+RUN python setup.py install \ 
+ && python install.py
+
+RUN jupyter labextension install /registry
+RUN jupyter labextension install /renderer
+
+# Switch back to jovyan to avoid accidental container runs as root
+USER $NB_UID
+WORKDIR $HOME
