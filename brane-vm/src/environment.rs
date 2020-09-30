@@ -92,7 +92,7 @@ impl Environment for InMemoryEnvironment {
             return parent.get(name);
         }
 
-        panic!("Trying to access undeclared variable.");
+        panic!("Trying to access undeclared variable: {}", name);
     }
 
     ///

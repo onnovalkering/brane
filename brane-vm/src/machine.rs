@@ -168,6 +168,8 @@ impl Machine {
         let mut cursor: Box<dyn Cursor> = Box::new(InMemoryCursor::new());
 
         while let Some(instruction) = get_current_instruction(instructions, &cursor) {
+            debug!("current: {:#?}", instruction);
+
             match instruction {
                 Act(act) => {
                     let arguments = prepare_arguments(&act.input, &self.environment, &self.vault)?;

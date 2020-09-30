@@ -92,7 +92,8 @@ impl InMemoryCursor {
         depth: usize,
         value: usize,
     ) -> () {
-        self.subpositions.insert(depth, value);
+        self.subpositions_max.insert(depth, value);
+        debug!("Set subposition max at depth {} to {}", depth, value);
     }
 }
 
@@ -114,6 +115,8 @@ impl Cursor for InMemoryCursor {
         value: usize,
     ) -> usize {
         self.position = value;
+        debug!("Set position to {}", value);
+
         self.get_position()
     }
 
@@ -134,6 +137,8 @@ impl Cursor for InMemoryCursor {
         value: usize,
     ) -> usize {
         self.depth = value;
+        debug!("Set depth to {}", value);
+
         self.get_depth()
     }
 
@@ -156,6 +161,8 @@ impl Cursor for InMemoryCursor {
         value: usize,
     ) -> usize {
         self.subpositions.insert(depth, value);
+        debug!("Set subposition at depth {} to {}", depth, value);
+
         self.get_subposition(depth)
     }
 
