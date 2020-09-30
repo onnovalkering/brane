@@ -154,15 +154,21 @@ fn construct_envs(variables: &Map<Value>) -> Result<Map<String>> {
                 envs.insert(name.clone(), entries.len().to_string());
 
                 for (index, entry) in entries.iter().enumerate() {
-                    let value = match entry {
-                        Value::Boolean(value) => value.to_string(),
-                        Value::Integer(value) => value.to_string(),
-                        Value::Real(value) => value.to_string(),
-                        Value::Unicode(value) => value.to_string(),
-                        _ => unreachable!(),
-                    };
-
-                    envs.insert(format!("{}_{}", &name, index), value);
+                    if let Value::Array { .. } = entry {
+                        unimplemented!()
+                    } else if let Value::Struct { properties, .. } = entry {
+                        construct_struct_envs(&name, Some(index), properties, &mut envs);
+                    } else {
+                        let value = match entry {
+                            Value::Boolean(value) => value.to_string(),
+                            Value::Integer(value) => value.to_string(),
+                            Value::Real(value) => value.to_string(),
+                            Value::Unicode(value) => value.to_string(),
+                            _ => unreachable!(),
+                        };
+    
+                        envs.insert(format!("{}_{}", &name, index), value);
+                    }
                 }
             }
             Value::Boolean(value) => {
@@ -176,19 +182,7 @@ fn construct_envs(variables: &Map<Value>) -> Result<Map<String>> {
                 envs.insert(name, value.to_string());
             }
             Value::Struct { properties, ..} => {
-                for (key, entry) in properties.iter() {
-                    let value = match entry {
-                        Value::Array { entries: _, .. }=> unimplemented!(),
-                        Value::Boolean(value) => value.to_string(),
-                        Value::Integer(value) => value.to_string(),
-                        Value::Real(value) => value.to_string(),
-                        Value::Unicode(value) => value.to_string(),
-                        Value::Struct { properties: _, .. } => unimplemented!(),
-                        _ => unreachable!()
-                    };
-
-                    envs.insert(format!("{}_{}", &name, key.to_ascii_uppercase()), value);
-                }
+                construct_struct_envs(&name, None, properties, &mut envs);
             },
             Value::Unicode(value) => {
                 envs.insert(name, value.to_string());
@@ -199,6 +193,34 @@ fn construct_envs(variables: &Map<Value>) -> Result<Map<String>> {
 
     debug!("envs: {:?}", envs);
     Ok(envs)
+}
+
+///
+///
+///
+fn construct_struct_envs(
+    name: &String, 
+    index: Option<usize>,
+    properties: &Map<Value>, 
+    envs: &mut Map<String>
+) -> () {
+    for (key, entry) in properties.iter() {
+        let value = match entry {
+            Value::Array { entries: _, .. }=> unimplemented!(),
+            Value::Boolean(value) => value.to_string(),
+            Value::Integer(value) => value.to_string(),
+            Value::Real(value) => value.to_string(),
+            Value::Unicode(value) => value.to_string(),
+            Value::Struct { properties: _, .. } => unimplemented!(),
+            _ => unreachable!()
+        };
+
+        if let Some(index) = index {
+            envs.insert(format!("{}_{}_{}", &name, index, key.to_ascii_uppercase()), value);
+        } else {
+            envs.insert(format!("{}_{}", &name, key.to_ascii_uppercase()), value);
+        }
+    }
 }
 
 ///
@@ -271,6 +293,18 @@ fn unwrap_yaml_value(
         "boolean" => {
             let value = value.as_bool().unwrap();
             Value::Boolean(value)
+        }
+        "Directory" | "File" => {
+            let value = String::from(value.as_str().unwrap());
+            let url = Value::Unicode(value);
+
+            let mut properties: Map<Value> = Default::default();
+            properties.insert(String::from("url"), url);
+
+            Value::Struct {
+                data_type: String::from(data_type),
+                properties
+            }
         }
         "integer" => {
             let value = value.as_i64().unwrap();
