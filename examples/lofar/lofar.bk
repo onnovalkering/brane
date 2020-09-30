@@ -1,0 +1,22 @@
+import "fs"
+import "lta"
+import "prefactor"
+
+observation := ?? as Integer
+directory := new_directory
+
+staging := stage observation files
+wait until staging status = "success"
+
+archives := download observation files to directory
+measuresets := extract archives to directory
+
+input := CalibrateInput {
+    cellsize_lowres_deg: 0.00694,
+    image_padding: 1.4,
+    maxlambda_lowres: 2000
+    ms_array: measuresets,
+    reference_station: "CS001HBA0",
+}
+
+result := calibrate input

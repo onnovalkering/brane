@@ -42,8 +42,8 @@ actions:
         - to
 
     input: 
-      - type: string[]
-        name: surls
+      - type: File[]
+        name: files
 
       - type: Directory
         name: target
@@ -53,8 +53,29 @@ actions:
         secret: LOFAR_PROXY
 
     output:
-      - type: string[]
+      - type: File[]
         name: files
+
+  'extract':
+    command:
+      args:
+        - extract
+    
+    pattern:
+      prefix: extract
+      infix:
+        - to
+
+    input:
+      - type: File[]
+        name: files
+      
+      - type: Directory
+        name: target
+    
+    output:
+      - type: Directory[]
+        name: directories
 
   'files':
     command:
@@ -77,8 +98,8 @@ actions:
         secret: LOFAR_PASSWORD
 
     output:
-      - type: string[]
-        name: surls
+      - type: File[]
+        name: files
 
   'stage':
     command:
@@ -89,8 +110,8 @@ actions:
       prefix: stage
 
     input:
-      - type: string[]
-        name: surls
+      - type: File[]
+        name: files
 
       - type: string
         name: username

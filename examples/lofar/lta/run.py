@@ -4,8 +4,14 @@ import os
 import os.path
 import subprocess
 import sys
+import tarfile
 import xmlrpc.client
 import yaml
+
+from os import environ
+from os.path import dirname
+from urllib.parse import urlparse
+
 
 def download(): 
     target = os.environ["TARGET_URL"]
@@ -16,7 +22,7 @@ def download():
         f.write(proxy)
 
     # Write copyjob to /opt/wd/copyjob
-    surls = [os.environ[f"SURLS_{i}"] for i in range(int(os.environ["SURLS"]))]
+    surls = [os.environ[f"FILES_{i}_URL"] for i in range(int(os.environ["FILES"]))]
     files = [os.path.join(target, os.path.basename(s)) for s in surls]
     copyjob = '\n'.join([f"{s} {f}" for (s, f) in zip(surls, files)])
 
@@ -40,6 +46,22 @@ def download():
     return {"files": files}
 
 
+def extract():
+    target = urlparse(environ["TARGET_URL"]).path
+    files = [urlparse(environ[f"FILES_{i}_URL"]).path for i in range(int(environ["FILES"]))]
+    
+    directories = []
+    for file in files:
+        with tarfile.open(file, 'r') as tar:
+            tar.extractall(target)
+
+            first_name = tar.getnames()[0]
+            directory = first_name if dirname(first_name) == "" else dirname(first_name)
+            directories.append(os.path.join(target, directory))
+
+    return {"directories": directories}
+
+
 def files():
     username = os.environ["USERNAME"]
     password = os.environ["PASSWORD"]
@@ -55,7 +77,7 @@ def files():
         database.connect()
 
     query_observations = Observation.observationId == observation_id
-    surls = []
+    files = []
     for observation in query_observations:
         dataproduct_query = cdp.observations.contains(observation)
         dataproduct_query &= cdp.isValid == 1
@@ -63,17 +85,17 @@ def files():
         for dataproduct in dataproduct_query:
             fileobject = ((FileObject.data_object == dataproduct) & (FileObject.isValid > 0)).max('creation_date')
             if fileobject:
-                surls.append(fileobject.URI)
+                files.append(fileobject.URI)
 
-    return {"surls": surls}
+    return {"files": files}
 
 
 def stage():
-    surls_n = int(os.environ["SURLS"])
-    surls = [os.environ[f"SURLS_{i}"] for i in range(surls_n)]
+    files_n = int(os.environ["FILES"])
+    files = [os.environ[f"FILES_{i}_URL"] for i in range(files_n)]
 
     lta_proxy = get_lta_proxy()
-    request_id = lta_proxy.LtaStager.add_getid(surls)
+    request_id = lta_proxy.LtaStager.add_getid(files)
 
     return {'request_id': request_id}
 
@@ -100,6 +122,7 @@ def get_lta_proxy():
 if __name__ == "__main__":
     functions = {
         "download": download,
+        "extract": extract,
         "files": files,
         "stage": stage,
         "status": status
