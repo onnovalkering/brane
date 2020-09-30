@@ -5,5 +5,5 @@ parent: Packages
 nav_order: 2
 ---
 
-# Scripts
-...
+# DSL scripts
+Coming soon.

@@ -103,9 +103,9 @@ __Callbacks__, e.g. outputs from functions executed on a remote infrastructure, 
 ### Vault
 The vault, implemented using [HashiCorp Vault](https://www.vaultproject.io), provides __secure store for secrets__, e.g. credentials, certificates, and/or tokens. When a custom function requires one ore more secrets. They should be specified as a special secret (input) parameters of the function. During runtime, these secrets will be added to the function's arguments just before execution. This __implicit variable__ mechanism prevents embedding hard-coded secrets directly within data processing pipeline applications.
 
+<!-- 
 ### Virtual machine
 ...
-
 
 - executes the instruction graph
 - uses Redis for working copy variables, temps
@@ -115,4 +115,5 @@ The vault, implemented using [HashiCorp Vault](https://www.vaultproject.io), pro
 ... 
 
 - is at the center, makes everything tick
-- diagram ?
+- diagram ? 
+-->

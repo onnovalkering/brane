@@ -115,11 +115,43 @@ download observation files to dir
 </p>
 </video>
 
+
 ## Running calibration tasks
-...
+Coming soon.
 
 ## Displaying output
-...
+Coming soon.
 
+## Conclusion
+Coming soon.
+
+```go
+import "fs"
+import "lta"
+import "prefactor"
+
+observation := ?? as Integer
+
+staging := stage observation files
+wait until staging status = "success"
+
+directory := new_directory
+download observation files to directory
+
+archives := "*.tar" in directory
+measuresets := extract archives to directory
+
+input := CalibrateInput {
+    ms_array: measuresets,
+    
+    // Parameters
+    cellsize_lowres_deg: 0.00694,
+    image_padding: 1.4,
+    maxlambda_lowres: 2000
+    reference_station: "CS001HBA0",
+}
+
+result := calibrate input
+```
 
 <script src="https://vjs.zencdn.net/7.8.4/video.js"></script>
