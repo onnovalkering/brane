@@ -6,6 +6,9 @@ use diesel::prelude::*;
 use diesel::{r2d2, r2d2::ConnectionManager};
 use serde::Deserialize;
 use specifications::common::Value;
+use url::Url;
+use actix_files::NamedFile;
+use std::path::PathBuf;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 type Map<T> = std::collections::HashMap<String, T>;
@@ -22,6 +25,7 @@ pub fn scope() -> Scope {
         .route("", web::get().to(get_sessions))
         .route("/{uuid}", web::get().to(get_session))
         .route("/{uuid}", web::delete().to(delete_session))
+        .route("/{uuid}/files/{variable}", web::get().to(get_session_file))
         .route("/{uuid}/variables", web::get().to(get_session_variables))
 }
 
@@ -144,6 +148,72 @@ async fn delete_session(
         HttpResponse::Ok().body("")
     } else {
         HttpResponse::InternalServerError().body("")
+    }
+}
+
+///
+///
+///
+async fn get_session_file(
+    req: HttpRequest,
+    pool: web::Data<DbPool>,
+    path: web::Path<(String,String)>,
+) -> HttpResponse {
+    let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
+
+    let session = db::sessions.filter(db::uuid.eq(&path.0)).first::<Session>(&conn);
+    if session.is_err() {
+        return HttpResponse::NotFound().body("Session not found.");
+    }
+
+    let variable_name = path.1.clone();
+    let variable = if variable_name.contains('.') {
+        let segments: Vec<_> = variable_name.split('.').collect();
+
+        let object = Variable::belonging_to(&session.unwrap())
+            .filter(var_db::name.eq(&segments[0]))
+            .first::<Variable>(&conn);
+
+        if let Ok(object) = object {
+            let object: Value = serde_json::from_str(&object.content_json.unwrap()).unwrap();
+            if let Value::Struct { properties, .. } = object {
+                if let Some(value) = properties.get(segments[1]) {
+                    value.clone()
+                } else {
+                   return HttpResponse::NotFound().body("Variable not found. 1");
+                }
+            } else {
+                return HttpResponse::BadRequest().body("Variable is not a object.");
+            }
+        } else {
+            return HttpResponse::NotFound().body("Variable not found. 2");
+        }
+
+    } else {
+        let variable = Variable::belonging_to(&session.unwrap())
+            .filter(var_db::name.eq(&path.1))
+            .first::<Variable>(&conn);
+
+        if let Ok(variable) = variable {
+            let variable: Value = serde_json::from_str(&variable.content_json.unwrap()).unwrap();
+            variable
+        } else {
+            return HttpResponse::NotFound().body("Variable not found. 3");
+        }
+    };
+
+    if variable.data_type() != "File" {
+        return HttpResponse::BadRequest().body("Variable is not of type 'File'."); 
+    }
+
+    if let Value::Struct { properties, .. } = variable {
+        let url = properties.get("url").expect("Missing `url` property on File.");
+        let path = PathBuf::from(Url::parse(&url.as_string().unwrap()).unwrap().path());
+        
+        let file = NamedFile::open(path).unwrap();
+        return file.into_response(&req).unwrap();
+    } else {
+        return HttpResponse::InternalServerError().body("Illegal internal state.");
     }
 }
 
