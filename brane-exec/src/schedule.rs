@@ -27,7 +27,7 @@ pub async fn cwl(
 ) -> Result<()> {
     let (image, image_file) = determine_image(&act)?;
     let mounts = determine_mounts(vec!["/var/run/docker.sock:/var/run/docker.sock"], system);
-    let command = determine_command(invocation_id, "cwl", &act.name, &arguments)?;
+    let command = determine_cwl_command(invocation_id, "cwl", &act.name, &arguments, system)?;
 
     let exec = ExecuteInfo::new(image, image_file, mounts, command);
 
@@ -150,11 +150,12 @@ fn determine_mounts(
     mounts: Vec<&str>,
     system: &Box::<dyn System>,
 ) -> Option<Vec<String>> {
-    let temp_dir = system.get_temp_dir();
+    let _temp_dir = system.get_temp_dir();
     let session_dir = system.get_session_dir();
 
     let default = vec![
-        format!("{0}:{0}", temp_dir.into_os_string().into_string().unwrap()),
+        // format!("{0}:{0}", temp_dir.into_os_string().into_string().unwrap()),
+        String::from("/tmp:/tmp"),
         format!("{0}:{0}", session_dir.into_os_string().into_string().unwrap()),
     ];
 
@@ -181,11 +182,43 @@ fn determine_command(
     let callback_url = format!("http://{}/callback", API_HOST.as_str());
 
     let command = vec![
+        String::from("-d"),
         String::from("-c"),
         String::from(callback_url),
         String::from("-i"),
         format!("{}", invocation_id),
         kind.to_string(),
+        function.to_string(),
+        arguments,
+    ];
+
+    Ok(Some(command))
+}
+
+///
+///
+///
+fn determine_cwl_command(
+    invocation_id: i32,
+    kind: &str,
+    function: &str,
+    arguments: &Map<Value>,
+    system: &Box::<dyn System>,
+) -> Result<Option<Vec<String>>> {
+    let temp_dir = system.get_temp_dir();
+
+    let arguments = base64::encode(serde_json::to_string(&arguments)?);
+    let callback_url = format!("http://{}/callback", API_HOST.as_str());
+
+    let command = vec![
+        String::from("-d"),
+        String::from("-c"),
+        String::from(callback_url),
+        String::from("-i"),
+        format!("{}", invocation_id),
+        kind.to_string(),
+        String::from("-o"),
+        String::from(temp_dir.as_os_str().to_string_lossy()),
         function.to_string(),
         arguments,
     ];
