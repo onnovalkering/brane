@@ -87,7 +87,7 @@ async fn test_cwl(
         for (_, value) in properties.iter() {
             match value {
                 Value::Array { data_type, entries } => {
-                    if data_type == "Directory" || data_type == "File" {
+                    if data_type == "Directory[]" || data_type == "File[]" {
                         for entry in entries {
                             if let Value::Struct { properties, .. } = entry {
                                 let url = properties.get("url").expect(&format!("Missing `url` property on {}", data_type));
@@ -118,6 +118,7 @@ async fn test_cwl(
     debug!("Mounts: {:#?}", mounts);
     
     let command = vec![
+        String::from("-d"),
         String::from("cwl"),
         String::from("-o"),
         String::from(output_dir.as_os_str().to_string_lossy()),
@@ -300,13 +301,13 @@ fn prompt_for_value(
     p: &Parameter
 ) -> Result<Value> {
     let value = if data_type.ends_with("[]") {
-        let data_type = data_type[..data_type.len()-2].to_string();
+        let entry_data_type = data_type[..data_type.len()-2].to_string();
         let mut entries = vec![];
 
         loop {
             let mut p = p.clone();
-            p.data_type = format!("{}[{}]", data_type, entries.len());
-            entries.push(prompt_for_value(&data_type, &p)?);
+            p.data_type = format!("{}[{}]", entry_data_type, entries.len());
+            entries.push(prompt_for_value(&entry_data_type, &p)?);
         
             if !Confirm::new().with_prompt(format!("Do you want to more items to the {} array?", style(p.name).bold().cyan())).interact()? {
                 break
@@ -314,7 +315,7 @@ fn prompt_for_value(
         }
 
         Value::Array {
-            data_type,
+            data_type: data_type.to_string(),
             entries
         }
     } else {
