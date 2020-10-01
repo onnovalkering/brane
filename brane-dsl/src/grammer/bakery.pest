@@ -45,7 +45,7 @@ term            = { name | symbol | value }
 value 		      = { array | object | literal }
 literal         = { boolean | decimal | integer | string }
 name            = @{ name_sg ~ ("." ~ name_sg)* }
-name_sg         = @{ !reserved ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+name_sg         = @{ !(reserved ~ WS) ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 symbol          = { "+" | "-" | "/" | "*" | "%" }
 
 // Operators
