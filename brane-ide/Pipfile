@@ -11,7 +11,7 @@ ipython = "*"
 jupyter-client = "*"
 requests = "*"
 zmq = "*"
-jupyterlab = "==2.1.3"
+jupyterlab = "==2.2.5"
 
 [requires]
 python_version = "3.8"
