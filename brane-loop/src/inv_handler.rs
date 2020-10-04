@@ -150,7 +150,11 @@ async fn on_complete(context: String, _payload: JValue, db: &DbPool, rd: &Client
             .values(&new_variable)
             .on_conflict((var_db::name, var_db::session))
             .do_update()
-            .set((var_db::content_json.eq(value_json), var_db::updated.eq(Utc::now().naive_utc())))
+            .set((
+                var_db::content_json.eq(value_json),
+                var_db::type_.eq(value.data_type()),
+                var_db::updated.eq(Utc::now().naive_utc())
+            ))
             .execute(&db_conn)?;
     }
 
