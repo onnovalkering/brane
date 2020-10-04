@@ -14,28 +14,108 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use serde_yaml;
 use uuid::Uuid;
-use serde_json::json;
+use serde_json::{self, json};
 use console::style;
+use serde::{Deserialize, Serialize};
 
 type Map<T> = std::collections::HashMap<String, T>;
+
+#[serde(tag = "t", content = "c", rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+enum CompileServiceMessage {
+    Code(String),
+    Variables(Map<String>),
+}
+
+impl CompileServiceMessage {
+    pub fn from_string(s: String) -> Result<Self> {
+        let result = serde_json::from_str(&s)?;
+        Ok(result)
+    }
+}
+
 
 pub async fn start(
     secrets_file: Option<PathBuf>,
     co_address: Option<PathBuf>,
 ) -> Result<()> {
-    if let Some(co_address) = co_address {
-        return start_compile_service(co_address).await;
-    }
-
-    println!("Starting interactive session, press Ctrl+D to exit.\n");
-
-    let interface = Interface::new("brane-repl")?;
-    interface.set_prompt("brane> ")?;
-
     // Prepare DSL compiler
     let package_index = registry::get_package_index().await?;
     let mut compiler = Compiler::new(CompilerOptions::repl(), package_index)?;
 
+    if let Some(co_address) = co_address {
+        return start_compile_service(co_address, &mut compiler).await;
+    } else {
+        return start_repl(&mut compiler, secrets_file);
+    }
+}
+
+///
+///
+///
+async fn start_compile_service(
+    co_address: PathBuf,
+    compiler: &mut Compiler,
+) -> Result<()> {
+    println!("Starting compile-only service\n");
+
+    let context = zmq::Context::new();
+    let socket = context.socket(zmq::REP)?;
+
+    let address = co_address.into_os_string().into_string().unwrap();
+    let endpoint = format!("ipc://{}", address);
+
+    debug!("endpoint: {}", endpoint);
+    socket.bind(&endpoint)?;
+
+    loop {
+        let data = socket.recv_string(0)?;
+        if let Ok(data) = data {
+            debug!("data: {}", data);
+
+            let message = CompileServiceMessage::from_string(data)?;
+            let response = match message {
+                CompileServiceMessage::Code(code) => {
+                    let result = compiler.compile(&code);
+                    match result {
+                        Ok(instructions) => {
+                            json!({
+                                "variant": "ok",
+                                "content": instructions,
+                            })
+                        },
+                        Err(err) => {
+                            debug!("{}", err);
+                            json!({
+                                "variant": "err",
+                                "content": err.to_string(),
+                            })
+                        }
+                    }
+                }
+                CompileServiceMessage::Variables(variables) => {
+                    compiler.inject(variables);
+                    json!({
+                        "variant": "ok",
+                    })
+                }
+            };
+
+            let response_json = serde_json::to_string(&response)?;
+            debug!("Response: {}", response_json);
+
+            socket.send(&response_json, 0)?;
+        } else {
+            warn!("Failed to read compile-service request, ignoring..");
+            socket.send("", 0)?;
+        };
+    }    
+}
+
+fn start_repl(
+    compiler: &mut Compiler, 
+    secrets_file: Option<PathBuf>,
+) -> Result<()> {
     // Prepare machine
     let secrets: Map<Value> = if let Some(secrets_file) = secrets_file {
         let reader = BufReader::new(File::open(&secrets_file)?);
@@ -55,6 +135,11 @@ pub async fn start(
         Box::new(system),
         Box::new(vault),
     );
+
+    println!("Starting interactive session, press Ctrl+D to exit.\n");
+
+    let interface = Interface::new("brane-repl")?;
+    interface.set_prompt("brane> ")?;
 
     while let ReadResult::Input(line) = interface.read_line()? {
         if !line.trim().is_empty() {
@@ -84,56 +169,6 @@ pub async fn start(
     Ok(())
 }
 
-///
-///
-///
-async fn start_compile_service(co_address: PathBuf) -> Result<()> {
-    println!("Starting compile-only service\n");
-
-    // Prepare DSL compiler
-    let package_index = registry::get_package_index().await?;
-    let mut compiler = Compiler::new(CompilerOptions::repl(), package_index)?;
-
-    let context = zmq::Context::new();
-    let socket = context.socket(zmq::REP)?;
-
-    let address = co_address.into_os_string().into_string().unwrap();
-    let endpoint = format!("ipc://{}", address);
-
-    debug!("endpoint: {}", endpoint);
-    socket.bind(&endpoint)?;
-
-    loop {
-        let data = socket.recv_string(0)?;
-
-        if let Ok(data) = data {
-            let result = compiler.compile(&data);
-            let response = match result {
-                Ok(instructions) => {
-                    json!({
-                        "variant": "ok",
-                        "content": instructions,
-                    })
-                },
-                Err(err) => {
-                    debug!("{}", err);
-                    json!({
-                        "variant": "err",
-                        "content": err.to_string(),
-                    })
-                }
-            };
-
-            let response_json = serde_json::to_string(&response)?;
-            debug!("Response: {}", response_json);
-
-            socket.send(&response_json, 0)?;
-        } else {
-            warn!("Failed to read compile-service request, ignoring..");
-            socket.send("", 0)?;
-        };
-    }    
-}
 
 ///
 ///

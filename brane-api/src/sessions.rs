@@ -1,5 +1,5 @@
-use crate::models::{Session, NewSession, Variable, NewVariable};
-use crate::schema::{self, sessions::dsl as db, variables::dsl as var_db};
+use crate::models::{Session, NewSession, Variable, NewVariable, Invocation};
+use crate::schema::{self, sessions::dsl as db, variables::dsl as var_db, invocations::dsl as inv_db};
 use actix_web::Scope;
 use actix_web::{web, HttpRequest, HttpResponse};
 use diesel::prelude::*;
@@ -25,6 +25,7 @@ pub fn scope() -> Scope {
         .route("", web::get().to(get_sessions))
         .route("/{uuid}", web::get().to(get_session))
         .route("/{uuid}", web::delete().to(delete_session))
+        .route("/{uuid}/invocations", web::get().to(get_session_invocations))
         .route("/{uuid}/files/{variable}", web::get().to(get_session_file))
         .route("/{uuid}/variables", web::get().to(get_session_variables))
 }
@@ -105,17 +106,14 @@ async fn get_session(
 ) -> HttpResponse {
     let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
 
-    let sessions = web::block(move || db::sessions.filter(db::uuid.eq(&path.0)).limit(1).load::<Session>(&conn)).await;
+    let session = web::block(move || 
+        db::sessions.filter(db::uuid.eq(&path.0)).first::<Session>(&conn)
+    ).await;
 
-    if let Ok(sessions) = sessions {
-        if sessions.len() == 1 {
-            let session: &Session = sessions.first().unwrap();
-            HttpResponse::Ok().json(session)
-        } else {
-            HttpResponse::NotFound().body("")
-        }
+    if let Ok(session) = session {
+        HttpResponse::Ok().json(session)
     } else {
-        HttpResponse::InternalServerError().body("")
+        HttpResponse::NotFound().body("")
     }
 }
 
@@ -146,6 +144,45 @@ async fn delete_session(
 
     if diesel::delete(&session).execute(&conn).is_ok() {
         HttpResponse::Ok().body("")
+    } else {
+        HttpResponse::InternalServerError().body("")
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InvocationsFilter {
+    status: Option<String>
+}
+
+///
+///
+///
+async fn get_session_invocations(
+    _req: HttpRequest,
+    pool: web::Data<DbPool>,
+    path: web::Path<(String,)>,
+    filter: web::Query<InvocationsFilter>,
+) -> HttpResponse {
+    let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
+
+    let session = db::sessions.filter(db::uuid.eq(&path.0)).first::<Session>(&conn);
+    if session.is_err() {
+        return HttpResponse::NotFound().body("");
+    }
+
+    let session = session.unwrap();
+    let invocations = if let Some(status) = &filter.status {
+        Invocation::belonging_to(&session)
+            .filter(inv_db::status.eq(status))
+            .load::<Invocation>(&conn)
+    } else {
+        Invocation::belonging_to(&session)
+            .load::<Invocation>(&conn)
+    };
+
+    if let Ok(invocations) = invocations {
+        HttpResponse::Ok().json(invocations)
     } else {
         HttpResponse::InternalServerError().body("")
     }
@@ -209,7 +246,10 @@ async fn get_session_file(
     if let Value::Struct { properties, .. } = variable {
         let url = properties.get("url").expect("Missing `url` property on File.");
         let path = PathBuf::from(Url::parse(&url.as_string().unwrap()).unwrap().path());
-        
+        if !path.exists() {
+            return HttpResponse::BadRequest().body("");
+        }
+
         let file = NamedFile::open(path).unwrap();
         return file.into_response(&req).unwrap();
     } else {

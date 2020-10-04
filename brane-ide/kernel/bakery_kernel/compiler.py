@@ -2,7 +2,7 @@ from tempfile import mkdtemp
 from os import path, remove
 from zmq import Context, REQ
 from subprocess import Popen
-from json import loads
+from json import loads, dumps
 
 class BakeryCompiler:
     """
@@ -26,17 +26,23 @@ class BakeryCompiler:
             self.service.kill()
 
         if hasattr(self, 'address'):
-            os.remove(self.address)
-            os.remove(path.dirname(self.address))
+            remove(self.address)
+            remove(path.dirname(self.address))
 
     def compile(self, code):
-        self.socket.send_string(code)
+        message = dumps({
+            "t": "code",
+            "c": code
+        })
+        self.socket.send_string(message)
         result = self.socket.recv()
 
         return loads(result)
 
     def inject_variables(self, variables):
-        # TODO: implement this on the compile-service side first.
-        pass
-
-        
+        message = dumps({
+            "t": "variables",
+            "c": variables,
+        })
+        self.socket.send_string(message)
+        _ = self.socket.recv()

@@ -115,6 +115,13 @@ impl Compiler {
         Ok(instructions)
     }
 
+    pub fn inject(
+        &mut self,
+        variables: Map<String>
+    ) -> () {
+        self.state.variables.extend(variables);
+    }
+
     ///
     ///
     ///

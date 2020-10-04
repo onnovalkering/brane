@@ -15,7 +15,8 @@ pub struct Config {
     pub temporary_dir: PathBuf,
 }
 
-#[derive(Serialize, Queryable, Identifiable)]
+#[derive(Associations, Serialize, Queryable, Identifiable)]
+#[belongs_to(Session, foreign_key = "session")]
 pub struct Invocation {
     pub id: i32,
     pub session: i32,

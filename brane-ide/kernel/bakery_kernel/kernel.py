@@ -1,9 +1,11 @@
 from ipykernel.kernelbase import Kernel
 from os import getenv
-from zmq import Context, REQ
 from requests import get, post
 from urllib.parse import urljoin
 from time import sleep
+from base64 import b64encode
+from imghdr import what
+from io import BytesIO
 
 from .compiler import BakeryCompiler
 
@@ -15,10 +17,10 @@ SESSIONS_ENDPOINT = urljoin(f'http://{API_HOST}', 'sessions')
 
 class BakeryKernel(Kernel):
     implementation = 'Bakery'
-    implementation_version = '1.0'
-    banner = 'banner??'
+    implementation_version = '1.0.0'
+    banner = 'bakery'
     language = 'no-op'
-    language_version = '0.1'
+    language_version = '0.1.0'
     language_info = {
         'name': 'Bakery',
         'mimetype': 'text/plain',
@@ -42,20 +44,13 @@ class BakeryKernel(Kernel):
             instructions = result["content"]
             invocation_uuid = create_invocation(instructions, self.session_uuid)
 
-            # Keep polling until invocation is complete.
-            counter = 1
-            while True:
-                sleep(min(counter * .5, 5))
-
-                status = get_invocation_status(invocation_uuid)
-                self.publish_status(status, invocation_uuid, update=counter > 1)
-                counter += 1
-
-                if status["invocation"]["status"] == "complete":
-                    break
+            self.poll_invocation(invocation_uuid)
         else:
             self.publish_stream("stderr", result['content'])
 
+        return self.complete()      
+
+    def complete(self):
         # This marks the current cell as complete
         return {
             'status': 'ok',
@@ -64,14 +59,18 @@ class BakeryKernel(Kernel):
             'user_expressions': {},
         }
 
-    def attach_session(self, session_uuid):
-        """
-        Attach to an existing session. Variables will be restored.
-        """
-        self.session_uuid = session_uuid
+    def poll_invocation(self, invocation_uuid):
+        # Keep polling until invocation is complete.
+        counter = 1
+        while True:
+            sleep(min(counter * .5, 5))
 
-        variables = get_session_variables(session_uuid)
-        self.bakery.inject_variables(variables)
+            status = get_invocation_status(invocation_uuid)
+            self.publish_status(status, invocation_uuid, update=counter > 1)
+            counter += 1
+
+            if status["invocation"]["status"] == "complete":
+                break        
 
     def intercept_magic(self, code):
         """
@@ -79,7 +78,8 @@ class BakeryKernel(Kernel):
         No need to filter magic out, as it is considered a comment by Bakery.
         """
         magics = {
-            'attach': self.attach_session,
+            'attach': self.attach,
+            'display': self.display,
             'session': lambda: self.publish_stream('stdout', self.session_uuid),
             'variables': lambda: self.publish_json(get_session_variables(self.session_uuid), False)
         }
@@ -91,6 +91,42 @@ class BakeryKernel(Kernel):
 
             if magic is not None:
                 magic(*command[1:])
+
+
+    def attach(self, session_uuid):
+        """
+        Attach to an existing session. Variables will be restored, imports not.
+        """
+        self.session_uuid = session_uuid
+
+        variables = get_session_variables(session_uuid)
+        variables = {v["name"]: v["type_"] for v in variables}
+
+        self.bakery.inject_variables(variables)
+
+        invocation_uuid = get_active_invocation(session_uuid)
+        if invocation_uuid is not None:
+            self.poll_invocation(invocation_uuid)                
+        
+    def display(self, variable):
+        """
+        Retreives and displays a 'File' variable.
+        """
+        response = get(f"{SESSIONS_ENDPOINT}/{self.session_uuid}/files/{variable}")
+        with BytesIO(response.content) as b:
+            image = b.read()
+
+        image_type = what(None, image)
+        image_data = b64encode(image).decode('ascii')
+        
+        content = {
+            'data': {
+                f'image/{image_type}': image_data
+            },
+            'metadata': {}
+        }
+
+        self.send_response(self.iopub_socket, "display_data", content)
 
     def publish_json(self, data, update):
         """
@@ -106,7 +142,7 @@ class BakeryKernel(Kernel):
         }
 
         message_type = "update_display_data" if update else "display_data"
-        self.send_response(self.iopub_socket, message_type, content)        
+        self.send_response(self.iopub_socket, message_type, content)
 
     def publish_stream(self, stream, text):
         """
@@ -136,6 +172,19 @@ class BakeryKernel(Kernel):
 
         message_type = "update_display_data" if update else "display_data"
         self.send_response(self.iopub_socket, message_type, content)
+
+
+def get_active_invocation(session_uuid):
+    """
+    Retreives the current active invocation, if any, of the active session.
+    """
+    response = get(f"{SESSIONS_ENDPOINT}/{session_uuid}/invocations?status=active")
+    content = response.json()
+
+    if len(content) == 0:
+        return None
+    else:
+        return content[0]["uuid"]
 
 
 def create_invocation(instructions, session_uuid):
