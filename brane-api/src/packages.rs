@@ -104,7 +104,7 @@ async fn upload_package(
 ) -> HttpResponse {
     let conn = pool.get().expect("Couldn't get connection from db pool.");
     let config = config.get_ref().clone();
-    let docker_host = config.docker_host;
+    let registry_host = config.registry_host;
     let packages_dir = config.packages_dir;
     let temporary_dir = config.temporary_dir;
     let name = path.0.clone();
@@ -194,7 +194,7 @@ async fn upload_package(
                         .arg("copy")
                         .arg("--dest-tls-verify=false")
                         .arg(format!("docker-archive:{}", image_tar))
-                        .arg(format!("docker://{}/library/{}", docker_host, image_label))
+                        .arg(format!("docker://{}/library/{}", registry_host, image_label))
                         .status()
                 })
                 .await;

@@ -2,7 +2,7 @@ use anyhow::Result;
 use serde_json::Value as JValue;
 use diesel::prelude::*;
 use chrono::Utc;
-use brane_sys::{System, local::LocalSystem};
+use brane_sys::{System, local::LocalSystem, kubernetes::K8sSystem};
 use brane_vm::machine::{AsyncMachine, MachineResult};
 use brane_vm::vault::{Vault, HashiVault, InMemoryVault};
 use diesel::pg::PgConnection;
@@ -20,6 +20,10 @@ use serde_json::json;
 
 type DbPool = Pool<ConnectionManager<PgConnection>>;
 type Event = (String, String);
+
+lazy_static! {
+    static ref SYSTEM: String = env::var("SYSTEM").unwrap_or_else(|_| String::from("local"));
+}
 
 const MSG_NO_DB_CONNECTION: &str = "Couldn't get connection from db pool.";
 const MSG_NO_RD_CONNECTION: &str = "Couldn't get connection from rd client.";
@@ -273,9 +277,14 @@ fn setup_machine(
 ///
 ///
 fn setup_system(session_uuid: String) -> Result<Box<dyn System>> {
-    let system = LocalSystem::new(session_uuid.parse()?);
-    
-    Ok(Box::new(system))
+    let system: Box<dyn System> = match SYSTEM.as_str() {
+        "local" => Box::new(LocalSystem::new(session_uuid.parse()?)),
+        "kubernetes" => Box::new(K8sSystem::new(session_uuid.parse()?)),
+        "xenon" => unimplemented!(),
+        _ => bail!("Unrecognized system: {}", SYSTEM.as_str()),
+    };
+
+    Ok(system)
 }
 
 ///

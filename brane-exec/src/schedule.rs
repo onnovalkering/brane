@@ -1,5 +1,5 @@
 use crate::ExecuteInfo;
-use crate::docker;
+use crate::{docker, kubernetes};
 use anyhow::{Context, Result};
 use specifications::common::Value;
 use specifications::instructions::{Instruction, ActInstruction};
@@ -13,7 +13,8 @@ type Map<T> = std::collections::HashMap<String, T>;
 
 lazy_static! {
     static ref API_HOST: String = env::var("API_HOST").unwrap_or_else(|_| String::from("brane-api:8080"));
-    static ref DOCKER_HOST: String = env::var("DOCKER_HOST").unwrap_or_else(|_| String::from("localhost:5000"));
+    static ref REGISTRY_HOST: String = env::var("REGISTRY_HOST").unwrap_or_else(|_| String::from("localhost:5000"));
+    static ref SYSTEM: String = env::var("SYSTEM").unwrap_or_else(|_| String::from("local"));
 }
 
 ///
@@ -26,13 +27,11 @@ pub async fn cwl(
     system: &Box::<dyn System>,
 ) -> Result<()> {
     let (image, image_file) = determine_image(&act)?;
-    let mounts = determine_mounts(vec!["/var/run/docker.sock:/var/run/docker.sock"], system);
+    let mounts = determine_mounts(vec!["/var/run/docker.sock:/var/run/docker.sock", "/tmp:/tmp"], system);
     let command = determine_cwl_command(invocation_id, "cwl", &act.name, &arguments, system)?;
 
     let exec = ExecuteInfo::new(image, image_file, mounts, command);
-
-    docker::run(exec).await?;
-    Ok(())
+    run(exec).await
 }
 
 ///
@@ -103,9 +102,7 @@ pub async fn ecu(
     let command = determine_command(invocation_id, "ecu", &act.name, &arguments)?;
 
     let exec = ExecuteInfo::new(image, image_file, mounts, command);
-
-    docker::run(exec).await?;
-    Ok(())
+    run(exec).await
 }
 
 ///
@@ -122,9 +119,7 @@ pub async fn oas(
     let command = determine_command(invocation_id, "oas", &act.name, &arguments)?;
 
     let exec = ExecuteInfo::new(image, image_file, mounts, command);
-
-    docker::run(exec).await?;
-    Ok(())
+    run(exec).await
 }
 
 ///
@@ -137,7 +132,7 @@ fn determine_image(
 
     let image_file = act.meta.get("image_file").map(PathBuf::from);
     if image_file.is_none() {
-        image = format!("{}/library/{}", DOCKER_HOST.as_str(), image);
+        image = format!("{}/library/{}", REGISTRY_HOST.as_str(), image);
     }
 
     Ok((image, image_file))
@@ -150,12 +145,11 @@ fn determine_mounts(
     mounts: Vec<&str>,
     system: &Box::<dyn System>,
 ) -> Option<Vec<String>> {
-    let _temp_dir = system.get_temp_dir();
+    let temp_dir = system.get_temp_dir();
     let session_dir = system.get_session_dir();
 
     let default = vec![
-        // format!("{0}:{0}", temp_dir.into_os_string().into_string().unwrap()),
-        String::from("/tmp:/tmp"),
+        format!("{0}:{0}", temp_dir.into_os_string().into_string().unwrap()),
         format!("{0}:{0}", session_dir.into_os_string().into_string().unwrap()),
     ];
 
@@ -224,4 +218,17 @@ fn determine_cwl_command(
     ];
 
     Ok(Some(command))
+}
+
+///
+///
+///
+async fn run(exec: ExecuteInfo) -> Result<()> {
+    match SYSTEM.as_str() {
+        "local" => docker::run(exec).await?,
+        "kubernetes" => kubernetes::run(exec).await?,
+        _ => unimplemented!()
+    }
+
+    Ok(())
 }

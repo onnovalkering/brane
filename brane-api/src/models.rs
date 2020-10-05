@@ -10,8 +10,8 @@ type FResult<T> = Result<T, failure::Error>;
 
 #[derive(Clone)]
 pub struct Config {
-    pub docker_host: String,
     pub packages_dir: PathBuf,
+    pub registry_host: String,
     pub temporary_dir: PathBuf,
 }
 

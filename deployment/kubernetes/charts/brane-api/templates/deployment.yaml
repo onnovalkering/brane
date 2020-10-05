@@ -14,6 +14,11 @@ spec:
       labels:
         app: brane-api
     spec:
+      volumes:
+        - name: brane-nfs
+          nfs:
+            server: brane-nfs
+            path: /brane    
       containers:
         - name: brane-api
           image: onnovalkering/brane-api:0.1.0
@@ -24,3 +29,4 @@ spec:
               value: "0.0.0.0"
             - name: KAFKA_BROKERS
               value: confluent:9092
+          

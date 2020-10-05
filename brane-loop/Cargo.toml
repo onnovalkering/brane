@@ -12,6 +12,7 @@ brane-sys = { path = "../brane-sys" }
 env_logger = "0.7"
 failure = "0.1"
 futures = "0.3"
+lazy_static = "1.4"
 log = "0.4"
 diesel = { version = "1.4", features = ["r2d2", "postgres", "chrono"] }
 diesel_migrations = "1.4"

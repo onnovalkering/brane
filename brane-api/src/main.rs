@@ -33,7 +33,7 @@ mod sessions;
 embed_migrations!();
 
 const DEF_DATABASE_URL: &str = "postgres://postgres:postgres@postgres/postgres";
-const DEF_DOCKER_HOST: &str = "registry:5000";
+const DEF_REGISTRY_HOST: &str = "registry:5000";
 const DEF_KAFKA_BROKERS: &str = "kafka:9092";
 const DEF_PACKAGES_DIR: &str = "./packages";
 const DEF_REDIS_URL: &str = "redis://redis";
@@ -65,8 +65,8 @@ async fn main() -> std::io::Result<()> {
     }
 
     // Prepare the filesystem
-    let packages_dir = env::var("PACKAGES_DIR").unwrap_or_else(|_| String::from(DEF_PACKAGES_DIR));
-    let temporary_dir = env::var("TEMPORARY_DIR").unwrap_or_else(|_| String::from(DEF_TEMPORARY_DIR));
+    let packages_dir: PathBuf = env::var("PACKAGES_DIR").unwrap_or_else(|_| String::from(DEF_PACKAGES_DIR)).into();
+    let temporary_dir: PathBuf = env::var("TEMPORARY_DIR").unwrap_or_else(|_| String::from(DEF_TEMPORARY_DIR)).into();
     fs::create_dir_all(&temporary_dir)?;
     fs::create_dir_all(&packages_dir)?;
 
@@ -93,11 +93,11 @@ async fn main() -> std::io::Result<()> {
         .expect("Couldn't create a Kafka producer.");
 
     // Prepare configuration
-    let docker_host = env::var("DOCKER_HOST").unwrap_or_else(|_| String::from(DEF_DOCKER_HOST));
+    let registry_host = env::var("REGISTRY_HOST").unwrap_or_else(|_| String::from(DEF_REGISTRY_HOST));
     let config = models::Config {
-        docker_host,
-        packages_dir: PathBuf::from(packages_dir),
-        temporary_dir: PathBuf::from(temporary_dir),
+        packages_dir,
+        registry_host,
+        temporary_dir,
     };
 
     // Configure the HTTP server

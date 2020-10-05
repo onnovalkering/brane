@@ -14,6 +14,11 @@ spec:
       labels:
         app: brane-loop
     spec:
+      volumes:
+        - name: brane-nfs
+          nfs:
+            server: brane-nfs
+            path: /brane
       containers:
         - name: brane-loop
           image: onnovalkering/brane-loop:0.1.0
@@ -22,13 +27,18 @@ spec:
           env:
             - name: API_HOST
               value: "{{ .Values.hostname }}:31990"
-            - name: DOCKER_HOST
+            - name: REGISTRY_HOST
               value: "{{ .Values.hostname }}:31992"
             - name: KAFKA_BROKERS
               value: confluent:9092
-            - name: RUNTIME
+            - name: SYSTEM
               value: kubernetes
             - name: VAULT_HOST
               value: vault:8200
             - name: VAULT_TOKEN
               value: mytoken
+            - name: K8S_NAMESPACE
+              value: brane
+            - name: K8S_CONFIG
+              value: incluster
+
