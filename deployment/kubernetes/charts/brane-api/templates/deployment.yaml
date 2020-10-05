@@ -15,13 +15,15 @@ spec:
         app: brane-api
     spec:
       volumes:
-        - name: brane-nfs
-          nfs:
-            server: brane-nfs
-            path: /brane    
+        - name: brane-volume
+          persistentVolumeClaim:
+            claimName: brane-pvc
       containers:
         - name: brane-api
           image: onnovalkering/brane-api:0.1.0
+          volumeMounts:
+            - name: brane-volume          
+              mountPath: /brane
           ports:
             - containerPort: 8080
           env:

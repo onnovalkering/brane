@@ -1,0 +1,41 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: brane-pv
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: local-storage
+  capacity:
+    storage: 100Gi
+  volumeMode: Filesystem
+  persistentVolumeReclaimPolicy: Delete
+  local:
+    path: /data/brane
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+            - "{{ .Values.global.dataNode }}"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: brane-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: local-storage    
+  resources:
+    requests:
+      storage: 100Gi

@@ -15,20 +15,22 @@ spec:
         app: brane-loop
     spec:
       volumes:
-        - name: brane-nfs
-          nfs:
-            server: brane-nfs
-            path: /brane
+        - name: brane-volume
+          persistentVolumeClaim:
+            claimName: brane-pvc
       containers:
         - name: brane-loop
           image: onnovalkering/brane-loop:0.1.0
+          volumeMounts:
+            - name: brane-volume          
+              mountPath: /brane
           ports:
-            - containerPort: 8080
+            - containerPort: 8080              
           env:
             - name: API_HOST
-              value: "{{ .Values.hostname }}:31990"
+              value: "{{ .Values.global.hostname }}:31990"
             - name: REGISTRY_HOST
-              value: "{{ .Values.hostname }}:31992"
+              value: "{{ .Values.global.hostname }}:31992"
             - name: KAFKA_BROKERS
               value: confluent:9092
             - name: SYSTEM
