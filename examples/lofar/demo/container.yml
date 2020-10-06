@@ -1,0 +1,33 @@
+name: demo
+version: 1.0.0
+kind: compute
+
+dependencies:
+  - python3
+  - python3-yaml
+
+files:
+  - L570745_SB000_uv_first10.MS.tar
+  - L570745_SB001_uv_first10.MS.tar
+  - run.py
+
+entrypoint:
+  kind: task
+  exec: run.py
+
+actions:
+  'load':
+    command:
+      args:
+        - load
+
+    pattern:
+      prefix: load_demo_files_to
+
+    input: 
+      - type: Directory
+        name: target
+
+    output:
+      - type: File[]
+        name: files
