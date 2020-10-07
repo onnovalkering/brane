@@ -7,8 +7,7 @@ dependencies:
   - python3-yaml
 
 files:
-  - L570745_SB000_uv_first10.MS.tar
-  - L570745_SB001_uv_first10.MS.tar
+  - L591513_SB000_uv_delta_t_4.MS.tar
   - run.py
 
 entrypoint:

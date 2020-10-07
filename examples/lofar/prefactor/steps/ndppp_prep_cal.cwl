@@ -159,8 +159,18 @@ inputs:
 
 outputs:
   msout:
-    type: Directory?
+    type: Directory
     outputBinding:
       glob: "calibrated.MS"
 
 
+$namespaces:
+  s: http://schema.org/
+$schemas:
+  - https://schema.org/version/latest/schema.rdf
+
+
+
+s:license: "https://mit-license.org/"
+s:author:
+  s:person.url: "http://orcid.org/0000-0002-6136-3724"

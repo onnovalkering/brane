@@ -28,19 +28,19 @@ inputs:
       position: 19
 outputs:
   - id: psf
-    type: File?
+    type: File
     outputBinding:
       glob: wsclean-MFS-psf.fits
   - id: dirty
-    type: File?
+    type: File
     outputBinding:
       glob: wsclean-MFS-dirty.fits
   - id: residual
-    type: File?
+    type: File
     outputBinding:
       glob: wsclean-MFS-residual.fits
   - id: model
-    type: File?
+    type: File
     outputBinding:
       glob: wsclean-MFS-model.fits
 label: create_image
@@ -96,3 +96,8 @@ arguments:
   - -join-channels
 requirements:
   - class: InlineJavascriptRequirement
+$schemas:
+  - 'https://schema.org/version/latest/schema.rdf'
+'s:author':
+  's:person.url': 'https://orcid.org/0000-0001-5125-9539'
+'s:license': 'https://mit-license.org/'

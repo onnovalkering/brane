@@ -15,67 +15,67 @@ inputs:
     doc: list of calibrated measurement sets
 outputs:
   - id: mapfile_paths
-    type: File?
+    type: File
     outputBinding:
       glob: cwl
   - id: mapfile_deep_high_padded
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_deep_high_padded_size
   - id: mapfile_deep_high_size
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_deep_high_size
   - id: mapfile_deep_low_padded_size
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_deep_low_padded_size
   - id: mapfile_deep_low_size
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_deep_low_size
   - id: mapfile_freqstep
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_freqstep
   - id: mapfile_high_padded_size
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_high_padded_size
   - id: mapfile_high_size
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_high_size
   - id: mapfile_low_padded_size
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_low_padded_size
   - id: mapfile_low_size
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_low_size
   - id: mapfile_nbands
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_nbands
   - id: mapfile_nchansout_clean1
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_nchansout_clean1
   - id: mapfile_nwavelengths_high
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_nwavelengths_high
   - id: mapfile_nwavelengths_low
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_nwavelengths_low
   - id: mapfile_single
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_single
   - id: mapfile_timestep
-    type: File?
+    type: File
     outputBinding:
       glob: cwl_timestep
 label: _do_magic
@@ -93,3 +93,8 @@ arguments:
            mapfile_dir=os.path.basename("."))
 requirements:
   - class: InlineJavascriptRequirement
+$schemas:
+  - 'https://schema.org/version/latest/schema.rdf'
+'s:author':
+  's:person.url': 'https://orcid.org/0000-0001-5125-9539'
+'s:license': 'https://mit-license.org/'

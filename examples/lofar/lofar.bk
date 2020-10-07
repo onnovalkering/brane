@@ -11,12 +11,17 @@ wait until staging status = "success"
 archives := download observation files to directory
 measuresets := extract archives to directory
 
-input := CalibrateInput {
+input := new CalibrateInput {
+    ms_array: measuresets,
+
     cellsize_lowres_deg: 0.00694,
     image_padding: 1.4,
-    maxlambda_lowres: 2000
-    ms_array: measuresets,
+    maxlambda_lowres: 2000,
     reference_station: "CS001HBA0",
+    avg.timestep: 2,
+    avg.freqstep: 2,
+    flag.baseline: "[ CS013HBA* ]"
 }
 
 result := calibrate input
+return result

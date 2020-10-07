@@ -39,29 +39,39 @@ arguments:
 
 outputs:
     freqs_for_phase_array:
-      type: File?
+      type: File
       format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
       label: "Frequencies"
       outputBinding:
         glob: "freqs_for_phase_array.npy"
 
     phase_array:
-      type: File?
+      type: File
       format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
       label: "Phase solutions"
       outputBinding:
         glob: "cwl_phase_array.npy"
 
     station_names:
-      type: File?
+      type: File
       format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
       label: "Station names"
       outputBinding:
         glob: "cwl_station_names.npy"
 
     phase_xx_yy_offset:
-      type: File?
+      type: File
       format: image/png
       outputBinding:
         glob: "phase_xx_yy_offset.png"
 
+$namespaces:
+  s: http://schema.org/
+$schemas:
+  - https://schema.org/version/latest/schema.rdf
+
+
+
+s:license: "https://mit-license.org/"
+s:author:
+  s:person.url: "http://orcid.org/0000-0002-6136-3724"

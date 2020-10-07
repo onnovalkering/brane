@@ -55,3 +55,12 @@ outputs:
       glob: fitted_data_dTEC_fitclock_1st.sm.npy
 
 
+
+$namespaces:
+  s: http://schema.org/
+$schemas:
+  - https://schema.org/version/latest/schema.rdf
+
+s:license: "https://mit-license.org/"
+s:author:
+  s:person.url: "http://orcid.org/0000-0002-6136-3724"

@@ -1,39 +1,18 @@
-# https://github.com/EOSC-LOFAR/prefactor-cwl
-
 cwlVersion: v1.0
 class: Workflow
-
-s:name: prefactor
-s:version: 1.0.0
-label: calibrate
 
 requirements:
   ScatterFeatureRequirement: {}
 
 inputs:
-  ms_array: 
-    type: Directory[]
-  reference_station: 
-    type: string
-    default: CS001HBA0
-  avg.freqstep: 
-    type: int
-    default: 2
-  avg.timestep: 
-    type: int
-    default: 2
-  flag.baseline: 
-    type: string
-    default: "[ CS013HBA* ]"
-  maxlambda_lowres: 
-    type: int
-    default: 2000
-  cellsize_lowres_deg: 
-    type: float
-    default: 0.00694
-  image_padding: 
-    type: float
-    default: 1.4
+  ms_array: Directory[]
+  reference_station: string
+  avg.freqstep: int
+  avg.timestep: int
+  flag.baseline: string
+  maxlambda_lowres: int
+  cellsize_lowres_deg: float
+  image_padding: float
 
 outputs:
   losoto_h5:
@@ -42,73 +21,73 @@ outputs:
     label: "H5Parm solutions"
     outputSource: h5imp_cal/losoto_h5
 
-  dTEC_1st:
-    type: File
-    format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
-    label: "TEC solutions"
-    outputSource: fitclock/dTEC_1st
+  # dTEC_1st:
+  #   type: File
+  #   format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
+  #   label: "TEC solutions"
+  #   outputSource: fitclock/dTEC_1st
 
-  dTEC_1st_sm:
-    type: File
-    format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
-    label: "Smoothed TEC solutions"
-    outputSource: fitclock/dTEC_1st_sm
+  # dTEC_1st_sm:
+  #   type: File
+  #   format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
+  #   label: "Smoothed TEC solutions"
+  #   outputSource: fitclock/dTEC_1st_sm
 
-  dclock_1st:
-    type: File
-    format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
-    label: "Clock solutions"
-    outputSource: fitclock/dclock_1st
+  # dclock_1st:
+  #   type: File
+  #   format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
+  #   label: "Clock solutions"
+  #   outputSource: fitclock/dclock_1st
 
-  dclock_1st_sm:
-    type: File
-    format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
-    label: "Smoothed clock solutions"
-    outputSource: fitclock/dclock_1st_sm
+  # dclock_1st_sm:
+  #   type: File
+  #   format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
+  #   label: "Smoothed clock solutions"
+  #   outputSource: fitclock/dclock_1st_sm
 
-  amplitude_array:
-    type: File?
-    format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
-    label: "Amplitude solutions"
-    outputSource: ampl/amplitude_array
+  # amplitude_array:
+  #   type: File
+  #   format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
+  #   label: "Amplitude solutions"
+  #   outputSource: ampl/amplitude_array
 
-  dtec_allsols:
-    type: File?
-    format: iana:image/png
-    outputSource: plots/dtec_allsols
+  # dtec_allsols:
+  #   type: File
+  #   format: iana:image/png
+  #   outputSource: plots/dtec_allsols
 
-  dclock_allsols:
-    type: File?
-    format: iana:image/png
-    outputSource: plots/dclock_allsols
+  # dclock_allsols:
+  #   type: File
+  #   format: iana:image/png
+  #   outputSource: plots/dclock_allsols
 
-  amp_allsols:
-    type: File?
-    format: iana:image/png
-    outputSource: plots/amp_allsols
+  # amp_allsols:
+  #   type: File
+  #   format: iana:image/png
+  #   outputSource: plots/amp_allsols
 
-  phase_xx_yy_offset:
-    type: File?
-    format: iana:image/png
-    outputSource: phase/phase_xx_yy_offset
+  # phase_xx_yy_offset:
+  #   type: File
+  #   format: iana:image/png
+  #   outputSource: phase/phase_xx_yy_offset
 
-  freqs_for_phase_array:
-    type: File?
-    format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
-    label: "Frequencies"
-    outputSource: phase/freqs_for_phase_array
+  # freqs_for_phase_array:
+  #   type: File
+  #   format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
+  #   label: "Frequencies"
+  #   outputSource: phase/freqs_for_phase_array
 
-  phase_array:
-    type: File?
-    format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
-    label: "Phase solutions"
-    outputSource: phase/phase_array
+  # phase_array:
+  #   type: File
+  #   format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
+  #   label: "Phase solutions"
+  #   outputSource: phase/phase_array
 
-  station_names:
-    type: File?
-    format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
-    label: "Station names"
-    outputSource: phase/station_names
+  # station_names:
+  #   type: File
+  #   format: https://docs.scipy.org/doc/numpy-dev/neps/npy-format.html
+  #   label: "Station names"
+  #   outputSource: phase/station_names
 
   polXX_dirpointing:
     type: File
@@ -120,26 +99,25 @@ outputs:
     format: iana:image/png
     outputSource: plot_cal_phases/polYY_dirpointing
 
-  psf:
-    type: File?
-    format: iana:image/fits
-    outputSource: create_image/psf
+  # psf:
+  #   type: File
+  #   format: iana:image/fits
+  #   outputSource: create_image/psf
 
-  residual:
-    type: File?
-    format: iana:image/fits
-    outputSource: create_image/residual
+  # residual:
+  #   type: File
+  #   format: iana:image/fits
+  #   outputSource: create_image/residual
 
-  model:
-    type: File?
-    format: iana:image/fits
-    outputSource: create_image/model
+  # model:
+  #   type: File
+  #   format: iana:image/fits
+  #   outputSource: create_image/model
 
-  dirty:
-    type: File?
-    format: iana:image/fits
-    outputSource: create_image/dirty
-
+  # dirty:
+  #   type: File
+  #   format: iana:image/fits
+  #   outputSource: create_image/dirty
 
 steps:
   ndppp_prep_cal:
@@ -180,39 +158,39 @@ steps:
     out:
       [losoto_h5]
 
-  fitclock:
-    run: steps/fitclock.cwl
-    in:
-      globaldbname: h5imp_cal/losoto_h5
-    out:
-      [dTEC_1st, dTEC_1st_sm, dclock_1st, dclock_1st_sm]
+  # fitclock:
+  #   run: steps/fitclock.cwl
+  #   in:
+  #     globaldbname: h5imp_cal/losoto_h5
+  #   out:
+  #     [dTEC_1st, dTEC_1st_sm, dclock_1st, dclock_1st_sm]
 
-  ampl:
-    run: steps/ampl.cwl
-    in:
-      globaldbname: h5imp_cal/losoto_h5
-    out:
-      [amplitude_array]
+  # ampl:
+  #   run: steps/ampl.cwl
+  #   in:
+  #     globaldbname: h5imp_cal/losoto_h5
+  #   out:
+  #     [amplitude_array]
 
-  plots:
-    run: steps/plots.cwl
-    in:
-      amplitude_array: ampl/amplitude_array
-      dclock_1st: fitclock/dclock_1st
-      dclock_1st_sm: fitclock/dclock_1st_sm
-      dtec_1st_sm: fitclock/dTEC_1st_sm
-    out:
-       [dtec_allsols, dclock_allsols, amp_allsols]
+  # plots:
+  #   run: steps/plots.cwl
+  #   in:
+  #     amplitude_array: ampl/amplitude_array
+  #     dclock_1st: fitclock/dclock_1st
+  #     dclock_1st_sm: fitclock/dclock_1st_sm
+  #     dtec_1st_sm: fitclock/dTEC_1st_sm
+  #   out:
+  #      [dtec_allsols, dclock_allsols, amp_allsols]
 
-  phase:
-    run: steps/phase.cwl
-    in:
-      losoto: h5imp_cal/losoto_h5
-    out:
-      - freqs_for_phase_array
-      - phase_array
-      - station_names
-      - phase_xx_yy_offset
+  # phase:
+  #   run: steps/phase.cwl
+  #   in:
+  #     losoto: h5imp_cal/losoto_h5
+  #   out:
+  #     - freqs_for_phase_array
+  #     - phase_array
+  #     - station_names
+  #     - phase_xx_yy_offset
 
   plot_cal_phases:
     run: steps/plot_cal_phases.cwl
@@ -222,40 +200,54 @@ steps:
     out:
       [polXX_dirpointing, polYY_dirpointing]
 
-  do_magic:
-    run: steps/do_magic.cwl
-    in:
-      prepcals: calib_cal/mscalib
-    out:
-      - mapfile_paths
-      - mapfile_deep_high_padded
-      - mapfile_deep_high_size
-      - mapfile_deep_low_padded_size
-      - mapfile_deep_low_size
-      - mapfile_freqstep
-      - mapfile_high_padded_size
-      - mapfile_high_size
-      - mapfile_low_padded_size
-      - mapfile_low_size
-      - mapfile_nbands
-      - mapfile_nchansout_clean1
-      - mapfile_nwavelengths_high
-      - mapfile_nwavelengths_low
-      - mapfile_single
-      - mapfile_timestep
+  # do_magic:
+  #   run: steps/do_magic.cwl
+  #   in:
+  #     prepcals: calib_cal/mscalib
+  #   out:
+  #     - mapfile_paths
+  #     - mapfile_deep_high_padded
+  #     - mapfile_deep_high_size
+  #     - mapfile_deep_low_padded_size
+  #     - mapfile_deep_low_size
+  #     - mapfile_freqstep
+  #     - mapfile_high_padded_size
+  #     - mapfile_high_size
+  #     - mapfile_low_padded_size
+  #     - mapfile_low_size
+  #     - mapfile_nbands
+  #     - mapfile_nchansout_clean1
+  #     - mapfile_nwavelengths_high
+  #     - mapfile_nwavelengths_low
+  #     - mapfile_single
+  #     - mapfile_timestep
 
-  create_image:
-    run: steps/create_image.cwl
-    in:
-      mapfile_deep_low_size: do_magic/mapfile_deep_low_size
-      mapfile_nchansout_clean1: do_magic/mapfile_nchansout_clean1
-      mapfile_nwavelengths_low: do_magic/mapfile_nwavelengths_low
-      prepcals: calib_cal/mscalib
-      image_padding: image_padding
-      maxlambda_lowres: maxlambda_lowres
-      cellsize_lowres_deg: cellsize_lowres_deg
-    out:
-     - psf
-     - dirty
-     - residual
-     - model
+  # create_image:
+  #   run: steps/create_image.cwl
+  #   in:
+  #     mapfile_deep_low_size: do_magic/mapfile_deep_low_size
+  #     mapfile_nchansout_clean1: do_magic/mapfile_nchansout_clean1
+  #     mapfile_nwavelengths_low: do_magic/mapfile_nwavelengths_low
+  #     prepcals: calib_cal/mscalib
+  #     image_padding: image_padding
+  #     maxlambda_lowres: maxlambda_lowres
+  #     cellsize_lowres_deg: cellsize_lowres_deg
+  #   out:
+  #    - psf
+  #    - dirty
+  #    - residual
+  #    - model
+   
+$namespaces:
+  s: http://schema.org/
+  iana: https://www.iana.org/assignments/media-types/
+$schemas:
+  - 'https://schema.org/version/latest/schema.rdf'
+
+s:name: prefactor
+s:version: 1.0.0
+label: calibrate
+s:license: 'https://mit-license.org/'
+s:author:
+  - s:person.url: 'http://orcid.org/0000-0002-6136-3724'
+  - s:person.url: 'https://orcid.org/0000-0001-5125-9539'

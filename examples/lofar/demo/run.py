@@ -10,8 +10,7 @@ from urllib.parse import urlparse
 def load():
     target = urlparse(environ["TARGET_URL"]).path
     sources = [
-        "/opt/wd/L570745_SB000_uv_first10.MS.tar",
-        "/opt/wd/L570745_SB001_uv_first10.MS.tar"
+        "/opt/wd/L591513_SB000_uv_delta_t_4.MS.tar",
     ]
     
     files = []
@@ -19,7 +18,7 @@ def load():
         file = join(target, basename(source))
         files.append(file)
 
-        # copyfile(source, file)
+        copyfile(source, file)
 
     return {"files": files}
 
