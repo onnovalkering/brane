@@ -115,7 +115,6 @@ download observation files to dir
 </p>
 </video>
 
-
 ## Running calibration tasks
 Coming soon.
 
@@ -125,33 +124,38 @@ Coming soon.
 ## Conclusion
 Coming soon.
 
+<p style="text-align: center">
+    <img src="/brane/assets/img/lofar-demo.png">
+</p>
+
 ```go
 import "fs"
 import "lta"
 import "prefactor"
 
 observation := ?? as Integer
+directory := new_directory
 
 staging := stage observation files
 wait until staging status = "success"
 
-directory := new_directory
-download observation files to directory
-
-archives := "*.tar" in directory
+archives := download observation files to directory
 measuresets := extract archives to directory
 
-input := CalibrateInput {
+input := new CalibrateInput {
     ms_array: measuresets,
-    
-    // Parameters
+
     cellsize_lowres_deg: 0.00694,
     image_padding: 1.4,
-    maxlambda_lowres: 2000
+    maxlambda_lowres: 2000,
     reference_station: "CS001HBA0",
+    avg.timestep: 2,
+    avg.freqstep: 2,
+    flag.baseline: "[ CS013HBA* ]"
 }
 
 result := calibrate input
+return result
 ```
 
 <script src="https://vjs.zencdn.net/7.8.4/video.js"></script>
