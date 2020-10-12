@@ -1,14 +1,13 @@
 ---
 layout: default
-title: Demonstration
-nav_order: 5
-description: "demonstration"
-permalink: /demonstration
+title: LOFAR
+parent: Demonstrations
+nav_order: 1
 ---
 
 <link href="https://vjs.zencdn.net/7.8.4/video-js.css" rel="stylesheet" />
 
-# Demonstration
+# LOFAR
 This demonstration is based on a real-world data pipeline (Fig. 1) from the [LOFAR](http://lofar.org/about-lofar/general-information/introduction.html). This data pipeline generates, or rather calibrates, sky maps based on astronomical observations stored in LOFAR's <abbr title="Long-term archive">LTA</abbr>. Sky maps are images of the sky that aren't focused on a specific target. Astronomers use these sky maps for exploratory research and serendipitous discoveries. However, the pipeline is rather complex [[spreeuw2019lta](#)]. Partly because the typical sizes of astronomical observations, up to TBs, are non-trivial to handle. But also because running the necessary compute routines require domain knowledge and experience with <abbr title="High-performance computing">HPC</abbr> clusters. Due to this complexity, the utilization of the pipeline is minimal. 
 
 The steps of this pipeline are as follows:

@@ -1,10 +1,10 @@
 ---
 layout: default
-title: Packages
-nav_order: 8
+title: Demonstrations
+nav_order: 5
 has_children: true
 has_toc: false
 ---
 
-# Packages
+# Demonstrations
 Coming soon.

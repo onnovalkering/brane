@@ -12,7 +12,7 @@ Programmable Orchestration of Applications and Networking
 {: .fs-6 .fw-300 }
 
 [Get started now](/brane/quickstart/quickstart.html){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 } 
-[See it in action](/brane/demonstration.html){: .btn .fs-5 .mb-4 .mb-md-0 }
+[See it in action](/brane/demonstrations/demonstrations.html){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
 
