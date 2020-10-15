@@ -1,11 +1,11 @@
 use anyhow::Result;
-use specifications::common::{Parameter, Value, Type};
+use serde_json::Value as JValue;
+use specifications::common::{Parameter, Type, Value};
 use specifications::package::PackageInfo;
-use std::path::PathBuf;
 use std::fs::File;
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::Command;
-use serde_json::Value as JValue;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -21,8 +21,12 @@ pub fn handle(
     debug!("Executing '{}' (CWL) using arguments:\n{:#?}", function, arguments);
 
     let package_info = PackageInfo::from_path(working_dir.join("package.yml"))?;
-    let functions = package_info.functions.expect("Missing `functions` property in package.yml");
-    let function = functions.get(&function).expect(&format!("Function '{}' not found", function));
+    let functions = package_info
+        .functions
+        .expect("Missing `functions` property in package.yml");
+    let function = functions
+        .get(&function)
+        .expect(&format!("Function '{}' not found", function));
 
     assert_input(&function.parameters, &arguments)?;
     initialize(&arguments, &working_dir)?;
@@ -73,7 +77,7 @@ fn assert_input(
 ///
 fn initialize(
     arguments: &Map<Value>,
-    working_dir: &PathBuf
+    working_dir: &PathBuf,
 ) -> Result<()> {
     let mut input = Map::<JValue>::new();
     if let Some(Value::Struct { properties, .. }) = arguments.get("input") {
@@ -107,7 +111,7 @@ fn execute(
 
     let stdout = String::from(String::from_utf8_lossy(&result.stdout));
     let stderr = String::from(String::from_utf8_lossy(&result.stderr));
-    
+
     debug!("stdout:\n{}\n", &stdout);
     debug!("stderr:\n{}\n", &stderr);
 
@@ -135,24 +139,29 @@ fn capture_output(
             continue;
         }
 
-        let data_type = output["class"].as_str().expect("Missing `class` property on CWL output parameter.");
+        let data_type = output["class"]
+            .as_str()
+            .expect("Missing `class` property on CWL output parameter.");
         match data_type {
             "File" => {
                 let location = output["location"].as_str().unwrap().to_string();
 
                 let mut properties: Map<Value> = Default::default();
                 properties.insert("url".to_string(), Value::Unicode(location));
-                
+
                 let value = Value::Struct {
                     data_type: String::from("File"),
-                    properties
+                    properties,
                 };
 
                 output_properties.insert(name, value);
-            },
-            _ => unimplemented!()
+            }
+            _ => unimplemented!(),
         }
     }
 
-    Ok(Some(Value::Struct { data_type: return_type.clone(), properties: output_properties }))
+    Ok(Some(Value::Struct {
+        data_type: return_type.clone(),
+        properties: output_properties,
+    }))
 }

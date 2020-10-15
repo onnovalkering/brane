@@ -16,11 +16,11 @@ use dotenv::dotenv;
 use log::LevelFilter;
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::FutureProducer;
+use redis::Client;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use redis::Client;
 
 mod callback;
 mod health;
@@ -65,20 +65,28 @@ async fn main() -> std::io::Result<()> {
     }
 
     // Prepare the filesystem
-    let packages_dir: PathBuf = env::var("PACKAGES_DIR").unwrap_or_else(|_| String::from(DEF_PACKAGES_DIR)).into();
-    let temporary_dir: PathBuf = env::var("TEMPORARY_DIR").unwrap_or_else(|_| String::from(DEF_TEMPORARY_DIR)).into();
+    let packages_dir: PathBuf = env::var("PACKAGES_DIR")
+        .unwrap_or_else(|_| String::from(DEF_PACKAGES_DIR))
+        .into();
+    let temporary_dir: PathBuf = env::var("TEMPORARY_DIR")
+        .unwrap_or_else(|_| String::from(DEF_TEMPORARY_DIR))
+        .into();
     fs::create_dir_all(&temporary_dir)?;
     fs::create_dir_all(&packages_dir)?;
 
     // Create a database pool
     let db_url = env::var("DATABASE_URL").unwrap_or_else(|_| String::from(DEF_DATABASE_URL));
     let db_manager = ConnectionManager::<PgConnection>::new(db_url);
-    let db_pool = r2d2::Pool::builder().build(db_manager).expect("Failed to create DB connection pool.");
+    let db_pool = r2d2::Pool::builder()
+        .build(db_manager)
+        .expect("Failed to create DB connection pool.");
 
     // Create a Redis connection pool
     let rd_url = env::var("REDIS_URL").unwrap_or_else(|_| String::from(DEF_REDIS_URL));
     let rd_manager = Client::open(rd_url).unwrap();
-    let rd_pool = r2d2::Pool::builder().build(rd_manager).expect("Failed to create Redis connection pool.");
+    let rd_pool = r2d2::Pool::builder()
+        .build(rd_manager)
+        .expect("Failed to create Redis connection pool.");
 
     // Run database migrations
     let conn = db_pool.get().expect("Couldn't get connection from db pool.");

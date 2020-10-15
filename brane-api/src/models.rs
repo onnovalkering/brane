@@ -213,7 +213,7 @@ impl NewVariable {
         session: i32,
         name: String,
         type_: String,
-        content_json: Option<String>
+        content_json: Option<String>,
     ) -> FResult<Self> {
         let created = Utc::now().naive_utc();
 
@@ -222,7 +222,7 @@ impl NewVariable {
             created,
             name,
             type_,
-            content_json
+            content_json,
         })
     }
 }

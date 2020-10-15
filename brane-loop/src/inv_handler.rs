@@ -1,22 +1,22 @@
+use crate::models::{Invocation, NewVariable, Session, Variable};
+use crate::schema::{invocations::dsl as inv_db, sessions::dsl as ses_db, variables::dsl as var_db};
 use anyhow::Result;
-use serde_json::Value as JValue;
-use diesel::prelude::*;
-use chrono::Utc;
-use brane_sys::{System, local::LocalSystem, kubernetes::K8sSystem};
-use brane_vm::machine::{AsyncMachine, MachineResult};
-use brane_vm::vault::{Vault, HashiVault, InMemoryVault};
-use diesel::pg::PgConnection;
-use diesel::r2d2::{Pool, ConnectionManager};
-use redis::Client;
+use brane_sys::{kubernetes::K8sSystem, local::LocalSystem, System};
 use brane_vm::cursor::RedisCursor;
 use brane_vm::environment::{Environment, RedisEnvironment};
-use crate::schema::{invocations::dsl as inv_db, variables::dsl as var_db, sessions::dsl as ses_db};
-use crate::models::{Invocation, Variable, Session, NewVariable};
+use brane_vm::machine::{AsyncMachine, MachineResult};
+use brane_vm::vault::{HashiVault, InMemoryVault, Vault};
+use chrono::Utc;
+use diesel::pg::PgConnection;
+use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
 use redis::AsyncCommands;
+use redis::Client;
+use serde_json::json;
+use serde_json::Value as JValue;
 use specifications::common::Value;
 use specifications::instructions::Instruction;
 use std::env;
-use serde_json::json;
 
 type DbPool = Pool<ConnectionManager<PgConnection>>;
 type Event = (String, String);
@@ -31,8 +31,15 @@ const MSG_NO_RD_CONNECTION: &str = "Couldn't get connection from rd client.";
 ///
 ///
 ///
-pub async fn handle(context: String, payload: JValue, db: &DbPool, rd: &Client) -> Result<Vec<Event>> {
-    let event = payload["event"].as_str().expect("Payload doesn't contain 'event' property.");
+pub async fn handle(
+    context: String,
+    payload: JValue,
+    db: &DbPool,
+    rd: &Client,
+) -> Result<Vec<Event>> {
+    let event = payload["event"]
+        .as_str()
+        .expect("Payload doesn't contain 'event' property.");
 
     match event {
         "active" => on_active(context, payload, db, rd).await,
@@ -41,14 +48,19 @@ pub async fn handle(context: String, payload: JValue, db: &DbPool, rd: &Client) 
         "created" => on_created(context, payload, db, rd).await,
         "ready" => on_ready(context, payload, db, rd).await,
         "waiting" => on_waiting(context, payload, db, rd).await,
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 }
 
 ///
 ///
 ///
-async fn on_active(context: String, _payload: JValue, db: &DbPool, rd: &Client) -> Result<Vec<Event>> {
+async fn on_active(
+    context: String,
+    _payload: JValue,
+    db: &DbPool,
+    rd: &Client,
+) -> Result<Vec<Event>> {
     let db_conn = db.get().expect(MSG_NO_DB_CONNECTION);
     let mut rd_conn = rd.get_async_connection().await.expect(MSG_NO_RD_CONNECTION);
 
@@ -61,7 +73,7 @@ async fn on_active(context: String, _payload: JValue, db: &DbPool, rd: &Client) 
     // Setup VM
     let instructions = serde_json::from_str(&instructions_json)?;
     let mut machine = setup_machine(&context, session_uuid, invocation_id, instructions, rd)?;
-    
+
     // Run
     let result = machine.walk().await?;
     let status = match result {
@@ -74,13 +86,18 @@ async fn on_active(context: String, _payload: JValue, db: &DbPool, rd: &Client) 
         .set(inv_db::status.eq(status))
         .get_result::<Invocation>(&db_conn)?;
 
-    Ok(vec!((context, String::from(format!(r#"{{"event": "{}"}}"#, status)))))
+    Ok(vec![(context, String::from(format!(r#"{{"event": "{}"}}"#, status)))])
 }
 
 ///
 ///
 ///
-async fn on_callback(context: String, payload: JValue, db: &DbPool, rd: &Client) -> Result<Vec<Event>> {
+async fn on_callback(
+    context: String,
+    payload: JValue,
+    db: &DbPool,
+    rd: &Client,
+) -> Result<Vec<Event>> {
     let db_conn = db.get().expect(MSG_NO_DB_CONNECTION);
     let mut rd_conn = rd.get_async_connection().await.expect(MSG_NO_RD_CONNECTION);
 
@@ -106,13 +123,18 @@ async fn on_callback(context: String, payload: JValue, db: &DbPool, rd: &Client)
         .set(inv_db::status.eq("active"))
         .get_result::<Invocation>(&db_conn)?;
 
-    Ok(vec!((context, String::from(format!(r#"{{"event": "active"}}"#)))))
+    Ok(vec![(context, String::from(format!(r#"{{"event": "active"}}"#)))])
 }
 
 ///
 ///
 ///
-async fn on_complete(context: String, _payload: JValue, db: &DbPool, rd: &Client) -> Result<Vec<Event>> {
+async fn on_complete(
+    context: String,
+    _payload: JValue,
+    db: &DbPool,
+    rd: &Client,
+) -> Result<Vec<Event>> {
     let db_conn = db.get().expect(MSG_NO_DB_CONNECTION);
 
     debug!("Handling 'complete' event within context: {}", context);
@@ -130,13 +152,13 @@ async fn on_complete(context: String, _payload: JValue, db: &DbPool, rd: &Client
         let return_json = serde_json::to_string(terminate)?;
         diesel::update(inv_db::invocations.find(invocation_id))
             .set(inv_db::return_json.eq(return_json))
-            .get_result::<Invocation>(&db_conn)?;   
+            .get_result::<Invocation>(&db_conn)?;
     }
 
     let terminate = variables.get("terminate").unwrap_or(&Value::Unit).clone();
     let variables = variables.iter().filter(|(k, _)| !k.starts_with("_"));
-    
-    // Only variables that are new or updated: after each set, append key to Redis set. 
+
+    // Only variables that are new or updated: after each set, append key to Redis set.
     for (key, value) in variables {
         if key == "terminate" {
             continue;
@@ -144,11 +166,12 @@ async fn on_complete(context: String, _payload: JValue, db: &DbPool, rd: &Client
 
         let value_json = serde_json::to_string(value)?;
         let new_variable = NewVariable::new(
-            invocation.session, 
-            key.clone(), 
-            value.data_type().to_string(), 
-            Some(value_json.clone())
-        ).unwrap();
+            invocation.session,
+            key.clone(),
+            value.data_type().to_string(),
+            Some(value_json.clone()),
+        )
+        .unwrap();
 
         diesel::insert_into(var_db::variables)
             .values(&new_variable)
@@ -157,7 +180,7 @@ async fn on_complete(context: String, _payload: JValue, db: &DbPool, rd: &Client
             .set((
                 var_db::content_json.eq(value_json),
                 var_db::type_.eq(value.data_type()),
-                var_db::updated.eq(Utc::now().naive_utc())
+                var_db::updated.eq(Utc::now().naive_utc()),
             ))
             .execute(&db_conn)?;
     }
@@ -166,8 +189,8 @@ async fn on_complete(context: String, _payload: JValue, db: &DbPool, rd: &Client
     let stopped = Utc::now().naive_utc();
     diesel::update(inv_db::invocations.find(invocation_id))
         .set(inv_db::stopped.eq(stopped))
-        .get_result::<Invocation>(&db_conn)?;    
-    
+        .get_result::<Invocation>(&db_conn)?;
+
     let session = ses_db::sessions.find(invocation.session).first::<Session>(&db_conn)?;
     debug!("session: {:?}", session.parent);
 
@@ -176,18 +199,24 @@ async fn on_complete(context: String, _payload: JValue, db: &DbPool, rd: &Client
         let payload = json!({
             "event": "callback",
             "value": terminate,
-        }).to_string();
+        })
+        .to_string();
 
-        Ok(vec!((context, payload)))
+        Ok(vec![(context, payload)])
     } else {
-        Ok(vec!())
+        Ok(vec![])
     }
 }
 
 ///
 ///
 ///
-async fn on_created(context: String, _payload: JValue, db: &DbPool, rd: &Client) -> Result<Vec<Event>> {
+async fn on_created(
+    context: String,
+    _payload: JValue,
+    db: &DbPool,
+    rd: &Client,
+) -> Result<Vec<Event>> {
     let db_conn = db.get().expect(MSG_NO_DB_CONNECTION);
     let mut rd_conn = rd.get_async_connection().await.expect(MSG_NO_RD_CONNECTION);
 
@@ -196,11 +225,15 @@ async fn on_created(context: String, _payload: JValue, db: &DbPool, rd: &Client)
     let invocation_id: i32 = context[4..].parse()?;
     let invocation = inv_db::invocations.find(invocation_id).first::<Invocation>(&db_conn)?;
     let session = ses_db::sessions.find(invocation.session).first::<Session>(&db_conn)?;
-    let variables = var_db::variables.filter(var_db::session.eq(invocation.session)).load::<Variable>(&db_conn)?;
+    let variables = var_db::variables
+        .filter(var_db::session.eq(invocation.session))
+        .load::<Variable>(&db_conn)?;
 
     // Store control variables in Redis
     let _ = rd_conn.set(format!("{}_session", context), &session.uuid).await?;
-    let _ = rd_conn.set(format!("{}_instructions", context), &invocation.instructions_json).await?;
+    let _ = rd_conn
+        .set(format!("{}_instructions", context), &invocation.instructions_json)
+        .await?;
 
     // Store session variables in Redis
     let mut environment = RedisEnvironment::new(format!("{}_env", context), None, rd);
@@ -215,13 +248,18 @@ async fn on_created(context: String, _payload: JValue, db: &DbPool, rd: &Client)
         .set(inv_db::status.eq("ready"))
         .get_result::<Invocation>(&db_conn)?;
 
-    Ok(vec!((context, String::from(r#"{"event": "ready"}"#))))
+    Ok(vec![(context, String::from(r#"{"event": "ready"}"#))])
 }
 
 ///
 ///
 ///
-async fn on_ready(context: String, _payload: JValue, db: &DbPool, _rd: &Client) -> Result<Vec<Event>> {
+async fn on_ready(
+    context: String,
+    _payload: JValue,
+    db: &DbPool,
+    _rd: &Client,
+) -> Result<Vec<Event>> {
     let db_conn = db.get().expect(MSG_NO_DB_CONNECTION);
 
     debug!("Handling 'ready' event within context: {}", context);
@@ -234,16 +272,21 @@ async fn on_ready(context: String, _payload: JValue, db: &DbPool, _rd: &Client) 
         .set((inv_db::status.eq("active"), inv_db::started.eq(started)))
         .get_result::<Invocation>(&db_conn)?;
 
-    Ok(vec!((context, String::from(r#"{"event": "active"}"#))))
+    Ok(vec![(context, String::from(r#"{"event": "active"}"#))])
 }
 
 ///
 ///
 ///
-async fn on_waiting(context: String, _payload: JValue, _db: &DbPool, _rd: &Client) -> Result<Vec<Event>> {
+async fn on_waiting(
+    context: String,
+    _payload: JValue,
+    _db: &DbPool,
+    _rd: &Client,
+) -> Result<Vec<Event>> {
     debug!("Handling 'waiting' event within context: {}", context);
 
-    Ok(vec!())
+    Ok(vec![])
 }
 
 ///
@@ -262,9 +305,9 @@ fn setup_machine(
     let vault = setup_vault()?;
 
     let machine = AsyncMachine::new(
-        instructions, 
+        instructions,
         invocation_id,
-        Box::new(cursor), 
+        Box::new(cursor),
         Box::new(environment),
         system,
         vault,

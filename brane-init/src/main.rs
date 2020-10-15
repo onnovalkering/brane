@@ -17,7 +17,13 @@ struct CLI {
     invocation_id: Option<i32>,
     #[structopt(subcommand)]
     sub_command: SubCommand,
-    #[structopt(short, long, name = "PATH", help = "Path to working directory", default_value = "/opt/wd")]
+    #[structopt(
+        short,
+        long,
+        name = "PATH",
+        help = "Path to working directory",
+        default_value = "/opt/wd"
+    )]
     working_dir: PathBuf,
 }
 
@@ -47,7 +53,7 @@ enum SubCommand {
         function: String,
         #[structopt(help = "Arguments as Base64 encoded JSON")]
         arguments: String,
-    }
+    },
 }
 
 #[tokio::main]
@@ -77,12 +83,12 @@ async fn main() -> Result<()> {
 ///
 async fn run(options: CLI) -> Result<()> {
     let output = match options.sub_command {
-        SubCommand::Cwl { function, arguments, output_dir } => {
-            exec_cwl::handle(function, decode(arguments)?, options.working_dir, output_dir)?
-        }
-        SubCommand::Ecu { function, arguments } => {
-            exec_ecu::handle(function, decode(arguments)?, options.working_dir)?        
-        },
+        SubCommand::Cwl {
+            function,
+            arguments,
+            output_dir,
+        } => exec_cwl::handle(function, decode(arguments)?, options.working_dir, output_dir)?,
+        SubCommand::Ecu { function, arguments } => exec_ecu::handle(function, decode(arguments)?, options.working_dir)?,
         SubCommand::Oas { function, arguments } => {
             exec_oas::handle(function, decode(arguments)?, options.working_dir).await?
         }
@@ -104,12 +110,12 @@ fn decode<T>(input: String) -> Result<T>
 where
     T: DeserializeOwned,
 {
-    let input = base64::decode(input)
-        .with_context(|| "Decoding failed, encoded input doesn't seem to be Base64 encoded.")?;
+    let input =
+        base64::decode(input).with_context(|| "Decoding failed, encoded input doesn't seem to be Base64 encoded.")?;
 
     let input = String::from_utf8(input[..].to_vec())
         .with_context(|| "Conversion failed, decoded input doesn't seem to be UTF-8 encoded.")?;
-    
+
     serde_json::from_str(&input)
         .with_context(|| "Deserialization failed, decoded input doesn't seem to be as expected.")
 }

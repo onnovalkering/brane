@@ -51,14 +51,20 @@ pub fn get_module_patterns(module: &PackageInfo) -> Result<Vec<FunctionPattern>>
 ///
 ///
 ///
-fn build_pattern(name: &String, function: &Function) -> Result<String> {
+fn build_pattern(
+    name: &String,
+    function: &Function,
+) -> Result<String> {
     let mut pattern = vec![];
 
     if function.pattern.is_none() {
         pattern.push(regex::escape(name));
     }
 
-    let notation = function.pattern.clone().unwrap_or_else(|| CallPattern::new(None, None, None ));
+    let notation = function
+        .pattern
+        .clone()
+        .unwrap_or_else(|| CallPattern::new(None, None, None));
     if let Some(prefix) = notation.prefix {
         pattern.push(regex::escape(&prefix));
     }

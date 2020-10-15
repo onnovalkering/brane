@@ -1,23 +1,19 @@
-use std::rc::Rc;
-use std::cell::RefCell;
-use redis::{Connection, Client};
 use redis::Commands;
+use redis::{Client, Connection};
 use specifications::instructions::Move;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 pub trait Cursor {
-    fn get_position(
-        &self,
-    ) -> usize;
+    fn get_position(&self) -> usize;
 
     fn set_position(
         &mut self,
         value: usize,
     ) -> usize;
 
-    fn get_depth(
-        &self,
-    ) -> usize;
+    fn get_depth(&self) -> usize;
 
     fn set_depth(
         &mut self,
@@ -45,9 +41,7 @@ pub trait Cursor {
         max_subposition: usize,
     ) -> ();
 
-    fn exit_sub(
-        &mut self,
-    ) -> ();
+    fn exit_sub(&mut self) -> ();
 }
 
 ///
@@ -78,8 +72,8 @@ impl InMemoryCursor {
     ///
     ///
     fn get_subposition_max(
-        &self, 
-        depth: usize
+        &self,
+        depth: usize,
     ) -> usize {
         self.subpositions_max.get(&depth).unwrap_or(&(0 as usize)).clone()
     }
@@ -101,9 +95,7 @@ impl Cursor for InMemoryCursor {
     ///
     ///
     ///
-    fn get_position(
-        &self,
-    ) -> usize {
+    fn get_position(&self) -> usize {
         self.position
     }
 
@@ -123,9 +115,7 @@ impl Cursor for InMemoryCursor {
     ///
     ///
     ///    
-    fn get_depth(
-        &self,
-    ) -> usize {
+    fn get_depth(&self) -> usize {
         self.depth
     }
 
@@ -184,7 +174,7 @@ impl Cursor for InMemoryCursor {
                 } else {
                     self.set_subposition(depth, subposition - 1);
                 }
-            },
+            }
             Move::Forward => {
                 if depth == 0 {
                     self.set_position(position + 1);
@@ -197,8 +187,8 @@ impl Cursor for InMemoryCursor {
                     } else {
                         self.exit_sub();
                     }
-                }              
-            },
+                }
+            }
             Move::Skip => {
                 if depth == 0 {
                     self.set_position(position + 2);
@@ -212,10 +202,10 @@ impl Cursor for InMemoryCursor {
                         self.exit_sub();
                     }
                 }
-            },
-        }        
+            }
+        }
     }
-    
+
     ///
     ///
     ///
@@ -236,9 +226,7 @@ impl Cursor for InMemoryCursor {
     ///
     ///
     ///
-    fn exit_sub(
-        &mut self,
-    ) -> () {
+    fn exit_sub(&mut self) -> () {
         let depth = self.get_depth();
         let new_depth = depth - 1;
 
@@ -267,7 +255,10 @@ impl RedisCursor {
         client: &Client,
     ) -> Self {
         let connection = client.get_connection().unwrap();
-        RedisCursor { connection: Rc::new(RefCell::new(connection)), prefix }
+        RedisCursor {
+            connection: Rc::new(RefCell::new(connection)),
+            prefix,
+        }
     }
 
     ///
@@ -275,9 +266,12 @@ impl RedisCursor {
     ///
     pub fn get(
         &self,
-        key: &str
+        key: &str,
     ) -> Option<usize> {
-        self.connection.borrow_mut().get(format!("{}_{}", self.prefix, key)).ok()
+        self.connection
+            .borrow_mut()
+            .get(format!("{}_{}", self.prefix, key))
+            .ok()
     }
 
     ///
@@ -286,9 +280,13 @@ impl RedisCursor {
     pub fn set(
         &self,
         key: &str,
-        value: usize
+        value: usize,
     ) -> () {
-        let _: () = self.connection.borrow_mut().set(format!("{}_{}", self.prefix, key), value).unwrap();
+        let _: () = self
+            .connection
+            .borrow_mut()
+            .set(format!("{}_{}", self.prefix, key), value)
+            .unwrap();
     }
 }
 
@@ -296,9 +294,7 @@ impl Cursor for RedisCursor {
     ///
     ///
     ///
-    fn get_position(
-        &self,
-    ) -> usize {
+    fn get_position(&self) -> usize {
         self.get("position").unwrap_or(0)
     }
 
@@ -316,9 +312,7 @@ impl Cursor for RedisCursor {
     ///
     ///
     ///    
-    fn get_depth(
-        &self,
-    ) -> usize {
+    fn get_depth(&self) -> usize {
         self.get("depth").unwrap_or(0)
     }
 
@@ -373,7 +367,7 @@ impl Cursor for RedisCursor {
                 } else {
                     self.set_subposition(depth, subposition - 1);
                 }
-            },
+            }
             Move::Forward => {
                 if depth == 0 {
                     self.set_position(position + 1);
@@ -386,8 +380,8 @@ impl Cursor for RedisCursor {
                     } else {
                         self.exit_sub();
                     }
-                }              
-            },
+                }
+            }
             Move::Skip => {
                 if depth == 0 {
                     self.set_position(position + 2);
@@ -401,10 +395,10 @@ impl Cursor for RedisCursor {
                         self.exit_sub();
                     }
                 }
-            },
-        }        
+            }
+        }
     }
-    
+
     ///
     ///
     ///
@@ -425,9 +419,7 @@ impl Cursor for RedisCursor {
     ///
     ///
     ///
-    fn exit_sub(
-        &mut self,
-    ) -> () {
+    fn exit_sub(&mut self) -> () {
         let depth = self.get_depth();
         let new_depth = depth - 1;
 

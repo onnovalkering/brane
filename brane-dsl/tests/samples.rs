@@ -42,7 +42,6 @@ fn while_loop() {
     assert!(instructions.len() > 0);
 }
 
-
 #[test]
 fn if_else() {
     let index = PackageIndex::from_path(&PathBuf::from("./resources/packages.json")).unwrap();

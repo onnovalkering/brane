@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
+use hashicorp_vault::{client::TokenData, Client};
 use specifications::common::Value;
-use hashicorp_vault::{Client, client::TokenData};
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -29,13 +29,11 @@ impl HashiVault {
     ///
     pub fn new(
         host: String,
-        token: String
+        token: String,
     ) -> Self {
         let client = Client::new(host, token).unwrap();
 
-        HashiVault { 
-            client
-        }
+        HashiVault { client }
     }
 }
 
@@ -64,7 +62,6 @@ impl Vault for HashiVault {
         }
     }
 }
-
 
 ///
 ///
@@ -101,7 +98,8 @@ impl Vault for InMemoryVault {
         &self,
         name: &str,
     ) -> Result<Value> {
-        Ok(self.secrets
+        Ok(self
+            .secrets
             .get(name)
             .with_context(|| format!("Trying to access undefined secret: {}", name))?
             .clone())

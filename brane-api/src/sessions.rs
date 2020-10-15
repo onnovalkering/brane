@@ -1,14 +1,14 @@
-use crate::models::{Session, NewSession, Variable, NewVariable, Invocation};
-use crate::schema::{self, sessions::dsl as db, variables::dsl as var_db, invocations::dsl as inv_db};
+use crate::models::{Invocation, NewSession, NewVariable, Session, Variable};
+use crate::schema::{self, invocations::dsl as inv_db, sessions::dsl as db, variables::dsl as var_db};
+use actix_files::NamedFile;
 use actix_web::Scope;
 use actix_web::{web, HttpRequest, HttpResponse};
 use diesel::prelude::*;
 use diesel::{r2d2, r2d2::ConnectionManager};
 use serde::Deserialize;
 use specifications::common::Value;
-use url::Url;
-use actix_files::NamedFile;
 use std::path::PathBuf;
+use url::Url;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 type Map<T> = std::collections::HashMap<String, T>;
@@ -44,7 +44,7 @@ async fn create_session(
     _req: HttpRequest,
     pool: web::Data<DbPool>,
     json: web::Json<CreateSession>,
-) -> HttpResponse { 
+) -> HttpResponse {
     let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
 
     // Store session information in database
@@ -59,11 +59,12 @@ async fn create_session(
             for (key, value) in arguments.iter() {
                 let value_json = serde_json::to_string(value).unwrap();
                 let new_variable = NewVariable::new(
-                    session.id, 
-                    key.clone(), 
-                    value.data_type().to_string(), 
-                    Some(value_json.clone())
-                ).unwrap();
+                    session.id,
+                    key.clone(),
+                    value.data_type().to_string(),
+                    Some(value_json.clone()),
+                )
+                .unwrap();
 
                 diesel::insert_into(var_db::variables)
                     .values(&new_variable)
@@ -106,9 +107,7 @@ async fn get_session(
 ) -> HttpResponse {
     let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
 
-    let session = web::block(move || 
-        db::sessions.filter(db::uuid.eq(&path.0)).first::<Session>(&conn)
-    ).await;
+    let session = web::block(move || db::sessions.filter(db::uuid.eq(&path.0)).first::<Session>(&conn)).await;
 
     if let Ok(session) = session {
         HttpResponse::Ok().json(session)
@@ -152,7 +151,7 @@ async fn delete_session(
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct InvocationsFilter {
-    status: Option<String>
+    status: Option<String>,
 }
 
 ///
@@ -177,8 +176,7 @@ async fn get_session_invocations(
             .filter(inv_db::status.eq(status))
             .load::<Invocation>(&conn)
     } else {
-        Invocation::belonging_to(&session)
-            .load::<Invocation>(&conn)
+        Invocation::belonging_to(&session).load::<Invocation>(&conn)
     };
 
     if let Ok(invocations) = invocations {
@@ -194,7 +192,7 @@ async fn get_session_invocations(
 async fn get_session_file(
     req: HttpRequest,
     pool: web::Data<DbPool>,
-    path: web::Path<(String,String)>,
+    path: web::Path<(String, String)>,
 ) -> HttpResponse {
     let conn = pool.get().expect(MSG_NO_DB_CONNECTION);
 
@@ -217,7 +215,7 @@ async fn get_session_file(
                 if let Some(value) = properties.get(segments[1]) {
                     value.clone()
                 } else {
-                   return HttpResponse::NotFound().body("Variable not found. 1");
+                    return HttpResponse::NotFound().body("Variable not found. 1");
                 }
             } else {
                 return HttpResponse::BadRequest().body("Variable is not a object.");
@@ -225,7 +223,6 @@ async fn get_session_file(
         } else {
             return HttpResponse::NotFound().body("Variable not found. 2");
         }
-
     } else {
         let variable = Variable::belonging_to(&session.unwrap())
             .filter(var_db::name.eq(&path.1))
@@ -240,7 +237,7 @@ async fn get_session_file(
     };
 
     if variable.data_type() != "File" {
-        return HttpResponse::BadRequest().body("Variable is not of type 'File'."); 
+        return HttpResponse::BadRequest().body("Variable is not of type 'File'.");
     }
 
     if let Value::Struct { properties, .. } = variable {
@@ -273,10 +270,10 @@ async fn get_session_variables(
             let session: &Session = sessions.first().unwrap();
             Variable::belonging_to(session).load::<Variable>(&conn)
         } else {
-            return HttpResponse::NotFound().body("")
+            return HttpResponse::NotFound().body("");
         }
     } else {
-        return HttpResponse::InternalServerError().body("")
+        return HttpResponse::InternalServerError().body("");
     };
 
     if let Ok(variables) = variables {

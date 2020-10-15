@@ -4,6 +4,6 @@ extern crate anyhow;
 extern crate log;
 
 pub mod cursor;
-pub mod machine;
 pub mod environment;
+pub mod machine;
 pub mod vault;

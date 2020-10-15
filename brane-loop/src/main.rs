@@ -12,16 +12,16 @@ use diesel::pg::PgConnection;
 use diesel::{r2d2, r2d2::ConnectionManager};
 use dotenv::dotenv;
 use futures::StreamExt;
+use futures::*;
 use log::LevelFilter;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::stream_consumer::StreamConsumer;
 use rdkafka::consumer::{CommitMode, Consumer};
 use rdkafka::message::Message;
 use rdkafka::producer::{FutureProducer, FutureRecord};
+use redis::Client;
 use std::env;
 use structopt::StructOpt;
-use futures::*;
-use redis::Client;
 
 mod inv_handler;
 mod models;
@@ -88,11 +88,11 @@ async fn main() -> Result<()> {
                 let payload = match m.payload_view::<str>() {
                     None => serde_json::from_str("{}")?,
                     Some(Ok(s)) => serde_json::from_str(s)?,
-                    _ => unreachable!()
+                    _ => unreachable!(),
                 };
 
                 consumer.commit_message(&m, CommitMode::Async)?;
-                
+
                 debug!(
                     "key: '{:?}', payload: '{:?}', topic: {}, partition: {}, offset: {}, timestamp: {:?}",
                     key,
@@ -105,7 +105,7 @@ async fn main() -> Result<()> {
 
                 let events = match &key[..3] {
                     "inv" => inv_handler::handle(key, payload, &db, &rd).await?,
-                    _ => unimplemented!()
+                    _ => unimplemented!(),
                 };
 
                 for event in events {
@@ -118,7 +118,6 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-
 ///
 ///
 ///
@@ -127,26 +126,21 @@ async fn trigger_event(
     context: &String,
     payload: &String,
 ) -> Result<()> {
-    let message = FutureRecord::to(TOPIC_CONTROL)
-        .key(context)
-        .payload(payload);
+    let message = FutureRecord::to(TOPIC_CONTROL).key(context).payload(payload);
 
     info!("Going to trigger event within context '{}': {}", context, payload);
 
     let _ = producer
         .send(message, 0)
-        .map(|delivery| {
-            match delivery {
-                Ok(Ok(_)) => { Ok(())
-                }
-                Ok(Err(error)) => {
-                    error!("Unable to trigger event within context '{}':\n{:#?}", context, error);
-                    Err(())
-                },
-                Err(error) => {
-                    error!("Unable to trigger event within context '{}':\n{:#?}", context, error);
-                    Err(())
-                }
+        .map(|delivery| match delivery {
+            Ok(Ok(_)) => Ok(()),
+            Ok(Err(error)) => {
+                error!("Unable to trigger event within context '{}':\n{:#?}", context, error);
+                Err(())
+            }
+            Err(error) => {
+                error!("Unable to trigger event within context '{}':\n{:#?}", context, error);
+                Err(())
             }
         })
         .await;

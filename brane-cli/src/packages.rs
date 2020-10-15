@@ -168,7 +168,7 @@ pub async fn remove(
         .map(|v| v.unwrap().file_name())
         .map(|v| String::from(v.to_string_lossy()))
         .collect::<Vec<String>>();
-    
+
     // Ask for permission, if --force is not provided
     if !force {
         println!("Do you want to remove the following version(s)?");
@@ -179,7 +179,7 @@ pub async fn remove(
 
         // Abort, if not approved
         if !Confirm::new().interact()? {
-            return Ok(())
+            return Ok(());
         }
     }
 

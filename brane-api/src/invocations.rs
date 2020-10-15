@@ -6,10 +6,10 @@ use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
 use futures::*;
 use rdkafka::producer::{FutureProducer, FutureRecord};
-use serde::Deserialize;
-use specifications::instructions::Instruction;
 use redis::Commands;
+use serde::Deserialize;
 use serde_json::json;
+use specifications::instructions::Instruction;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 type RedisPool = r2d2::Pool<redis::Client>;
@@ -58,7 +58,10 @@ async fn create_invocation(
 
     // Store invocation information in database
     let invocation = web::block(move || {
-        let session = s_db::sessions.filter(s_db::uuid.eq(&json.session)).first::<Session>(&conn).unwrap();
+        let session = s_db::sessions
+            .filter(s_db::uuid.eq(&json.session))
+            .first::<Session>(&conn)
+            .unwrap();
         // TODO: check if session is "created" or "idle", i.e. there is currently no other invocation active
 
         let new_invocation = NewInvocation::new(session.id, json.name.clone(), &json.instructions).unwrap();
@@ -302,24 +305,35 @@ async fn get_invocation_status(
     let db_conn = db_pool.get().expect(MSG_NO_DB_CONNECTION);
     let mut rd_conn = rd_pool.get().expect(MSG_NO_RD_CONNECTION);
 
-    let invocation = web::block(move || db::invocations.filter(db::uuid.eq(&path.0)).first::<Invocation>(&db_conn)).await;
+    let invocation = web::block(move || {
+        db::invocations
+            .filter(db::uuid.eq(&path.0))
+            .first::<Invocation>(&db_conn)
+    })
+    .await;
     if invocation.is_err() {
         return HttpResponse::NotFound().body("");
     }
 
     let invocation = invocation.unwrap();
-    let position: i32 = rd_conn.get(format!("inv-{}_cursor_position", invocation.id)).unwrap_or(0);
+    let position: i32 = rd_conn
+        .get(format!("inv-{}_cursor_position", invocation.id))
+        .unwrap_or(0);
     let depth: i32 = rd_conn.get(format!("inv-{}_cursor_depth", invocation.id)).unwrap_or(0);
 
     println!("{}", format!("inv-{}_cursor_depth: {}", invocation.id, depth));
 
     let subpositions: Vec<i32> = if depth > 0 {
-        (1..depth+1).map(|d| {
-            let subposition: i32 = rd_conn.get(format!("inv-{}_cursor_subposition_{}", invocation.id, d)).unwrap();
-            subposition
-        }).collect()
+        (1..depth + 1)
+            .map(|d| {
+                let subposition: i32 = rd_conn
+                    .get(format!("inv-{}_cursor_subposition_{}", invocation.id, d))
+                    .unwrap();
+                subposition
+            })
+            .collect()
     } else {
-        vec!()
+        vec![]
     };
 
     let status = json!({
@@ -355,10 +369,7 @@ async fn trigger_event(
 
             match delivery {
                 Ok(_) => {
-                    info!(
-                        "Triggered '{}' event for invocation #{}.",
-                        event, invocation_id
-                    );
+                    info!("Triggered '{}' event for invocation #{}.", event, invocation_id);
                     Ok(())
                 }
                 Err(error) => {

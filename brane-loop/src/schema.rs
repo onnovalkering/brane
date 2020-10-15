@@ -57,9 +57,4 @@ table! {
 joinable!(invocations -> sessions (session));
 joinable!(variables -> sessions (session));
 
-allow_tables_to_appear_in_same_query!(
-    invocations,
-    packages,
-    sessions,
-    variables,
-);
+allow_tables_to_appear_in_same_query!(invocations, packages, sessions, variables,);

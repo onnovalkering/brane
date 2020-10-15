@@ -4,9 +4,9 @@ use k8s_openapi::api::batch::v1::Job;
 use kube::api::{Api, PostParams};
 use kube::client::APIClient;
 use kube::config;
+use rand::{distributions::Alphanumeric, Rng};
 use serde_json::json;
 use std::env;
-use rand::{Rng, distributions::Alphanumeric};
 
 lazy_static! {
     static ref NAMESPACE: String = env::var("K8S_NAMESPACE").unwrap_or_else(|_| String::from("default"));
@@ -26,7 +26,11 @@ pub async fn run(exec: ExecuteInfo) -> Result<()> {
         .collect::<String>()
         .to_lowercase();
 
-    info!("Scheduling '{}' on Kubernetes (namespace: {})", image, NAMESPACE.as_str());
+    info!(
+        "Scheduling '{}' on Kubernetes (namespace: {})",
+        image,
+        NAMESPACE.as_str()
+    );
 
     let resource = serde_json::to_vec(&json!({
         "apiVersion": "batch/v1",

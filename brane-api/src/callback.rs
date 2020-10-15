@@ -1,10 +1,10 @@
-use anyhow::Result;
 use actix_web::Scope;
 use actix_web::{web, HttpRequest, HttpResponse};
+use anyhow::Result;
 use rdkafka::producer::{FutureProducer, FutureRecord};
-use specifications::{common::Value, status::StatusInfo};
 use serde::Deserialize;
 use serde_json::json;
+use specifications::{common::Value, status::StatusInfo};
 
 const TOPIC_CONTROL: &str = "control";
 
@@ -43,7 +43,8 @@ async fn act_callback(
     let message_payload = json!({
         "event": "callback",
         "value": json.value,
-    }).to_string();
+    })
+    .to_string();
 
     let delivery = trigger_event(&producer, message_key, message_payload).await;
     if delivery.is_ok() {
@@ -65,7 +66,8 @@ async fn status_callback(
     let message_payload = json!({
         "event": "status",
         "info": json.info,
-    }).to_string();
+    })
+    .to_string();
 
     let delivery = trigger_event(&producer, message_key, message_payload).await;
     if delivery.is_ok() {
@@ -83,23 +85,16 @@ async fn trigger_event(
     context: String,
     payload: String,
 ) -> Result<()> {
-    let message = FutureRecord::to(TOPIC_CONTROL)
-        .key(&context)
-        .payload(&payload);
+    let message = FutureRecord::to(TOPIC_CONTROL).key(&context).payload(&payload);
 
-    let delivery = producer
-        .send(message, 0)
-        .await?;
+    let delivery = producer.send(message, 0).await?;
 
     match delivery {
-        Ok(_) => {
-            Ok(())
-        }
-        Err(error) => {
-            Err(anyhow!("Unable to tirgger event within context '{}':\n{:?}",
-                context,
-                error,    
-            ))
-        }
-    }        
+        Ok(_) => Ok(()),
+        Err(error) => Err(anyhow!(
+            "Unable to tirgger event within context '{}':\n{:?}",
+            context,
+            error,
+        )),
+    }
 }

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use specifications::common::Value;
 use serde_json::json;
+use specifications::common::Value;
 
 pub async fn submit(
     callback_url: &String,
@@ -15,7 +15,8 @@ pub async fn submit(
     });
 
     let client = reqwest::Client::new();
-    client.post(&callback_url)
+    client
+        .post(&callback_url)
         .json(&payload)
         .send()
         .await

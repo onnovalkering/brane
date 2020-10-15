@@ -1,6 +1,6 @@
 use crate::functions::{self, FunctionPattern};
 use crate::indexes::PackageIndex;
-use crate::parser::{self, AstNode, AstPredicate, AstTerm, AstRelation};
+use crate::parser::{self, AstNode, AstPredicate, AstRelation, AstTerm};
 use anyhow::Result;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
@@ -94,8 +94,12 @@ impl Compiler {
                     } else {
                         self.handle_call_node(terms)?
                     }
-                },
-                AstNode::Condition { predicate, if_exec, el_exec } => self.handle_condition_node(predicate, *if_exec, el_exec.map(|e| *e))?,
+                }
+                AstNode::Condition {
+                    predicate,
+                    if_exec,
+                    el_exec,
+                } => self.handle_condition_node(predicate, *if_exec, el_exec.map(|e| *e))?,
                 AstNode::Import { module, version } => self.handle_import_node(module, version)?,
                 AstNode::Parameter { name, complex } => self.handle_parameter_node(name, complex)?,
                 AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
@@ -117,7 +121,7 @@ impl Compiler {
 
     pub fn inject(
         &mut self,
-        variables: Map<String>
+        variables: Map<String>,
     ) -> () {
         self.state.variables.extend(variables);
     }
@@ -169,22 +173,39 @@ impl Compiler {
                 if let Value::Struct { data_type, properties } = value {
                     if let Some(c_type) = self.state.types.get(data_type) {
                         for property in &c_type.properties {
-                            ensure!(properties.get(&property.name).is_some(), "Missing '{}' in {} object.", property.name, data_type);
+                            ensure!(
+                                properties.get(&property.name).is_some(),
+                                "Missing '{}' in {} object.",
+                                property.name,
+                                data_type
+                            );
                             let actual_property = properties.get(&property.name).unwrap();
 
-                            ensure!(actual_property.data_type() == property.data_type, "Mismatch in datatype '{}' should be {} but is {}.", property.name, property.data_type, actual_property.data_type());
+                            ensure!(
+                                actual_property.data_type() == property.data_type,
+                                "Mismatch in datatype '{}' should be {} but is {}.",
+                                property.name,
+                                property.data_type,
+                                actual_property.data_type()
+                            );
                         }
 
-                        ensure!(properties.len() == c_type.properties.len(), "Mismatch in number of actual and expected properties.");
+                        ensure!(
+                            properties.len() == c_type.properties.len(),
+                            "Mismatch in number of actual and expected properties."
+                        );
                     } else {
-                        bail!("Cannot find type information for {}. If it is custom type, please bring it into scope.", data_type);
+                        bail!(
+                            "Cannot find type information for {}. If it is custom type, please bring it into scope.",
+                            data_type
+                        );
                     }
 
                     (Some(value.clone()), data_type.to_string())
                 } else {
                     (Some(value.clone()), data_type.to_string())
                 }
-            },
+            }
             AstTerm::Name(variable) => {
                 debug!("name: {}", variable);
 
@@ -201,7 +222,7 @@ impl Compiler {
                                 for p in &arch_type.properties {
                                     properties.insert(p.name.clone(), p.clone());
                                 }
-    
+
                                 if let Some(p) = properties.get(segments[1]) {
                                     p.data_type.clone()
                                 } else {
@@ -272,7 +293,6 @@ impl Compiler {
         if_exec: AstNode,
         el_exec: Option<AstNode>,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
-
         debug!("{:?}", predicate);
 
         let (poll, condition) = match predicate {
@@ -281,32 +301,46 @@ impl Compiler {
                 let condition = Condition::eq(variable.unwrap().as_pointer(), Value::Boolean(true));
 
                 (poll.unwrap(), condition)
-            },
-            AstPredicate::Comparison { lhs_terms, relation, rhs_terms } => {
+            }
+            AstPredicate::Comparison {
+                lhs_terms,
+                relation,
+                rhs_terms,
+            } => {
                 let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), lhs_terms)?;
                 let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), rhs_terms)?;
-                let poll = SubInstruction::new(vec!(lhs_poll.unwrap(), rhs_poll.unwrap()), Default::default());
+                let poll = SubInstruction::new(vec![lhs_poll.unwrap(), rhs_poll.unwrap()], Default::default());
 
                 let condition = match relation {
                     AstRelation::Equals => Condition::eq(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
-                    AstRelation::NotEquals => Condition::ne(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::NotEquals => {
+                        Condition::ne(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer())
+                    }
                     AstRelation::Greater => Condition::gt(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
                     AstRelation::Less => Condition::lt(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
-                    AstRelation::GreaterOrEqual => Condition::ge(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
-                    AstRelation::LessOrEqual => Condition::le(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::GreaterOrEqual => {
+                        Condition::ge(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer())
+                    }
+                    AstRelation::LessOrEqual => {
+                        Condition::le(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer())
+                    }
                 };
 
                 (poll, condition)
             }
         };
 
-        let if_check = MovInstruction::new(vec!(condition.clone()), vec!(Move::Forward, Move::Skip), Default::default());
+        let if_check = MovInstruction::new(
+            vec![condition.clone()],
+            vec![Move::Forward, Move::Skip],
+            Default::default(),
+        );
 
         let (_, if_exec) = match if_exec {
             AstNode::Assignment { name, terms } => self.handle_assignment_node(name, terms)?,
             AstNode::Call { terms } => self.handle_call_node(terms)?,
             AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
-            _ => unreachable!()
+            _ => unreachable!(),
         };
 
         let instruction = if let Some(el_exec) = el_exec {
@@ -314,16 +348,22 @@ impl Compiler {
                 AstNode::Assignment { name, terms } => self.handle_assignment_node(name, terms)?,
                 AstNode::Call { terms } => self.handle_call_node(terms)?,
                 AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
-                _ => unreachable!()
+                _ => unreachable!(),
             };
 
-            let el_check = MovInstruction::new(vec!(condition.clone()), vec!(Move::Skip, Move::Forward), Default::default());
-            SubInstruction::new(vec!(poll, if_check, if_exec.unwrap(), el_check, el_exec.unwrap()), Default::default())
+            let el_check = MovInstruction::new(
+                vec![condition.clone()],
+                vec![Move::Skip, Move::Forward],
+                Default::default(),
+            );
+            SubInstruction::new(
+                vec![poll, if_check, if_exec.unwrap(), el_check, el_exec.unwrap()],
+                Default::default(),
+            )
         } else {
-            SubInstruction::new(vec!(poll, if_check, if_exec.unwrap()), Default::default())
+            SubInstruction::new(vec![poll, if_check, if_exec.unwrap()], Default::default())
         };
 
-        
         Ok((None, Some(instruction)))
     }
 
@@ -340,7 +380,9 @@ impl Compiler {
         if let Some(package_info) = package_info {
             let package_patterns = functions::get_module_patterns(package_info)?;
             self.state.imports.extend(package_patterns);
-            self.state.imports.sort_by(|a, b| a.parameters.len().partial_cmp(&b.parameters.len()).unwrap());
+            self.state
+                .imports
+                .sort_by(|a, b| a.parameters.len().partial_cmp(&b.parameters.len()).unwrap());
             self.state.imports.reverse();
 
             if let Some(types) = &package_info.types {
@@ -380,7 +422,7 @@ impl Compiler {
     ///
     ///
     ///
-    fn handle_wait_until_node (
+    fn handle_wait_until_node(
         &mut self,
         predicate: AstPredicate,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
@@ -390,19 +432,29 @@ impl Compiler {
                 let condition = Condition::eq(variable.unwrap().as_pointer(), Value::Boolean(true));
 
                 (poll.unwrap(), condition)
-            },
-            AstPredicate::Comparison { lhs_terms, relation, rhs_terms } => {
+            }
+            AstPredicate::Comparison {
+                lhs_terms,
+                relation,
+                rhs_terms,
+            } => {
                 let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), lhs_terms)?;
                 let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), rhs_terms)?;
-                let poll = SubInstruction::new(vec!(lhs_poll.unwrap(), rhs_poll.unwrap()), Default::default());
+                let poll = SubInstruction::new(vec![lhs_poll.unwrap(), rhs_poll.unwrap()], Default::default());
 
                 let condition = match relation {
                     AstRelation::Equals => Condition::eq(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
-                    AstRelation::NotEquals => Condition::ne(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::NotEquals => {
+                        Condition::ne(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer())
+                    }
                     AstRelation::Greater => Condition::gt(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
                     AstRelation::Less => Condition::lt(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
-                    AstRelation::GreaterOrEqual => Condition::ge(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
-                    AstRelation::LessOrEqual => Condition::le(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::GreaterOrEqual => {
+                        Condition::ge(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer())
+                    }
+                    AstRelation::LessOrEqual => {
+                        Condition::le(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer())
+                    }
                 };
 
                 (poll, condition)
@@ -412,9 +464,9 @@ impl Compiler {
         let mut check_meta = Map::<String>::new();
         check_meta.insert(String::from("sleep_after_false"), String::from("10s"));
 
-        let check = MovInstruction::new(vec!(condition), vec!(Move::Forward, Move::Backward), check_meta);
-        let instruction = SubInstruction::new(vec!(poll, check), Default::default());
-        
+        let check = MovInstruction::new(vec![condition], vec![Move::Forward, Move::Backward], check_meta);
+        let instruction = SubInstruction::new(vec![poll, check], Default::default());
+
         Ok((None, Some(instruction)))
     }
 
@@ -432,19 +484,29 @@ impl Compiler {
                 let condition = Condition::eq(variable.unwrap().as_pointer(), Value::Boolean(true));
 
                 (poll.unwrap(), condition)
-            },
-            AstPredicate::Comparison { lhs_terms, relation, rhs_terms } => {
+            }
+            AstPredicate::Comparison {
+                lhs_terms,
+                relation,
+                rhs_terms,
+            } => {
                 let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), lhs_terms)?;
                 let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), rhs_terms)?;
-                let poll = SubInstruction::new(vec!(lhs_poll.unwrap(), rhs_poll.unwrap()), Default::default());
+                let poll = SubInstruction::new(vec![lhs_poll.unwrap(), rhs_poll.unwrap()], Default::default());
 
                 let condition = match relation {
                     AstRelation::Equals => Condition::eq(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
-                    AstRelation::NotEquals => Condition::ne(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::NotEquals => {
+                        Condition::ne(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer())
+                    }
                     AstRelation::Greater => Condition::gt(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
                     AstRelation::Less => Condition::lt(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
-                    AstRelation::GreaterOrEqual => Condition::ge(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
-                    AstRelation::LessOrEqual => Condition::le(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer()),
+                    AstRelation::GreaterOrEqual => {
+                        Condition::ge(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer())
+                    }
+                    AstRelation::LessOrEqual => {
+                        Condition::le(lhs_var.unwrap().as_pointer(), rhs_var.unwrap().as_pointer())
+                    }
                 };
 
                 (poll, condition)
@@ -455,15 +517,23 @@ impl Compiler {
             AstNode::Assignment { name, terms } => self.handle_assignment_node(name, terms)?,
             AstNode::Call { terms } => self.handle_call_node(terms)?,
             AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
-            _ => unreachable!()
+            _ => unreachable!(),
         };
 
-        let check_before = MovInstruction::new(vec!(condition.clone()), vec!(Move::Forward, Move::Skip), Default::default());
-        let check_after = MovInstruction::new(vec!(condition.clone()), vec!(Move::Backward, Move::Forward), Default::default());
-        
-        let exec_and_poll = SubInstruction::new(vec!(exec.unwrap(), poll.clone()), Default::default());
-        let instruction = SubInstruction::new(vec!(poll, check_before, exec_and_poll, check_after), Default::default());
-        
+        let check_before = MovInstruction::new(
+            vec![condition.clone()],
+            vec![Move::Forward, Move::Skip],
+            Default::default(),
+        );
+        let check_after = MovInstruction::new(
+            vec![condition.clone()],
+            vec![Move::Backward, Move::Forward],
+            Default::default(),
+        );
+
+        let exec_and_poll = SubInstruction::new(vec![exec.unwrap(), poll.clone()], Default::default());
+        let instruction = SubInstruction::new(vec![poll, check_before, exec_and_poll, check_after], Default::default());
+
         Ok((None, Some(instruction)))
     }
 
@@ -630,19 +700,15 @@ pub fn terms_to_instructions(
                 }
 
                 // Add implicit arguments to input (secrets)
-                function
-                    .parameters
-                    .iter()
-                    .filter(|p| p.secret.is_some())
-                    .for_each(|p| {
-                        let pointer = Value::Pointer {
-                            variable: p.secret.as_ref().unwrap().clone(),
-                            data_type: p.data_type.clone(),
-                            secret: true,
-                        };
+                function.parameters.iter().filter(|p| p.secret.is_some()).for_each(|p| {
+                    let pointer = Value::Pointer {
+                        variable: p.secret.as_ref().unwrap().clone(),
+                        data_type: p.data_type.clone(),
+                        secret: true,
+                    };
 
-                        input.insert(p.name.clone(), pointer);
-                    });
+                    input.insert(p.name.clone(), pointer);
+                });
 
                 debug!("Input: {:?}", &input);
 

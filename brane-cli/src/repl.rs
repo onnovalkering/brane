@@ -1,22 +1,22 @@
 use crate::{packages, registry};
 use anyhow::Result;
 use brane_dsl::compiler::{Compiler, CompilerOptions};
-use brane_vm::machine::Machine;
-use brane_vm::environment::InMemoryEnvironment;
-use brane_vm::vault::InMemoryVault;
 use brane_sys::local::LocalSystem;
+use brane_vm::environment::InMemoryEnvironment;
+use brane_vm::machine::Machine;
+use brane_vm::vault::InMemoryVault;
+use console::style;
 use futures::executor::block_on;
 use linefeed::{Interface, ReadResult};
+use serde::{Deserialize, Serialize};
+use serde_json::{self, json};
+use serde_yaml;
 use specifications::common::Value;
 use specifications::instructions::Instruction;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
-use serde_yaml;
 use uuid::Uuid;
-use serde_json::{self, json};
-use console::style;
-use serde::{Deserialize, Serialize};
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -33,7 +33,6 @@ impl CompileServiceMessage {
         Ok(result)
     }
 }
-
 
 pub async fn start(
     secrets_file: Option<PathBuf>,
@@ -78,12 +77,10 @@ async fn start_compile_service(
                 CompileServiceMessage::Code(code) => {
                     let result = compiler.compile(&code);
                     match result {
-                        Ok(instructions) => {
-                            json!({
-                                "variant": "ok",
-                                "content": instructions,
-                            })
-                        },
+                        Ok(instructions) => json!({
+                            "variant": "ok",
+                            "content": instructions,
+                        }),
                         Err(err) => {
                             debug!("{}", err);
                             json!({
@@ -109,11 +106,11 @@ async fn start_compile_service(
             warn!("Failed to read compile-service request, ignoring..");
             socket.send("", 0)?;
         };
-    }    
+    }
 }
 
 fn start_repl(
-    compiler: &mut Compiler, 
+    compiler: &mut Compiler,
     secrets_file: Option<PathBuf>,
 ) -> Result<()> {
     // Prepare machine
@@ -130,11 +127,7 @@ fn start_repl(
     let system = LocalSystem::new(session_id);
     let vault = InMemoryVault::new(secrets);
 
-    let mut machine = Machine::new(
-        Box::new(environment),
-        Box::new(system),
-        Box::new(vault),
-    );
+    let mut machine = Machine::new(Box::new(environment), Box::new(system), Box::new(vault));
 
     println!("Starting interactive session, press Ctrl+D to exit.\n");
 
@@ -155,7 +148,7 @@ fn start_repl(
                 let output = machine.walk(&instructions)?;
 
                 match output {
-                    Value::Unit => {},
+                    Value::Unit => {}
                     _ => print(&output, false),
                 }
             }
@@ -168,7 +161,6 @@ fn start_repl(
     println!("Goodbye.");
     Ok(())
 }
-
 
 ///
 ///
@@ -190,7 +182,7 @@ fn preprocess_instructions(instructions: &Vec<Instruction>) -> Result<Vec<Instru
                             act.meta
                                 .insert(String::from("instr_file"), String::from(instr_file.to_string_lossy()));
                         }
-                    },
+                    }
                     "cwl" | "ecu" | "oas" => {
                         let image_file = block_on(registry::get_package_source(&name, &version, &kind))?;
                         if image_file.exists() {

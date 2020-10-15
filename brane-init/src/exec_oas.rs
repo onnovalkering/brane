@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
-use specifications::common::{Value, Parameter, Type};
-use specifications::package::PackageInfo;
-use std::path::PathBuf;
 use openapiv3::{OpenAPI, Operation, Parameter as OParameter, ReferenceOr};
+use specifications::common::{Parameter, Type, Value};
+use specifications::package::PackageInfo;
 use std::fs::File;
 use std::io::BufReader;
+use std::path::PathBuf;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -19,8 +19,12 @@ pub async fn handle(
     debug!("Executing '{}' (OAS) using arguments:\n{:#?}", func_name, arguments);
 
     let package_info = PackageInfo::from_path(working_dir.join("package.yml"))?;
-    let functions = package_info.functions.expect("Missing `functions` property in package.yml");
-    let function = functions.get(&func_name).expect(&format!("Function '{}' not found", func_name));
+    let functions = package_info
+        .functions
+        .expect("Missing `functions` property in package.yml");
+    let function = functions
+        .get(&func_name)
+        .expect(&format!("Function '{}' not found", func_name));
 
     assert_input(&function.parameters, &arguments)?;
     initialize(&arguments, &working_dir)?;
@@ -47,7 +51,8 @@ fn assert_input(
 
     for p in parameters {
         let expected_type = p.data_type.as_str();
-        let argument = arguments.get(&p.name)
+        let argument = arguments
+            .get(&p.name)
             .with_context(|| format!("Argument not provided: {}", p.name))?;
 
         let actual_type = argument.data_type();
@@ -69,7 +74,7 @@ fn assert_input(
 ///
 fn initialize(
     _arguments: &Map<Value>,
-    _working_dir: &PathBuf
+    _working_dir: &PathBuf,
 ) -> Result<()> {
     // unimplemented
 
@@ -177,11 +182,13 @@ fn capture_output(
         Value::Struct { properties, .. } => {
             let properties = if let Some(c_types) = c_types {
                 let mut filtered = Map::<Value>::new();
-                let c_type = c_types.get(return_type)
+                let c_type = c_types
+                    .get(return_type)
                     .with_context(|| format!("Cannot find {} in custom types.", return_type))?;
-                
+
                 for p in &c_type.properties {
-                    let property = properties.get(&p.name)
+                    let property = properties
+                        .get(&p.name)
                         .with_context(|| format!("Cannot find {} in output (required)", p.name))?;
 
                     filtered.insert(p.name.to_string(), property.clone());

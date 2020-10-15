@@ -1,9 +1,9 @@
-use specifications::common::Value;
-use std::rc::Rc;
-use std::cell::RefCell;
-use redis::{Connection, Client};
 use redis::Commands;
+use redis::{Client, Connection};
 use serde_json;
+use specifications::common::Value;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -154,14 +154,21 @@ impl RedisEnvironment {
         client: &Client,
     ) -> Self {
         let connection = client.get_connection().unwrap();
-        RedisEnvironment { connection: Rc::new(RefCell::new(connection)), parent, prefix }
+        RedisEnvironment {
+            connection: Rc::new(RefCell::new(connection)),
+            parent,
+            prefix,
+        }
     }
 
     pub fn local_exists(
         &self,
         key: &str,
     ) -> bool {
-        self.connection.borrow_mut().exists(format!("{}_{}", self.prefix, key)).unwrap()
+        self.connection
+            .borrow_mut()
+            .exists(format!("{}_{}", self.prefix, key))
+            .unwrap()
     }
 
     ///
@@ -169,7 +176,7 @@ impl RedisEnvironment {
     ///
     pub fn local_get(
         &self,
-        key: &str
+        key: &str,
     ) -> Option<String> {
         if let Ok(result) = self.connection.borrow_mut().get(format!("{}_{}", self.prefix, key)) {
             Some(result)
@@ -180,9 +187,12 @@ impl RedisEnvironment {
 
     pub fn local_remove(
         &self,
-        key: &str
+        key: &str,
     ) -> () {
-        self.connection.borrow_mut().del(format!("{}_{}", self.prefix, key)).unwrap()
+        self.connection
+            .borrow_mut()
+            .del(format!("{}_{}", self.prefix, key))
+            .unwrap()
     }
 
     ///
@@ -191,9 +201,12 @@ impl RedisEnvironment {
     pub fn local_set(
         &self,
         key: &str,
-        value: String
+        value: String,
     ) -> String {
-        self.connection.borrow_mut().set(format!("{}_{}", self.prefix, key), value).unwrap()
+        self.connection
+            .borrow_mut()
+            .set(format!("{}_{}", self.prefix, key), value)
+            .unwrap()
     }
 }
 
@@ -229,7 +242,7 @@ impl Environment for RedisEnvironment {
         }
 
         if let Some(parent) = &self.parent {
-            return parent.get(name)
+            return parent.get(name);
         }
 
         panic!("Trying to access undeclared variable: '{}'.", name);
@@ -277,7 +290,7 @@ impl Environment for RedisEnvironment {
         }
 
         for key in keys {
-            let name = String::from(&key[self.prefix.len()+1..]);
+            let name = String::from(&key[self.prefix.len() + 1..]);
             let value = self.get(&name);
 
             variables.insert(name, value);

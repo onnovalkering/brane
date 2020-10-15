@@ -1,24 +1,24 @@
-use crate::environment::{InMemoryEnvironment, Environment};
+use crate::cursor::{Cursor, InMemoryCursor};
+use crate::environment::{Environment, InMemoryEnvironment};
 use crate::vault::{InMemoryVault, Vault};
 use anyhow::Result;
+use brane_exec::{docker, schedule, ExecuteInfo};
 use brane_sys::System;
-use brane_exec::{schedule, ExecuteInfo, docker};
-use specifications::common::Value;
-use specifications::instructions::{Instruction, Instruction::*, Move::*, Operator::*};
-use specifications::instructions::*;
-use crate::cursor::{Cursor, InMemoryCursor};
-use std::path::PathBuf;
 use futures::executor::block_on;
+use humantime::Duration;
+use specifications::common::Value;
+use specifications::instructions::*;
+use specifications::instructions::{Instruction, Instruction::*, Move::*, Operator::*};
 use std::fs::File;
 use std::io::BufReader;
-use humantime::Duration;
+use std::path::PathBuf;
 use std::thread;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
 pub enum MachineResult {
     Waiting,
-    Complete
+    Complete,
 }
 
 ///
@@ -58,9 +58,7 @@ impl AsyncMachine {
     ///
     ///
     ///
-    pub async fn walk(
-        &mut self,
-    ) -> Result<MachineResult> {
+    pub async fn walk(&mut self) -> Result<MachineResult> {
         while let Some(instruction) = get_current_instruction(&self.instructions, &self.cursor) {
             match instruction {
                 Act(act) => {
@@ -71,7 +69,7 @@ impl AsyncMachine {
                     if kind == "std" {
                         let package = act.meta.get("name").expect("No `name` property in metadata.");
                         let function = brane_std::FUNCTIONS.get(package).unwrap().get(&act.name).unwrap();
-                        
+
                         let output = function(&arguments, &self.system)?;
                         self.callback(output)?;
                     } else {
@@ -80,13 +78,13 @@ impl AsyncMachine {
                             "dsl" => schedule::dsl(&act, arguments, self.invocation_id).await?,
                             "ecu" => schedule::ecu(&act, arguments, self.invocation_id, &self.system).await?,
                             "oas" => schedule::oas(&act, arguments, self.invocation_id, &self.system).await?,
-                            _ => unreachable!()
+                            _ => unreachable!(),
                         };
 
                         // This will put the current machine in a waiting state
                         return Ok(MachineResult::Waiting);
                     }
-                },
+                }
                 Mov(mov) => handle_mov(&mov, &mut self.cursor, &self.environment),
                 Sub(sub) => handle_sub(&sub, &mut self.cursor),
                 Var(var) => handle_var(&var, &mut self.cursor, &mut self.environment),
@@ -164,7 +162,7 @@ impl Machine {
         instructions: &Vec<Instruction>,
     ) -> Result<Value> {
         debug!("instructions: {:?}", instructions);
-    
+
         let mut cursor: Box<dyn Cursor> = Box::new(InMemoryCursor::new());
 
         while let Some(instruction) = get_current_instruction(instructions, &cursor) {
@@ -179,7 +177,7 @@ impl Machine {
                     let output = if kind == "std" {
                         let package = act.meta.get("name").expect("No `name` property in metadata.");
                         let function = brane_std::FUNCTIONS.get(package).unwrap().get(&act.name).unwrap();
-                        
+
                         function(&arguments, &self.system)?
                     } else {
                         match kind.as_str() {
@@ -187,15 +185,15 @@ impl Machine {
                             "dsl" => handle_act_dsl(&act, arguments, self.system.clone())?,
                             "ecu" => handle_act(&act, arguments, kind, &self.system)?,
                             "oas" => handle_act(&act, arguments, kind, &self.system)?,
-                            _ => unreachable!()
+                            _ => unreachable!(),
                         }
                     };
-                    
+
                     if let Some(ref assignment) = act.assignment {
                         // Assert that types match
                         let actual_type = output.data_type();
                         let expected_type = act.data_type.expect("Missing `data_type` property.");
-            
+
                         if actual_type != expected_type {
                             return Err(anyhow!(
                                 "Type assertion failed. Expected '{}', but was '{}'.",
@@ -203,12 +201,12 @@ impl Machine {
                                 actual_type
                             ));
                         }
-            
+
                         self.environment.set(assignment, &output);
                     }
-            
-                    cursor.go(Forward);                    
-                },
+
+                    cursor.go(Forward);
+                }
                 Mov(mov) => handle_mov(&mov, &mut cursor, &self.environment),
                 Sub(sub) => handle_sub(&sub, &mut cursor),
                 Var(var) => handle_var(&var, &mut cursor, &mut self.environment),
@@ -240,11 +238,11 @@ fn get_current_instruction(
 ) -> Option<Instruction> {
     let position = cursor.get_position();
     if position == instructions.len() {
-        return None
+        return None;
     }
 
     let mut instruction = instructions.get(position).unwrap();
-    (1..cursor.get_depth()+1).for_each(|d| {
+    (1..cursor.get_depth() + 1).for_each(|d| {
         let subposition = cursor.get_subposition(d);
         if let Instruction::Sub(sub) = instruction {
             instruction = sub.instructions.get(subposition).unwrap();
@@ -288,10 +286,18 @@ fn handle_act(
     act: &ActInstruction,
     arguments: Map<Value>,
     kind: &str,
-    system: &Box::<dyn System>,
+    system: &Box<dyn System>,
 ) -> Result<Value> {
-    let image = act.meta.get("image").expect("Missing `image` metadata property.").clone();
-    let image_file = act.meta.get("image_file").map(PathBuf::from).expect("Missing `image_file` metadata property.");
+    let image = act
+        .meta
+        .get("image")
+        .expect("Missing `image` metadata property.")
+        .clone();
+    let image_file = act
+        .meta
+        .get("image_file")
+        .map(PathBuf::from)
+        .expect("Missing `image_file` metadata property.");
 
     let temp_dir = system.get_temp_dir();
     let session_dir = system.get_session_dir();
@@ -303,11 +309,7 @@ fn handle_act(
     ];
 
     let arguments = base64::encode(serde_json::to_string(&arguments)?);
-    let command = vec![
-        String::from(kind),
-        String::from(&act.name),
-        arguments,
-    ];
+    let command = vec![String::from(kind), String::from(&act.name), arguments];
 
     let exec = ExecuteInfo::new(image, Some(image_file), Some(mounts), Some(command));
     let (stdout, stderr) = block_on(docker::run_and_wait(exec))?;
@@ -330,7 +332,12 @@ fn handle_act_dsl(
     arguments: Map<Value>,
     system: Box<dyn System>,
 ) -> Result<Value> {
-    let instr_file = act.meta.get("instr_file").map(PathBuf::from).expect("Missing `instr_file` metadata property").clone();
+    let instr_file = act
+        .meta
+        .get("instr_file")
+        .map(PathBuf::from)
+        .expect("Missing `instr_file` metadata property")
+        .clone();
     let buf_reader = BufReader::new(File::open(instr_file)?);
     let instructions: Vec<Instruction> = serde_yaml::from_reader(buf_reader)?;
     let instructions = preprocess_instructions(&instructions)?;
@@ -340,11 +347,7 @@ fn handle_act_dsl(
     let environment = InMemoryEnvironment::new(Some(arguments), None);
     let vault = InMemoryVault::new(Default::default());
 
-    let mut machine = Machine::new(
-        Box::new(environment),
-        system,
-        Box::new(vault),
-    );
+    let mut machine = Machine::new(Box::new(environment), system, Box::new(vault));
 
     machine.walk(&instructions)
 }
@@ -429,7 +432,10 @@ fn handle_var(
 
     for variable in &var.set {
         if let Some(value) = &variable.value {
-            if let Value::Pointer { variable: p_variable, .. } = value {
+            if let Value::Pointer {
+                variable: p_variable, ..
+            } = value
+            {
                 let value = resolve_variable(p_variable, environment);
                 environment.set(&variable.name, &value);
             } else {
@@ -451,7 +457,7 @@ fn resolve_variable(
     if variable.contains(".") {
         let segments: Vec<_> = variable.split(".").collect();
         let arch_value = environment.get(segments[0]);
-    
+
         match arch_value {
             Value::Array { entries, .. } => {
                 if segments[1] == "length" {
@@ -477,9 +483,7 @@ fn resolve_variable(
 ///
 ///
 ///
-pub fn preprocess_instructions(
-    instructions: &Vec<Instruction>,
-) -> Result<Vec<Instruction>> {
+pub fn preprocess_instructions(instructions: &Vec<Instruction>) -> Result<Vec<Instruction>> {
     let mut instructions = instructions.clone();
 
     for instruction in &mut instructions {

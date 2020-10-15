@@ -1,13 +1,13 @@
 use crate::ExecuteInfo;
 use crate::{docker, kubernetes};
 use anyhow::{Context, Result};
-use specifications::common::Value;
-use specifications::instructions::{Instruction, ActInstruction};
-use std::path::PathBuf;
-use std::env;
+use brane_sys::System;
 use reqwest::Client;
 use serde_json::{json, Value as JValue};
-use brane_sys::System;
+use specifications::common::Value;
+use specifications::instructions::{ActInstruction, Instruction};
+use std::env;
+use std::path::PathBuf;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -24,7 +24,7 @@ pub async fn cwl(
     act: &ActInstruction,
     arguments: Map<Value>,
     invocation_id: i32,
-    system: &Box::<dyn System>,
+    system: &Box<dyn System>,
 ) -> Result<()> {
     let (image, image_file) = determine_image(&act)?;
     let mounts = determine_mounts(vec!["/var/run/docker.sock:/var/run/docker.sock", "/tmp:/tmp"], system);
@@ -48,11 +48,14 @@ pub async fn dsl(
     let client = Client::new();
 
     // Retreive package source (i.e. instructions)
-    let package_source_url = format!("http://{}/packages/{}/{}/source", API_HOST.as_str(), name, version);    
-    let package_source = client.get(&package_source_url)
-        .send().await
+    let package_source_url = format!("http://{}/packages/{}/{}/source", API_HOST.as_str(), name, version);
+    let package_source = client
+        .get(&package_source_url)
+        .send()
+        .await
         .with_context(|| "Failed to perform GET to retreive package instructions.")?
-        .text().await?;
+        .text()
+        .await?;
 
     let instructions: Vec<Instruction> = serde_yaml::from_str(&package_source)
         .with_context(|| "Failed to parse package source as instructions (YAML).")?;
@@ -64,11 +67,14 @@ pub async fn dsl(
         "arguments": arguments,
     });
 
-    let process: JValue = client.post(&process_creation_url)
+    let process: JValue = client
+        .post(&process_creation_url)
         .json(&payload)
-        .send().await
+        .send()
+        .await
         .with_context(|| "Failed to perform POST to create child process.")?
-        .json().await
+        .json()
+        .await
         .with_context(|| "Failed to parse POST response from child process creation.")?;
 
     let process_uuid = process["uuid"].as_str().expect("Missing `uuid` property.");
@@ -80,9 +86,11 @@ pub async fn dsl(
         "instructions": instructions,
     });
 
-    client.post(&invocation_creation_url)
+    client
+        .post(&invocation_creation_url)
         .json(&payload)
-        .send().await
+        .send()
+        .await
         .with_context(|| "Failed to perform POST to invocation creation endpoint.")?;
 
     Ok(())
@@ -95,7 +103,7 @@ pub async fn ecu(
     act: &ActInstruction,
     arguments: Map<Value>,
     invocation_id: i32,
-    system: &Box::<dyn System>,
+    system: &Box<dyn System>,
 ) -> Result<()> {
     let (image, image_file) = determine_image(&act)?;
     let mounts = determine_mounts(vec![], system);
@@ -112,7 +120,7 @@ pub async fn oas(
     act: &ActInstruction,
     arguments: Map<Value>,
     invocation_id: i32,
-    system: &Box::<dyn System>,
+    system: &Box<dyn System>,
 ) -> Result<()> {
     let (image, image_file) = determine_image(&act)?;
     let mounts = determine_mounts(vec![], system);
@@ -125,10 +133,12 @@ pub async fn oas(
 ///
 ///
 ///
-fn determine_image(
-    act: &ActInstruction
-) -> Result<(String, Option<PathBuf>)> {
-    let mut image = act.meta.get("image").expect("Missing `image` metadata property.").clone();
+fn determine_image(act: &ActInstruction) -> Result<(String, Option<PathBuf>)> {
+    let mut image = act
+        .meta
+        .get("image")
+        .expect("Missing `image` metadata property.")
+        .clone();
 
     let image_file = act.meta.get("image_file").map(PathBuf::from);
     if image_file.is_none() {
@@ -143,7 +153,7 @@ fn determine_image(
 ///
 fn determine_mounts(
     mounts: Vec<&str>,
-    system: &Box::<dyn System>,
+    system: &Box<dyn System>,
 ) -> Option<Vec<String>> {
     let temp_dir = system.get_temp_dir();
     let session_dir = system.get_session_dir();
@@ -153,10 +163,7 @@ fn determine_mounts(
         format!("{0}:{0}", session_dir.into_os_string().into_string().unwrap()),
     ];
 
-    let mut mounts: Vec<String> = mounts
-        .iter()
-        .map(|m| m.to_string())
-        .collect();
+    let mut mounts: Vec<String> = mounts.iter().map(|m| m.to_string()).collect();
 
     mounts.extend(default);
 
@@ -170,7 +177,7 @@ fn determine_command(
     invocation_id: i32,
     kind: &str,
     function: &str,
-    arguments: &Map<Value>
+    arguments: &Map<Value>,
 ) -> Result<Option<Vec<String>>> {
     let arguments = base64::encode(serde_json::to_string(&arguments)?);
     let callback_url = format!("http://{}/callback", API_HOST.as_str());
@@ -197,7 +204,7 @@ fn determine_cwl_command(
     kind: &str,
     function: &str,
     arguments: &Map<Value>,
-    system: &Box::<dyn System>,
+    system: &Box<dyn System>,
 ) -> Result<Option<Vec<String>>> {
     let temp_dir = system.get_temp_dir();
 
@@ -227,7 +234,7 @@ async fn run(exec: ExecuteInfo) -> Result<()> {
     match SYSTEM.as_str() {
         "local" => docker::run(exec).await?,
         "kubernetes" => kubernetes::run(exec).await?,
-        _ => unimplemented!()
+        _ => unimplemented!(),
     }
 
     Ok(())

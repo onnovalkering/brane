@@ -1,23 +1,22 @@
 use crate::ExecuteInfo;
 use anyhow::Result;
-use bollard::models::HostConfig;
 use bollard::container::{
-    Config, CreateContainerOptions, LogOutput, 
-    LogsOptions, RemoveContainerOptions,
-    StartContainerOptions, WaitContainerOptions,
+    Config, CreateContainerOptions, LogOutput, LogsOptions, RemoveContainerOptions, StartContainerOptions,
+    WaitContainerOptions,
 };
 use bollard::errors::Error;
 use bollard::image::{CreateImageOptions, ImportImageOptions, RemoveImageOptions};
+use bollard::models::HostConfig;
 use bollard::Docker;
 use futures_util::stream::TryStreamExt;
 use hyper::Body;
 use std::default::Default;
+use std::env;
+use std::path::PathBuf;
 use tokio::fs::File as TFile;
 use tokio::stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use uuid::Uuid;
-use std::env;
-use std::path::PathBuf;
 
 lazy_static! {
     static ref DOCKER_NETWORK: String = env::var("DOCKER_NETWORK").unwrap_or_else(|_| String::from("host"));
@@ -162,13 +161,13 @@ async fn pull_image(
     docker: &Docker,
     image: String,
 ) -> Result<()> {
-    let options = Some(CreateImageOptions{
+    let options = Some(CreateImageOptions {
         from_image: image,
         ..Default::default()
     });
 
     docker.create_image(options, None, None).try_collect::<Vec<_>>().await?;
-      
+
     Ok(())
 }
 
@@ -192,14 +191,12 @@ async fn remove_container(
 ///
 ///
 ///
-pub async fn remove_image(
-    name: &String,
-) -> Result<()> {
+pub async fn remove_image(name: &String) -> Result<()> {
     let docker = Docker::connect_with_local_defaults()?;
 
     let image = docker.inspect_image(name).await;
     if image.is_err() {
-        return Ok(())
+        return Ok(());
     }
 
     let remove_options = Some(RemoveImageOptions {

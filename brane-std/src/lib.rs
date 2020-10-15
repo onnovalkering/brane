@@ -20,7 +20,6 @@ lazy_static! {
 
         packages
     };
-
     pub static ref FUNCTIONS: Map<Map<Func>> = {
         let mut functions = Map::new();
         functions.insert(fs::PACKAGE.name.clone(), fs::FUNCTIONS.clone());

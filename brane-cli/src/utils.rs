@@ -8,8 +8,7 @@ use std::path::PathBuf;
 ///
 ///
 pub fn get_config_dir() -> PathBuf {
-    appdirs::user_config_dir(Some("brane"), None, false)
-        .expect("Couldn't determine Brane condig directory.")
+    appdirs::user_config_dir(Some("brane"), None, false).expect("Couldn't determine Brane condig directory.")
 }
 
 ///

@@ -86,7 +86,12 @@ enum SubCommand {
     Repl {
         #[structopt(short, long, name = "SECRETS", help = "File containing secrets")]
         secrets: Option<PathBuf>,
-        #[structopt(short, long = "compile-only", name = "ADDRESS", help = "Start compile-only service at the provided IPC pathname")]
+        #[structopt(
+            short,
+            long = "compile-only",
+            name = "ADDRESS",
+            help = "Start compile-only service at the provided IPC pathname"
+        )]
         co_address: Option<PathBuf>,
     },
 
@@ -112,7 +117,7 @@ enum SubCommand {
         version: String,
         #[structopt(short, long, help = "Don't ask for confirmation")]
         force: bool,
-    },    
+    },
 }
 
 #[tokio::main]
@@ -159,7 +164,12 @@ async fn main() -> Result<()> {
 async fn run(options: CLI) -> Result<()> {
     use SubCommand::*;
     match options.sub_command {
-        Build { context, file, kind, init } => {
+        Build {
+            context,
+            file,
+            kind,
+            init,
+        } => {
             let kind = if let Some(kind) = kind {
                 kind.to_lowercase()
             } else {
@@ -183,7 +193,7 @@ async fn run(options: CLI) -> Result<()> {
         Login { host, username } => {
             registry::login(host, username)?;
         }
-        Logout { } => {
+        Logout {} => {
             registry::logout()?;
         }
         Pull { name, version } => {
@@ -195,7 +205,7 @@ async fn run(options: CLI) -> Result<()> {
         Remove { name, version, force } => {
             packages::remove(name, version, force).await?;
         }
-        Repl { secrets, co_address} => {
+        Repl { secrets, co_address } => {
             repl::start(secrets, co_address).await?;
         }
         Test { name, version } => {

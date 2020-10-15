@@ -37,7 +37,15 @@ pub fn handle(
     let dockerfile = generate_dockerfile(&ecu_document, init_path.is_some())?;
     let package_info = generate_package_info(&ecu_document)?;
     let package_dir = packages::get_package_dir(&package_info.name, Some(&package_info.version))?;
-    prepare_directory(&ecu_document, &ecu_file, dockerfile, init_path, &context, &package_info, &package_dir)?;
+    prepare_directory(
+        &ecu_document,
+        &ecu_file,
+        dockerfile,
+        init_path,
+        &context,
+        &package_info,
+        &package_dir,
+    )?;
 
     debug!("Successfully prepared package directory.");
 
@@ -182,7 +190,7 @@ fn prepare_directory(
     if !wd.exists() {
         fs::create_dir(&wd)?;
     }
-    
+
     // Always copy these two files, required by convention
     fs::copy(ecu_file, wd.join("container.yml"))?;
     fs::copy(package_dir.join("package.yml"), wd.join("package.yml"))?;
@@ -199,7 +207,7 @@ fn prepare_directory(
             let file_path = context.join(file);
             fs::copy(&file_path, &wd_path)
                 .with_context(|| format!("Couldn't find {:?} within the build context.", file_path))?;
-                
+
             debug!("Copied {:?} to working directory", file_path);
         }
     }
@@ -244,7 +252,9 @@ fn build_docker_image(
         .expect("Couldn't run 'docker' command.");
 
     if !buildx.status.success() {
-        return Err(anyhow!("Failed to build ECU image. Is BuildKit enabled (see documentation)?"));
+        return Err(anyhow!(
+            "Failed to build ECU image. Is BuildKit enabled (see documentation)?"
+        ));
     }
 
     let output = Command::new("docker")
@@ -260,7 +270,9 @@ fn build_docker_image(
         .expect("Couldn't run 'docker' command.");
 
     if !output.success() {
-        return Err(anyhow!("Failed to build ECU image. See Docker output above for more information."));
+        return Err(anyhow!(
+            "Failed to build ECU image. See Docker output above for more information."
+        ));
     }
 
     Ok(())

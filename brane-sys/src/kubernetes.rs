@@ -1,9 +1,9 @@
 use crate::System;
 use anyhow::Result;
-use url::Url;
-use std::path::PathBuf;
-use uuid::Uuid;
 use std::fs::{self, File};
+use std::path::PathBuf;
+use url::Url;
+use uuid::Uuid;
 
 ///
 ///
@@ -23,7 +23,7 @@ impl K8sSystem {
 
     ///
     ///
-    /// 
+    ///
     fn determine_parent(
         &self,
         uuid: &Uuid,
@@ -46,7 +46,7 @@ impl K8sSystem {
     ///
     fn get_session_dir(
         &self,
-        uuid: &Uuid
+        uuid: &Uuid,
     ) -> PathBuf {
         PathBuf::from("/brane/session").join(uuid.to_string())
     }
@@ -56,15 +56,17 @@ impl K8sSystem {
     ///
     fn get_temp_dir(
         &self,
-        uuid: &Uuid
+        uuid: &Uuid,
     ) -> PathBuf {
         PathBuf::from("/brane/temp").join(uuid.to_string())
-    }    
+    }
 }
 
 impl System for K8sSystem {
     fn clone(&self) -> Box<dyn System> {
-        let system = K8sSystem { uuid: self.uuid.clone() };
+        let system = K8sSystem {
+            uuid: self.uuid.clone(),
+        };
 
         Box::new(system)
     }
@@ -116,7 +118,10 @@ impl System for K8sSystem {
 ///
 ///
 fn path_to_url(path: &PathBuf) -> Result<Url> {
-    Ok(Url::parse(&format!("file://{}", path.clone().into_os_string().into_string().unwrap()))?)
+    Ok(Url::parse(&format!(
+        "file://{}",
+        path.clone().into_os_string().into_string().unwrap()
+    ))?)
 }
 
 ///

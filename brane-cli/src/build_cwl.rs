@@ -1,11 +1,11 @@
 use crate::{packages, utils};
 use anyhow::{Context, Result};
 use console::style;
-use cwl::v11_cm::{Any, Format};
 use cwl::v11_clt::{
     CommandInputParameter, CommandInputParameterType, CommandLineToolInput, CommandLineToolInputType,
     CommandLineToolOutput, CommandLineToolOutputType, CommandOutputParameter, CommandOutputParameterType,
 };
+use cwl::v11_cm::{Any, Format};
 use cwl::v11_wf::{
     WorkflowInputParameterType, WorkflowInputType, WorkflowInputs, WorkflowOutputParameter,
     WorkflowOutputParameterType, WorkflowOutputType, WorkflowOutputs, WorkflowSteps,
@@ -43,7 +43,7 @@ pub fn handle(
 ) -> Result<()> {
     let context = fs::canonicalize(context)?;
     debug!("Using {:?} as build context", context);
-    
+
     let cwl_file = context.join(file);
     let cwl_reader = BufReader::new(File::open(&cwl_file)?);
     let cwl_document = CwlDocument::from_reader(cwl_reader).unwrap();
@@ -52,7 +52,15 @@ pub fn handle(
     let dockerfile = generate_dockerfile(&cwl_document, init_path.is_some())?;
     let package_info = create_package_info(&cwl_document)?;
     let package_dir = packages::get_package_dir(&package_info.name, Some(&package_info.version))?;
-    prepare_directory(&cwl_document, &cwl_file, dockerfile, init_path, &context, &package_info, &package_dir)?;
+    prepare_directory(
+        &cwl_document,
+        &cwl_file,
+        dockerfile,
+        init_path,
+        &context,
+        &package_info,
+        &package_dir,
+    )?;
 
     debug!("Successfully prepared package directory.");
 
@@ -302,25 +310,25 @@ fn construct_wf_properties(wf: &Workflow) -> Result<(String, Vec<Property>, Vec<
                             "integer" => Value::Integer(yvalue.as_i64().unwrap()),
                             "real" => Value::Real(yvalue.as_f64().unwrap()),
                             "string" => Value::Unicode(yvalue.as_str().unwrap().to_string()),
-                            _ => unimplemented!()
+                            _ => unimplemented!(),
                         };
 
                         property.default = Some(default);
                     }
 
                     input_properties.push(property);
-                } else { 
+                } else {
                     unimplemented!()
                 }
             }
-        },
-        WorkflowInputs::TypeMap(inputs) => { 
+        }
+        WorkflowInputs::TypeMap(inputs) => {
             for (p_name, p_type) in inputs.iter() {
                 let property = construct_wf_input_prop(p_name, p_type)?;
                 input_properties.push(property);
             }
-        },
-        _ => unimplemented!()
+        }
+        _ => unimplemented!(),
     }
 
     // Construct output properties
@@ -488,10 +496,10 @@ fn prepare_directory(
                         fs::create_dir_all(&parent)?;
                     }
                 }
-    
+
                 fs::copy(&run_file, &wd_path)
                     .with_context(|| format!("Couldn't find {:?} within the build context.", run_file))?;
-                    
+
                 debug!("Copied {:?} to working directory", run_file);
             } else {
                 return Err(anyhow!("Can't find workfow step file: {:?}", run_file));
@@ -522,7 +530,7 @@ fn prepare_directory(
     if !output.status.success() {
         warn!("Failed to cleanup working directory.");
     }
-    
+
     Ok(())
 }
 
@@ -539,7 +547,9 @@ fn build_docker_image(
         .expect("Couldn't run 'docker' command.");
 
     if !buildx.status.success() {
-        return Err(anyhow!("Failed to build Docker image. Is BuildKit enabled (see documentation)?"));
+        return Err(anyhow!(
+            "Failed to build Docker image. Is BuildKit enabled (see documentation)?"
+        ));
     }
 
     let output = Command::new("docker")
@@ -555,7 +565,9 @@ fn build_docker_image(
         .expect("Couldn't run 'docker' command.");
 
     if !output.success() {
-        return Err(anyhow!("Failed to build Docker image. See Docker output above for more information."));
+        return Err(anyhow!(
+            "Failed to build Docker image. See Docker output above for more information."
+        ));
     }
 
     Ok(())

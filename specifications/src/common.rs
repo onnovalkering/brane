@@ -102,15 +102,11 @@ impl Type {
     ///
     pub fn new(
         name: String,
-        properties: Vec<Property>
+        properties: Vec<Property>,
     ) -> Self {
-        Type {
-            name,
-            properties
-        }
+        Type { name, properties }
     }
 }
-
 
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
@@ -301,30 +297,26 @@ impl Value {
     pub fn as_json(&self) -> JValue {
         use Value::*;
         match self {
-            Array { entries, .. } => {
-                json!(entries.iter().map(|e| e.as_json()).collect::<JValue>())
-            },
+            Array { entries, .. } => json!(entries.iter().map(|e| e.as_json()).collect::<JValue>()),
             Boolean(b) => json!(b),
             Integer(i) => json!(i),
             Pointer { .. } => unimplemented!(),
             Real(r) => json!(r),
-            Struct { data_type, properties } => {
-                match data_type.as_str() {
-                    "Directory" | "File" => {
-                        let url = properties.get("url").unwrap();
-                        json!({
-                            "class": data_type,
-                            "path": url.as_json(),
-                        })
-                    },
-                    _ => {
-                        let mut object = Map::<JValue>::new();
-                        for (name, value) in properties {
-                            object.insert(name.clone(), value.as_json());
-                        }
-
-                        json!(object)
+            Struct { data_type, properties } => match data_type.as_str() {
+                "Directory" | "File" => {
+                    let url = properties.get("url").unwrap();
+                    json!({
+                        "class": data_type,
+                        "path": url.as_json(),
+                    })
+                }
+                _ => {
+                    let mut object = Map::<JValue>::new();
+                    for (name, value) in properties {
+                        object.insert(name.clone(), value.as_json());
                     }
+
+                    json!(object)
                 }
             },
             Unicode(s) => json!(s),
@@ -444,13 +436,11 @@ impl Variable {
     ///
     ///
     ///
-    pub fn as_pointer(
-        &self
-    ) -> Value {
-        Value::Pointer { 
-            data_type: self.data_type.clone(), 
+    pub fn as_pointer(&self) -> Value {
+        Value::Pointer {
+            data_type: self.data_type.clone(),
             secret: false,
-            variable: self.name.clone(), 
+            variable: self.name.clone(),
         }
     }
 }

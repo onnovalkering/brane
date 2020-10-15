@@ -1,10 +1,10 @@
 use crate::System;
 use anyhow::Result;
-use url::Url;
-use std::path::PathBuf;
-use uuid::Uuid;
 use std::env;
 use std::fs::{self, File};
+use std::path::PathBuf;
+use url::Url;
+use uuid::Uuid;
 
 ///
 ///
@@ -24,7 +24,7 @@ impl LocalSystem {
 
     ///
     ///
-    /// 
+    ///
     fn determine_parent(
         &self,
         uuid: &Uuid,
@@ -47,7 +47,7 @@ impl LocalSystem {
     ///
     fn get_session_dir(
         &self,
-        uuid: &Uuid
+        uuid: &Uuid,
     ) -> PathBuf {
         appdirs::user_data_dir(Some("brane"), None, false)
             .expect("Couldn't determine Brane data directory.")
@@ -60,15 +60,17 @@ impl LocalSystem {
     ///
     fn get_temp_dir(
         &self,
-        uuid: &Uuid
+        uuid: &Uuid,
     ) -> PathBuf {
         env::temp_dir().join(uuid.to_string())
-    }    
+    }
 }
 
 impl System for LocalSystem {
     fn clone(&self) -> Box<dyn System> {
-        let system = LocalSystem { uuid: self.uuid.clone() };
+        let system = LocalSystem {
+            uuid: self.uuid.clone(),
+        };
 
         Box::new(system)
     }
@@ -120,7 +122,10 @@ impl System for LocalSystem {
 ///
 ///
 fn path_to_url(path: &PathBuf) -> Result<Url> {
-    Ok(Url::parse(&format!("file://{}", path.clone().into_os_string().into_string().unwrap()))?)
+    Ok(Url::parse(&format!(
+        "file://{}",
+        path.clone().into_os_string().into_string().unwrap()
+    ))?)
 }
 
 ///

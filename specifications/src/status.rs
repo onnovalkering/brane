@@ -14,7 +14,7 @@ pub struct StatusInfo {
 
 impl StatusInfo {
     pub fn new(
-        instruction_id: i32, 
+        instruction_id: i32,
         invocation_id: i32,
         status: Status,
     ) -> Self {

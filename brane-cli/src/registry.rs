@@ -1,37 +1,37 @@
 use crate::packages;
 use crate::utils;
-use console::style;
 use anyhow::{Context, Result};
 use brane_dsl::indexes::PackageIndex;
+use console::style;
+use console::{pad_str, Alignment};
+use dialoguer::Confirm;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use dialoguer::Confirm;
+use indicatif::{ProgressBar, ProgressStyle};
+use prettytable::format::FormatBuilder;
+use prettytable::Table;
 use reqwest::{self, multipart::Form, multipart::Part, Body, Client, Method};
-use serde_json::{json, Value as JValue};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value as JValue};
 use serde_with::skip_serializing_none;
 use specifications::package::PackageInfo;
 use std::env;
 use std::fs::{self, File};
 use std::io::prelude::*;
-use std::path::PathBuf;
 use std::io::BufReader;
+use std::path::PathBuf;
 use tar::Archive;
 use tokio::fs::File as TokioFile;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use url::Url;
-use console::{pad_str, Alignment};
-use prettytable::format::FormatBuilder;
-use prettytable::Table;
-use indicatif::{ProgressBar, ProgressStyle};
 
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct RegistryConfig {
     pub url: String,
-    pub username: String,    
+    pub username: String,
 }
 
 impl RegistryConfig {
@@ -57,12 +57,12 @@ pub fn login(
     url: String,
     username: String,
 ) -> Result<()> {
-    let url = Url::parse(&url)
-        .with_context(|| format!("Not a valid absolute URL: {}", url))?;
+    let url = Url::parse(&url).with_context(|| format!("Not a valid absolute URL: {}", url))?;
 
-    let host = url.host_str()
+    let host = url
+        .host_str()
         .with_context(|| format!("URL does not have a (valid) host: {}", url))?;
-    
+
     let config_file = utils::get_config_dir().join("registry.yml");
     let mut config = if config_file.exists() {
         RegistryConfig::from_path(&config_file)?
@@ -71,14 +71,9 @@ pub fn login(
     };
 
     config.username = username;
-    config.url = format!(
-        "{}://{}:{}", 
-        url.scheme(), 
-        host,
-        url.port().unwrap_or(8080)
-    );
+    config.url = format!("{}://{}:{}", url.scheme(), host, url.port().unwrap_or(8080));
 
-    // Write registry.yml to config directory   
+    // Write registry.yml to config directory
     fs::create_dir_all(&config_file.parent().unwrap())?;
     let mut buffer = File::create(config_file)?;
     write!(buffer, "{}", serde_yaml::to_string(&config)?)?;
@@ -106,7 +101,7 @@ pub async fn pull(
     version: Option<String>,
 ) -> Result<()> {
     let version = version.expect("please provide version");
-    
+
     let url = get_registry_endpoint(format!("/{}/{}/archive", name, version))?;
     let mut package_archive = reqwest::get(&url).await?;
 
@@ -122,9 +117,11 @@ pub async fn pull(
     let mut temp_file = File::create(&temp_filepath)?;
 
     let progress = ProgressBar::new(content_length);
-    progress.set_style(ProgressStyle::default_bar()
-        .template("Downloading... [{elapsed_precise}] {bar:40.cyan/blue} {percent}/100%")
-        .progress_chars("##-"));
+    progress.set_style(
+        ProgressStyle::default_bar()
+            .template("Downloading... [{elapsed_precise}] {bar:40.cyan/blue} {percent}/100%")
+            .progress_chars("##-"),
+    );
 
     while let Some(chunk) = package_archive.chunk().await? {
         progress.inc(chunk.len() as u64);
@@ -139,8 +136,7 @@ pub async fn pull(
     fs::create_dir_all(&package_dir)?;
 
     let progress = ProgressBar::new(content_length);
-    progress.set_style(ProgressStyle::default_bar()
-        .template("Extracting...  [{elapsed_precise}]"));
+    progress.set_style(ProgressStyle::default_bar().template("Extracting...  [{elapsed_precise}]"));
     progress.enable_steady_tick(250);
 
     let mut archive = Archive::new(GzDecoder::new(archive_file));
@@ -175,8 +171,7 @@ pub async fn push(
     let archive_file = File::create(&archive_filepath)?;
 
     let progress = ProgressBar::new(0);
-    progress.set_style(ProgressStyle::default_bar()
-        .template("Compressing... [{elapsed_precise}]"));
+    progress.set_style(ProgressStyle::default_bar().template("Compressing... [{elapsed_precise}]"));
     progress.enable_steady_tick(250);
 
     // Create package tarball
@@ -201,8 +196,7 @@ pub async fn push(
     form = form.part("file", Part::stream(reader).file_name(archive_filename));
 
     let progress = ProgressBar::new(0);
-    progress.set_style(ProgressStyle::default_bar()
-        .template("Uploading...   [{elapsed_precise}]"));
+    progress.set_style(ProgressStyle::default_bar().template("Uploading...   [{elapsed_precise}]"));
     progress.enable_steady_tick(250);
 
     let request = request.multipart(form);
@@ -331,7 +325,7 @@ pub async fn get_package_source(
 
                 instructions
             }
-        },
+        }
         "cwl" | "ecu" | "oas" => {
             let image_file = package_dir.join("image.tar");
             if image_file.exists() {
@@ -360,7 +354,7 @@ pub async fn get_package_source(
 
                 image_file
             }
-        },
+        }
         _ => unreachable!(),
     };
 
@@ -389,7 +383,10 @@ pub async fn unpublish(
     let url = get_registry_endpoint(format!("/{}/{}", name, version))?;
 
     let client = Client::new();
-    let package = client.get(&url).send().await
+    let package = client
+        .get(&url)
+        .send()
+        .await
         .with_context(|| format!("Failed to reach registry at: {}", url))?;
 
     if !package.status().is_success() {
@@ -399,7 +396,7 @@ pub async fn unpublish(
             style(&name).bold().cyan(),
         );
 
-        return Ok(())
+        return Ok(());
     }
 
     // Ask for permission, if --force is not provided
@@ -409,11 +406,12 @@ pub async fn unpublish(
 
         // Abort, if not approved
         if !Confirm::new().interact()? {
-            return Ok(())
+            return Ok(());
         }
     }
 
-    client.delete(&url)
+    client
+        .delete(&url)
         .send()
         .await
         .with_context(|| "Failed to delete '{}' with version '{}' at remote registry.")?;

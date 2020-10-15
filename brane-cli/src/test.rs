@@ -1,20 +1,22 @@
 use crate::packages;
 use anyhow::Result;
-use brane_vm::machine::{self, Machine};
 use brane_exec::{docker, ExecuteInfo};
-use brane_vm::environment::InMemoryEnvironment;
-use brane_vm::vault::InMemoryVault;
 use brane_sys::local::LocalSystem;
+use brane_vm::environment::InMemoryEnvironment;
+use brane_vm::machine::{self, Machine};
+use brane_vm::vault::InMemoryVault;
 use console::style;
-use dialoguer::{Confirm, Password};
 use dialoguer::theme::ColorfulTheme;
+use dialoguer::{Confirm, Password};
 use dialoguer::{Input as Prompt, Select};
 use serde_yaml;
 use specifications::common::{Function, Parameter, Type, Value};
 use specifications::instructions::Instruction;
 use specifications::package::PackageInfo;
+use std::env;
+use std::fs;
 use std::fs::File;
-use std::io::{BufReader};
+use std::io::BufReader;
 use std::path::PathBuf;
 use std::{
     fmt::{Debug, Display},
@@ -22,8 +24,6 @@ use std::{
 };
 use url::Url;
 use uuid::Uuid;
-use std::env;
-use std::fs;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -90,23 +90,27 @@ async fn test_cwl(
                     if data_type == "Directory[]" || data_type == "File[]" {
                         for entry in entries {
                             if let Value::Struct { properties, .. } = entry {
-                                let url = properties.get("url").expect(&format!("Missing `url` property on {}", data_type));
+                                let url = properties
+                                    .get("url")
+                                    .expect(&format!("Missing `url` property on {}", data_type));
                                 let path = url_to_path(&Url::parse(&url.as_string()?)?)?;
-            
-                                mounts.push(format!("{0}:{0}", path.into_os_string().to_string_lossy()));   
+
+                                mounts.push(format!("{0}:{0}", path.into_os_string().to_string_lossy()));
                             }
                         }
                     }
-                },
-                Value::Struct { data_type, properties} => {
+                }
+                Value::Struct { data_type, properties } => {
                     if data_type == "Directory" || data_type == "File" {
-                        let url = properties.get("url").expect(&format!("Missing `url` property on {}", data_type));
+                        let url = properties
+                            .get("url")
+                            .expect(&format!("Missing `url` property on {}", data_type));
                         let path = url_to_path(&Url::parse(&url.as_string()?)?)?;
 
                         mounts.push(format!("{0}:{0}", path.into_os_string().to_string_lossy()));
                     }
-                },
-                _ => continue
+                }
+                _ => continue,
             }
         }
     }
@@ -116,14 +120,14 @@ async fn test_cwl(
     fs::create_dir(&output_dir)?;
 
     debug!("Mounts: {:#?}", mounts);
-    
+
     let command = vec![
         String::from("-d"),
         String::from("cwl"),
         String::from("-o"),
         String::from(output_dir.as_os_str().to_string_lossy()),
-        function, 
-        base64::encode(serde_json::to_string(&arguments)?)
+        function,
+        base64::encode(serde_json::to_string(&arguments)?),
     ];
 
     debug!("{:?}", command);
@@ -136,7 +140,7 @@ async fn test_cwl(
     }
 
     debug!("stdout: {}", stdout);
-    Ok(serde_json::from_str(&stdout)?)    
+    Ok(serde_json::from_str(&stdout)?)
 }
 
 ///
@@ -166,11 +170,7 @@ fn test_dsl(
     let system = LocalSystem::new(session_id);
     let vault = InMemoryVault::new(Default::default());
 
-    let mut machine = Machine::new(
-        Box::new(environment),
-        Box::new(system),
-        Box::new(vault),
-    );
+    let mut machine = Machine::new(Box::new(environment), Box::new(system), Box::new(vault));
 
     machine.walk(&instructions)
 }
@@ -190,9 +190,9 @@ async fn test_ecu(
     let image_file = Some(package_dir.join("image.tar"));
 
     let command = vec![
-        String::from("ecu"), 
-        function, 
-        base64::encode(serde_json::to_string(&arguments)?)
+        String::from("ecu"),
+        function,
+        base64::encode(serde_json::to_string(&arguments)?),
     ];
 
     debug!("{:?}", command);
@@ -224,10 +224,10 @@ async fn test_oas(
 
     let command = vec![
         String::from("oas"),
-        function, 
-        base64::encode(serde_json::to_string(&arguments)?)
+        function,
+        base64::encode(serde_json::to_string(&arguments)?),
     ];
-    
+
     debug!("{:?}", command);
 
     let exec = ExecuteInfo::new(image, image_file, None, Some(command));
@@ -266,7 +266,7 @@ fn prompt_for_input(
 
         let value = if let Some(input_type) = types.get(data_type) {
             let mut properties = Map::<Value>::new();
-    
+
             for p in &input_type.properties {
                 let p = p.clone().into_parameter();
                 let data_type = p.data_type.as_str();
@@ -298,25 +298,31 @@ fn prompt_for_input(
 ///
 fn prompt_for_value(
     data_type: &str,
-    p: &Parameter
+    p: &Parameter,
 ) -> Result<Value> {
     let value = if data_type.ends_with("[]") {
-        let entry_data_type = data_type[..data_type.len()-2].to_string();
+        let entry_data_type = data_type[..data_type.len() - 2].to_string();
         let mut entries = vec![];
 
         loop {
             let mut p = p.clone();
             p.data_type = format!("{}[{}]", entry_data_type, entries.len());
             entries.push(prompt_for_value(&entry_data_type, &p)?);
-        
-            if !Confirm::new().with_prompt(format!("Do you want to more items to the {} array?", style(p.name).bold().cyan())).interact()? {
-                break
+
+            if !Confirm::new()
+                .with_prompt(format!(
+                    "Do you want to more items to the {} array?",
+                    style(p.name).bold().cyan()
+                ))
+                .interact()?
+            {
+                break;
             }
         }
 
         Value::Array {
             data_type: data_type.to_string(),
-            entries
+            entries,
         }
     } else {
         match data_type {
@@ -333,9 +339,9 @@ fn prompt_for_value(
 
                 Value::Struct {
                     data_type: String::from(data_type),
-                    properties
+                    properties,
                 }
-            },
+            }
             "integer" => {
                 let default = p.clone().default.map(|d| d.as_i64().unwrap());
                 Value::Integer(prompt(&p, default)?)
@@ -354,7 +360,7 @@ fn prompt_for_value(
 
                 Value::Unicode(value)
             }
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     };
 
@@ -404,9 +410,7 @@ fn prompt_password(
 ///
 ///
 ///
-fn print_output(
-    value: &Value
-) -> () {
+fn print_output(value: &Value) -> () {
     match value {
         Value::Array { entries, .. } => {
             println!("{}", style("[").bold().cyan());

@@ -1,9 +1,9 @@
 use anyhow::Result;
 use brane_sys::System;
-use specifications::common::{Function, CallPattern, Value, Type, Parameter, Property};
-use specifications::package::PackageInfo;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
+use specifications::common::{CallPattern, Function, Parameter, Property, Type, Value};
+use specifications::package::PackageInfo;
 use url::Url;
 
 type Map<T> = std::collections::HashMap<String, T>;
@@ -110,7 +110,10 @@ lazy_static! {
 ///
 ///
 ///
-pub fn new_directory(arguments: &Map<Value>, system: &Box<dyn System>) -> Result<Value> {
+pub fn new_directory(
+    arguments: &Map<Value>,
+    system: &Box<dyn System>,
+) -> Result<Value> {
     let name = arguments
         .get("name")
         .map(|v| v.as_string().unwrap())
@@ -118,12 +121,14 @@ pub fn new_directory(arguments: &Map<Value>, system: &Box<dyn System>) -> Result
 
     let parent = arguments
         .get("parent")
-        .map(|v| if let Value::Struct { properties, .. } = v {
-            let url = properties.get("url").unwrap().as_string().unwrap();
-            let url = Url::parse(&url).unwrap();
-            Some(url)
-        } else {
-            None
+        .map(|v| {
+            if let Value::Struct { properties, .. } = v {
+                let url = properties.get("url").unwrap().as_string().unwrap();
+                let url = Url::parse(&url).unwrap();
+                Some(url)
+            } else {
+                None
+            }
         })
         .unwrap_or_else(|| None);
 
@@ -144,7 +149,10 @@ pub fn new_directory(arguments: &Map<Value>, system: &Box<dyn System>) -> Result
 ///
 ///
 ///
-pub fn new_file(arguments: &Map<Value>, system: &Box<dyn System>) -> Result<Value> {
+pub fn new_file(
+    arguments: &Map<Value>,
+    system: &Box<dyn System>,
+) -> Result<Value> {
     let name = arguments
         .get("name")
         .map(|v| v.as_string().unwrap())
@@ -152,12 +160,14 @@ pub fn new_file(arguments: &Map<Value>, system: &Box<dyn System>) -> Result<Valu
 
     let parent = arguments
         .get("parent")
-        .map(|v| if let Value::Struct { properties, .. } = v {
-            let url = properties.get("url").unwrap().as_string().unwrap();
-            let url = Url::parse(&url).unwrap();
-            Some(url)
-        } else {
-            None
+        .map(|v| {
+            if let Value::Struct { properties, .. } = v {
+                let url = properties.get("url").unwrap().as_string().unwrap();
+                let url = Url::parse(&url).unwrap();
+                Some(url)
+            } else {
+                None
+            }
         })
         .unwrap_or_else(|| None);
 
@@ -178,7 +188,10 @@ pub fn new_file(arguments: &Map<Value>, system: &Box<dyn System>) -> Result<Valu
 ///
 ///
 ///
-pub fn new_temp_directory(arguments: &Map<Value>, system: &Box<dyn System>) -> Result<Value> {
+pub fn new_temp_directory(
+    arguments: &Map<Value>,
+    system: &Box<dyn System>,
+) -> Result<Value> {
     let name = arguments
         .get("name")
         .map(|v| v.as_string().unwrap())
@@ -202,7 +215,10 @@ pub fn new_temp_directory(arguments: &Map<Value>, system: &Box<dyn System>) -> R
 ///
 ///
 ///
-pub fn new_temp_file(arguments: &Map<Value>, system: &Box<dyn System>) -> Result<Value> {
+pub fn new_temp_file(
+    arguments: &Map<Value>,
+    system: &Box<dyn System>,
+) -> Result<Value> {
     let name = arguments
         .get("name")
         .map(|v| v.as_string().unwrap())

@@ -97,7 +97,7 @@ pub enum AstPredicate {
         lhs_terms: Vec<AstTerm>,
         relation: AstRelation,
         rhs_terms: Vec<AstTerm>,
-    }
+    },
 }
 
 #[derive(Debug)]
@@ -300,10 +300,8 @@ fn parse_predicate_rule(rule: Pair<Rule>) -> Result<AstPredicate> {
             } else {
                 unreachable!()
             }
-        },
-        Rule::comparison => {
-            Ok(parse_comparison_rule(predicate)?)
         }
+        Rule::comparison => Ok(parse_comparison_rule(predicate)?),
         _ => unreachable!(),
     }
 }
@@ -328,7 +326,11 @@ fn parse_comparison_rule(rule: Pair<Rule>) -> Result<AstPredicate> {
         unreachable!();
     };
 
-    Ok(AstPredicate::Comparison { lhs_terms, relation, rhs_terms })
+    Ok(AstPredicate::Comparison {
+        lhs_terms,
+        relation,
+        rhs_terms,
+    })
 }
 
 ///
@@ -344,7 +346,7 @@ fn parse_relation_rule(rule: Pair<Rule>) -> Result<AstRelation> {
         "<" => AstRelation::Less,
         ">=" => AstRelation::GreaterOrEqual,
         "<=" => AstRelation::LessOrEqual,
-        _ => unreachable!()
+        _ => unreachable!(),
     })
 }
 
@@ -434,7 +436,7 @@ fn parse_value_rule(rule: Pair<Rule>) -> Result<Value> {
             };
 
             Ok(Value::Array { data_type, entries })
-        },
+        }
         Rule::object => parse_object_rule(value),
         Rule::literal => parse_literal_rule(value),
         _ => unreachable!(),

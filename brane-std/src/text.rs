@@ -66,7 +66,10 @@ lazy_static! {
 ///
 ///
 ///
-pub fn concat(arguments: &Map<Value>, _system: &Box<dyn System>) -> Result<Value> {
+pub fn concat(
+    arguments: &Map<Value>,
+    _system: &Box<dyn System>,
+) -> Result<Value> {
     let left = arguments.get("left").expect("Missing `left` argument");
     let right = arguments.get("right").expect("Missing `right` argument");
 
@@ -76,7 +79,10 @@ pub fn concat(arguments: &Map<Value>, _system: &Box<dyn System>) -> Result<Value
 ///
 ///
 ///
-pub fn split(arguments: &Map<Value>, _system: &Box<dyn System>) -> Result<Value> {
+pub fn split(
+    arguments: &Map<Value>,
+    _system: &Box<dyn System>,
+) -> Result<Value> {
     let input = arguments.get("input").expect("Missing `input` argument.");
     if let Value::Unicode(text) = input {
         let data_type = String::from("string[]");

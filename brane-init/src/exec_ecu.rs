@@ -19,7 +19,9 @@ pub fn handle(
 
     let container_info = ContainerInfo::from_path(working_dir.join("container.yml"))?;
     let functions = container_info.actions;
-    let function = functions.get(&function).expect(&format!("Function '{}' not found", function));    
+    let function = functions
+        .get(&function)
+        .expect(&format!("Function '{}' not found", function));
 
     assert_input(&function.input, &arguments)?;
     initialize(&working_dir)?;
@@ -166,7 +168,7 @@ fn construct_envs(variables: &Map<Value>) -> Result<Map<String>> {
                             Value::Unicode(value) => value.to_string(),
                             _ => unreachable!(),
                         };
-    
+
                         envs.insert(format!("{}_{}", &name, index), value);
                     }
                 }
@@ -181,9 +183,9 @@ fn construct_envs(variables: &Map<Value>) -> Result<Map<String>> {
             Value::Real(value) => {
                 envs.insert(name, value.to_string());
             }
-            Value::Struct { properties, ..} => {
+            Value::Struct { properties, .. } => {
                 construct_struct_envs(&name, None, properties, &mut envs);
-            },
+            }
             Value::Unicode(value) => {
                 envs.insert(name, value.to_string());
             }
@@ -199,20 +201,20 @@ fn construct_envs(variables: &Map<Value>) -> Result<Map<String>> {
 ///
 ///
 fn construct_struct_envs(
-    name: &String, 
+    name: &String,
     index: Option<usize>,
-    properties: &Map<Value>, 
-    envs: &mut Map<String>
+    properties: &Map<Value>,
+    envs: &mut Map<String>,
 ) -> () {
     for (key, entry) in properties.iter() {
         let value = match entry {
-            Value::Array { entries: _, .. }=> unimplemented!(),
+            Value::Array { entries: _, .. } => unimplemented!(),
             Value::Boolean(value) => value.to_string(),
             Value::Integer(value) => value.to_string(),
             Value::Real(value) => value.to_string(),
             Value::Unicode(value) => value.to_string(),
             Value::Struct { properties: _, .. } => unimplemented!(),
-            _ => unreachable!()
+            _ => unreachable!(),
         };
 
         if let Some(index) = index {
@@ -303,7 +305,7 @@ fn unwrap_yaml_value(
 
             Value::Struct {
                 data_type: String::from(data_type),
-                properties
+                properties,
             }
         }
         "integer" => {
