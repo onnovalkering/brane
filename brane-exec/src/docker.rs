@@ -2,11 +2,12 @@ use crate::ExecuteInfo;
 use anyhow::Result;
 use bollard::models::HostConfig;
 use bollard::container::{
-    Config, CreateContainerOptions, LogOutput, LogsOptions, RemoveContainerOptions, StartContainerOptions,
-    WaitContainerOptions,
+    Config, CreateContainerOptions, LogOutput, 
+    LogsOptions, RemoveContainerOptions,
+    StartContainerOptions, WaitContainerOptions,
 };
 use bollard::errors::Error;
-use bollard::image::{CreateImageOptions, ImportImageOptions};
+use bollard::image::{CreateImageOptions, ImportImageOptions, RemoveImageOptions};
 use bollard::Docker;
 use futures_util::stream::TryStreamExt;
 use hyper::Body;
@@ -74,12 +75,7 @@ pub async fn run_and_wait(exec: ExecuteInfo) -> Result<(String, String)> {
     }
 
     // Don't leave behind any waste: remove container
-    let remove_options = Some(RemoveContainerOptions {
-        force: true,
-        ..Default::default()
-    });
-
-    docker.remove_container(&name, remove_options).await?;
+    remove_container(&docker, &name).await?;
 
     Ok((stdout, stderr))
 }
@@ -173,5 +169,46 @@ async fn pull_image(
 
     docker.create_image(options, None, None).try_collect::<Vec<_>>().await?;
       
+    Ok(())
+}
+
+///
+///
+///
+async fn remove_container(
+    docker: &Docker,
+    name: &String,
+) -> Result<()> {
+    let remove_options = Some(RemoveContainerOptions {
+        force: true,
+        ..Default::default()
+    });
+
+    docker.remove_container(name, remove_options).await?;
+
+    Ok(())
+}
+
+///
+///
+///
+pub async fn remove_image(
+    name: &String,
+) -> Result<()> {
+    let docker = Docker::connect_with_local_defaults()?;
+
+    let image = docker.inspect_image(name).await;
+    if image.is_err() {
+        return Ok(())
+    }
+
+    let remove_options = Some(RemoveImageOptions {
+        force: true,
+        ..Default::default()
+    });
+
+    let image = image.unwrap();
+    docker.remove_image(&image.id, remove_options, None).await?;
+
     Ok(())
 }
