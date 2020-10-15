@@ -1,4 +1,5 @@
 use anyhow::Result;
+use brane_exec::docker;
 use chrono::Utc;
 use console::{pad_str, Alignment};
 use dialoguer::Confirm;
@@ -141,7 +142,7 @@ pub fn list() -> Result<()> {
 ///
 ///
 ///
-pub fn remove(
+pub async fn remove(
     name: String,
     version: Option<String>,
     force: bool,
@@ -162,26 +163,36 @@ pub fn remove(
         return Ok(());
     }
 
-    // Also remove without confirmation if --force is provided.
-    if force {
-        fs::remove_dir_all(&package_dir)?;
-        return Ok(());
-    }
-
     // Look for packages.
     let versions = fs::read_dir(&package_dir)?
         .map(|v| v.unwrap().file_name())
-        .map(|v| String::from(v.to_string_lossy()));
+        .map(|v| String::from(v.to_string_lossy()))
+        .collect::<Vec<String>>();
+    
+    // Ask for permission, if --force is not provided
+    if !force {
+        println!("Do you want to remove the following version(s)?");
+        for version in &versions {
+            println!("- {}", version);
+        }
+        println!();
 
-    println!("Do you want to remove the following version(s)?");
-    for version in versions {
-        println!("- {}", version);
+        // Abort, if not approved
+        if !Confirm::new().interact()? {
+            return Ok(())
+        }
     }
-    println!();
 
-    if Confirm::new().interact()? {
-        fs::remove_dir_all(&package_dir)?;
+    // Check if image is locally loaded in Docker
+    for version in &versions {
+        let image_name = format!("{}:{}", name, version);
+        docker::remove_image(&image_name).await?;
+
+        let image_name = format!("localhost:5000/library/{}:{}", name, version);
+        docker::remove_image(&image_name).await?;
     }
+
+    fs::remove_dir_all(&package_dir)?;
 
     Ok(())
 }

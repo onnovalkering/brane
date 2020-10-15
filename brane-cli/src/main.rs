@@ -183,7 +183,7 @@ async fn run(options: CLI) -> Result<()> {
             registry::push(name, version).await?;
         }
         Remove { name, version, force } => {
-            packages::remove(name, version, force)?;
+            packages::remove(name, version, force).await?;
         }
         Repl { secrets, co_address} => {
             repl::start(secrets, co_address).await?;
