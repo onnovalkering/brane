@@ -72,7 +72,7 @@ enum SubCommand {
         version: String,
     },
 
-    #[structopt(name = "remove", about = "Remove one or more local packages")]
+    #[structopt(name = "remove", about = "Remove a local package")]
     Remove {
         #[structopt(name = "NAME", help = "Name of the package")]
         name: String,
@@ -103,6 +103,16 @@ enum SubCommand {
         #[structopt(name = "TERM", help = "Term to use as search criteria")]
         term: String,
     },
+
+    #[structopt(name = "unpublish", about = "Remove a package from a registry")]
+    Unpublish {
+        #[structopt(name = "NAME", help = "Name of the package")]
+        name: String,
+        #[structopt(name = "VERSION", help = "Version of the package")]
+        version: String,
+        #[structopt(short, long, help = "Don't ask for confirmation")]
+        force: bool,
+    },    
 }
 
 #[tokio::main]
@@ -193,6 +203,9 @@ async fn run(options: CLI) -> Result<()> {
         }
         Search { term } => {
             registry::search(term).await?;
+        }
+        Unpublish { name, version, force } => {
+            registry::unpublish(name, version, force).await?;
         }
     }
 

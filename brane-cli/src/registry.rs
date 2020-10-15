@@ -6,6 +6,7 @@ use brane_dsl::indexes::PackageIndex;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
+use dialoguer::Confirm;
 use reqwest::{self, multipart::Form, multipart::Part, Body, Client, Method};
 use serde_json::{json, Value as JValue};
 use serde::{Deserialize, Serialize};
@@ -375,4 +376,47 @@ pub fn get_registry_endpoint(path: String) -> Result<String> {
         .with_context(|| "No registry configuration found, please use `brane login` first.")?;
 
     Ok(format!("{}/packages{}", config.url, path))
+}
+
+///
+///
+///
+pub async fn unpublish(
+    name: String,
+    version: String,
+    force: bool,
+) -> Result<()> {
+    let url = get_registry_endpoint(format!("/{}/{}", name, version))?;
+
+    let client = Client::new();
+    let package = client.get(&url).send().await
+        .with_context(|| format!("Failed to reach registry at: {}", url))?;
+
+    if !package.status().is_success() {
+        println!(
+            "Remote registry doesn't contain version {} of package {}.",
+            style(&version).bold().cyan(),
+            style(&name).bold().cyan(),
+        );
+
+        return Ok(())
+    }
+
+    // Ask for permission, if --force is not provided
+    if !force {
+        println!("Do you want to remove the following version(s)?");
+        println!("- {}", version);
+
+        // Abort, if not approved
+        if !Confirm::new().interact()? {
+            return Ok(())
+        }
+    }
+
+    client.delete(&url)
+        .send()
+        .await
+        .with_context(|| "Failed to delete '{}' with version '{}' at remote registry.")?;
+
+    Ok(())
 }
