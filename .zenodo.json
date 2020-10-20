@@ -1,0 +1,13 @@
+{
+    "title": "Brane",
+    "description": "Brane (programmable orchestration of applications and networking) provides a programmatic approach to constructing research infrastructures that is intuitive and easy to use, yet is expressive enough to capture and control the entire, distributed, technical stack. The programming model is based on the separation of concerns principle. For each level of the technical stack, and associated roles, different tooling and abstractions are provided. As a result, top-level applications can be written in a domain-specific language by domain scientists, while underlying routines are implemented and optimised by the relevant experts, e.g. software and system engineers.",
+    "license": {
+        "id": "Apache-2.0"
+    },
+    "creators": [
+        {
+            "affiliation": "University of Amsterdam",
+            "name": "Onno Valkering"
+        }
+    ]
+}
