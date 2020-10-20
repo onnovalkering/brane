@@ -1,6 +1,8 @@
 import "fs"
 
-file1 := new File { url: "file:///tmp/1" }
+file1_url := "file:///tmp/1"
+
+file1 := new File { url: file1_url }
 file2 := new File { url: "file:///tmp/2" }
 
 files := [file1, file2]

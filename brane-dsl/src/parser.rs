@@ -321,7 +321,20 @@ fn parse_object_rule(rule: Pair<Rule>) -> Result<Value> {
         let name = prop_inner.next().unwrap().as_str().to_string();
         let value = prop_inner.next().unwrap();
 
-        properties.insert(name, parse_value_rule(value)?);
+        match value.as_rule() {
+            Rule::name => {
+                let variable = parse_name_rule(value)?;
+                let data_type = String::from("??");
+                let pointer = Value::Pointer { 
+                    variable,
+                    data_type,
+                    secret: false,
+                };
+
+                properties.insert(name, pointer);
+            }
+            _ => { properties.insert(name, parse_value_rule(value)?); }
+        }
     }
 
     Ok(Value::Struct { data_type, properties })

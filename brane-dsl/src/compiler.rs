@@ -187,10 +187,10 @@ impl Compiler {
             data_type.clone()
         };
 
-        println!("{}", data_type);
+        let value = if let Value::Struct { data_type, properties } = value {
+            if let Some(c_type) = self.state.types.get(&data_type) {
+                let mut resolved_properties = Map::<Value>::new();
 
-        if let Value::Struct { data_type, properties } = &value {
-            if let Some(c_type) = self.state.types.get(data_type) {
                 for property in &c_type.properties {
                     ensure!(
                         properties.get(&property.name).is_some(),
@@ -200,27 +200,52 @@ impl Compiler {
                     );
 
                     let actual_property = properties.get(&property.name).unwrap();
+                    let actual_data_type = if let Value::Pointer { variable, data_type, .. } = actual_property {
+                        if data_type == "??" {
+                            if let Some(ref_data_typed) = self.state.variables.get(variable) {
+                                ref_data_typed.clone()
+                            } else {
+                                bail!("Cannot find variable '{}'", variable);
+                            }
+                        } else {
+                            data_type.clone()
+                        }
+                    } else {
+                        actual_property.data_type().to_string()
+                    };
 
                     ensure!(
-                        actual_property.data_type() == property.data_type,
+                        actual_data_type == property.data_type,
                         "Mismatch in datatype '{}' should be {} but is {}.",
                         property.name,
                         property.data_type,
-                        actual_property.data_type()
+                        actual_data_type
                     );
+
+                    let resolved_value = if let Value::Pointer { variable, secret, .. } = actual_property {
+                        Value::Pointer { variable: variable.clone(), secret: secret.clone(), data_type: actual_data_type }
+                    } else {
+                        actual_property.clone()
+                    };
+
+                    resolved_properties.insert(property.name.clone(), resolved_value);
                 }
 
                 ensure!(
                     properties.len() == c_type.properties.len(),
                     "Mismatch in number of actual and expected properties."
                 );
+
+                Value::Struct { data_type, properties: resolved_properties }
             } else {
                 bail!(
                     "Cannot find type information for {}. If it is custom type, please bring it into scope.",
                     data_type
                 );
             }
-        }
+        } else {
+            value
+        };
 
         let variable = Variable::new(name, data_type.to_string(), None, Some(value.clone()));
         let instruction = VarInstruction::new(Default::default(), vec![variable.clone()], Default::default());
