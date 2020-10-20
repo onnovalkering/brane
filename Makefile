@@ -32,7 +32,7 @@ start: start-services
 	tmux send-keys 'make start-ide' 'C-m'		&& \
 	tmux -2 attach-session -t brane
 
-stop: 
+stop: stop-services
 	tmux select-window -t brane:0				&& \
 	tmux select-pane -t 0 						&& \
 	tmux send-keys 'C-c'						&& \
