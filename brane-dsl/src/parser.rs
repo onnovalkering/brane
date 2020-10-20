@@ -32,9 +32,6 @@ pub enum AstNode {
     Literal {
         value: Value,
     },
-    Variable {
-        name: String,
-    },
     Parameter {
         name: String,
         complex: String,
@@ -81,9 +78,8 @@ impl AstNode {
     ///
     ///
     pub fn is_term(&self) -> bool {
-        use AstNode::*;
         match self {
-            Literal { .. } | Variable { .. } | Word { .. } => true,
+            AstNode::Literal { .. } | AstNode::Word { .. } => true,
             _ => false
         }
     }        
@@ -96,7 +92,6 @@ impl Display for AstNode {
     ) -> fmt::Result {
         match self {
             AstNode::Literal { value } => write!(f, "{}", value),
-            AstNode::Variable { name } => write!(f, "{}", name),
             AstNode::Word { text } => write!(f, "{}", text),
             _ => unimplemented!()
         }
@@ -148,19 +143,46 @@ pub fn parse(input: &str) -> Result<Vec<AstNode>> {
         }
     }
 
+    println!("{:#?}", ast);
+
     Ok(ast)
 }
 
 ///
 ///
 ///
-fn parse_array_rule(rule: Pair<Rule>) -> Result<Vec<Value>> {
+fn parse_array_rule(rule: Pair<Rule>) -> Result<Vec<Value>> {    
     let array = rule.into_inner();
 
     let mut values = vec![];
     for element in array {
-        let inner = element.into_inner().next().unwrap();
-        values.push(parse_value_rule(inner)?);
+       let value = match element.as_rule() {
+            Rule::array => {
+                let entries = parse_array_rule(element)?;
+                let data_type = if !entries.is_empty() {
+                    format!("{}[]", entries.first().unwrap().data_type())
+                } else {
+                    String::from("Array")
+                };
+    
+                Value::Array { data_type, entries }
+            }
+            Rule::object => parse_object_rule(element)?,
+            Rule::literal => parse_literal_rule(element)?,
+            Rule::name => {
+                let variable = parse_name_rule(element)?;
+                let data_type = String::from("??");
+    
+                Value::Pointer { 
+                    variable,
+                    data_type,
+                    secret: false,
+                }
+            }
+            _ => unreachable!(),
+        };
+
+        values.push(value);
     }
 
     Ok(values)

@@ -105,11 +105,10 @@ impl Compiler {
                 AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
                 AstNode::WaitUntil { predicate } => self.handle_wait_until_node(predicate)?,
                 AstNode::WhileLoop { predicate, exec } => self.handle_while_loop_node(predicate, *exec)?,
-                AstNode::Literal { .. } | AstNode::Variable { .. } => {
-                    debug!("Encountered standalone literal or variable.");
+                AstNode::Literal { .. } | AstNode::Word { .. } => {
+                    debug!("Encountered standalone literal or word.");
                     (None, None)
-                },
-                AstNode::Word { .. } => unreachable!()
+                }
             };
 
             // Variable bookkeeping
@@ -144,7 +143,6 @@ impl Compiler {
         match expr {
             AstNode::Call { terms } => self.handle_assignment_call_node(name, terms),
             AstNode::Literal { value } => self.handle_assignment_literal_node(name, value),
-            AstNode::Variable { name: variable } => self.handle_assignment_variable_node(name, variable),
             _ => unreachable!()
         }
     }
@@ -173,7 +171,23 @@ impl Compiler {
         name: String,
         value: Value,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
-        let data_type = value.data_type();
+        let data_type = value.data_type().to_string();
+        let data_type = if data_type == "??[]" {
+            if let Value::Array { entries, .. } = &value {
+                if let Some(Value::Pointer { variable, .. }) = entries.first() {
+                    let element_type = self.state.variables.get(variable).expect(&format!("Not a valid variable pointer from array: {}.", variable));
+                    format!("{}[]", element_type)
+                } else {
+                    unreachable!();
+                }
+            } else {
+                unreachable!();
+            }
+        } else {
+            data_type.clone()
+        };
+
+        println!("{}", data_type);
 
         if let Value::Struct { data_type, properties } = &value {
             if let Some(c_type) = self.state.types.get(data_type) {
@@ -213,58 +227,6 @@ impl Compiler {
 
         Ok((Some(variable), Some(instruction)))
     }    
-
-    ///
-    ///
-    ///
-    fn handle_assignment_variable_node(
-        &mut self,
-        name: String,
-        variable: String,
-    ) -> Result<(Option<Variable>, Option<Instruction>)> {
-        debug!("name: {}", variable);
-
-        let data_type = if variable.contains(".") {
-            let segments: Vec<_> = variable.split('.').collect();
-            if let Some(arch_type) = self.state.variables.get(segments[0]) {
-                if arch_type.ends_with("[]") && segments[1] == "length" {
-                    String::from("integer")
-                } else {
-                    debug!("Resolving {} within type {}", variable, arch_type);
-                    if let Some(arch_type) = self.state.types.get(arch_type) {
-                        // TODO: use hashmap in Type struct
-                        let mut properties = Map::<Property>::new();
-                        for p in &arch_type.properties {
-                            properties.insert(p.name.clone(), p.clone());
-                        }
-
-                        if let Some(p) = properties.get(segments[1]) {
-                            p.data_type.clone()
-                        } else {
-                            bail!("Property {} doesn't exist on type {}", segments[1], arch_type.name);
-                        }
-                    } else {
-                        bail!("Cannot find type information for {}. If it is custom type, please bring it into scope.", arch_type);
-                    }
-                }
-            } else {
-                bail!("Cannot find variable: {}", segments[0]);
-            }
-        } else {
-            self.state.variables.get(&variable).unwrap().clone()
-        };
-
-        let value = Value::Pointer {
-            variable: variable.clone(),
-            data_type: data_type.clone(),
-            secret: false,
-        };
-
-        let variable = Variable::new(name, data_type, None, Some(value));
-        let instruction = VarInstruction::new(Default::default(), vec![variable.clone()], Default::default());
-
-        Ok((Some(variable), Some(instruction)))
-    }
 
     ///
     ///
@@ -560,7 +522,7 @@ impl Compiler {
         if let Some(terms) = terms {
             // If the term is an existing variable, set that variable as terminate variable.
             if terms.len() == 1 {
-                if let AstNode::Variable { name } = &terms[0] {
+                if let AstNode::Word { text: name } = &terms[0] {
                     if let Some(data_type) = self.state.variables.get(name) {
                         let value = Value::Pointer {
                             variable: name.clone(),
@@ -599,6 +561,24 @@ pub fn terms_to_instructions(
 
     debug!("Terms: {:?}", terms);
 
+    let mut instructions: Vec<Instruction> = vec![];
+    let mut return_data_type = String::from("unit");
+
+    // Check if is variable assignment
+    if terms.len() == 1 && result_var.is_some() {
+        if let Some(AstNode::Word { text: name }) = terms.first() {
+            if let Some(data_type) = variables.get(name) {
+                // TODO: create set
+                let pointer = Value::Pointer { data_type: data_type.clone(), variable: name.clone(), secret: false };
+                let set = vec![Variable::new(result_var.unwrap(), data_type.clone(), None, Some(pointer))];
+                let instruction = VarInstruction::new(vec!(), set, Default::default());
+                instructions.push(instruction);
+                
+                return Ok((instructions, data_type.clone()))
+            }
+        }
+    }
+
     // Replace literals in terms with names
     let mut literals = Map::<Value>::new();
     let terms: Vec<AstNode> = terms
@@ -609,7 +589,7 @@ pub fn terms_to_instructions(
                 literals.insert(temp_var.clone(), value.clone());
                 variables.insert(temp_var.clone(), value.data_type().to_string());
 
-                AstNode::Variable { name: temp_var }
+                AstNode::Word { text: temp_var }
             }
             _ => t.clone()
         })
@@ -632,9 +612,7 @@ pub fn terms_to_instructions(
     let mut temp_vars: Vec<String> = vec![];
 
     let mut term_pattern = build_terms_pattern(&terms, &variables, &state.types)?;
-
-    let mut instructions: Vec<Instruction> = vec![];
-    let mut return_data_type = String::from("unit");
+    println!("{:?}", term_pattern);
 
     loop {
         let term_pattern_clone = term_pattern.clone();
@@ -643,6 +621,7 @@ pub fn terms_to_instructions(
         if let Some(coverage) = placeholders_regex.find(&term_pattern_clone) {
             if coverage.start() == 0 && coverage.end() == term_pattern_clone.len() {
                 debug!("Done: no more unkowns to eliminate.");
+                println!("DONE");
                 break;
             }
         }
@@ -751,6 +730,8 @@ pub fn terms_to_instructions(
 
     // Modify assignment of last ACT instruction, if specified.
     if let Some(result_var) = result_var {
+        println!("{:#?}", terms);
+
         ensure!(!instructions.is_empty(), "Created no ACT instructions.");
 
         match instructions.remove(instructions.len() - 1) {
@@ -782,7 +763,7 @@ fn build_terms_pattern(
     let mut term_pattern_segments = vec![];
     for term in terms {
         match term {
-            AstNode::Word { text: name } | AstNode::Variable { name } => {
+            AstNode::Word { text: name } => {
                 if name.contains('.') {
                     let segments: Vec<_> = name.split('.').collect();
                     if let Some(arch_type) = variables.get(segments[0]) {

@@ -1,3 +1,5 @@
+import "fs"
+
 file1 := new File { url: "file:///tmp/1" }
 file2 := new File { url: "file:///tmp/2" }
 
