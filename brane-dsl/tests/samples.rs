@@ -55,3 +55,17 @@ fn if_else() {
     assert!(instructions.len() > 0);
     println!("{:#?}", instructions);
 }
+
+#[test]
+fn files() {
+    let index = PackageIndex::from_path(&PathBuf::from("./resources/packages.json")).unwrap();
+
+    let options = CompilerOptions::default();
+    let mut compiler = Compiler::new(options, index).unwrap();
+
+    let program = fs::read_to_string("./resources/files.bk").unwrap();
+    let instructions = compiler.compile(&program).unwrap();
+
+    assert!(instructions.len() > 0);
+    println!("{:#?}", instructions);
+}

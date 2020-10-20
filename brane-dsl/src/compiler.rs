@@ -1,6 +1,6 @@
 use crate::functions::{self, FunctionPattern};
 use crate::indexes::PackageIndex;
-use crate::parser::{self, AstNode, AstPredicate, AstRelation, AstTerm};
+use crate::parser::{self, AstNode, AstPredicate, AstRelation};
 use anyhow::Result;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
@@ -87,7 +87,7 @@ impl Compiler {
 
         for node in ast {
             let (variable, instruction) = match node {
-                AstNode::Assignment { name, terms } => self.handle_assignment_node(name, terms)?,
+                AstNode::Assignment { name, expr } => self.handle_assignment_node(name, *expr)?,
                 AstNode::Call { terms } => {
                     if self.options.return_call {
                         self.handle_assignment_call_node(String::from("terminate"), terms)?
@@ -105,6 +105,11 @@ impl Compiler {
                 AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
                 AstNode::WaitUntil { predicate } => self.handle_wait_until_node(predicate)?,
                 AstNode::WhileLoop { predicate, exec } => self.handle_while_loop_node(predicate, *exec)?,
+                AstNode::Literal { .. } | AstNode::Variable { .. } => {
+                    debug!("Encountered standalone literal or variable.");
+                    (None, None)
+                },
+                AstNode::Word { .. } => unreachable!()
             };
 
             // Variable bookkeeping
@@ -132,127 +137,16 @@ impl Compiler {
     fn handle_assignment_node(
         &mut self,
         name: String,
-        terms: Vec<AstTerm>,
+        expr: AstNode,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
-        debug!("Handling assignment node: {:?}", terms);
+        debug!("Handling assignment node: {:?}", expr);
 
-        if terms.len() == 1 {
-            match &terms[0] {
-                AstTerm::Name(variable) => {
-                    let variable = if variable.contains(".") {
-                        let segments: Vec<_> = variable.split('.').collect();
-                        segments[0]
-                    } else {
-                        variable
-                    };
-
-                    if self.state.variables.contains_key(variable) {
-                        return self.handle_assignment_value_node(name, &terms[0]);
-                    }
-                }
-                AstTerm::Value(_) => {
-                    return self.handle_assignment_value_node(name, &terms[0]);
-                }
-            }
+        match expr {
+            AstNode::Call { terms } => self.handle_assignment_call_node(name, terms),
+            AstNode::Literal { value } => self.handle_assignment_literal_node(name, value),
+            AstNode::Variable { name: variable } => self.handle_assignment_variable_node(name, variable),
+            _ => unreachable!()
         }
-
-        self.handle_assignment_call_node(name, terms)
-    }
-
-    ///
-    ///
-    ///
-    fn handle_assignment_value_node(
-        &mut self,
-        name: String,
-        value: &AstTerm,
-    ) -> Result<(Option<Variable>, Option<Instruction>)> {
-        let (value, data_type) = match value {
-            AstTerm::Value(value) => {
-                let data_type = value.data_type();
-                if let Value::Struct { data_type, properties } = value {
-                    if let Some(c_type) = self.state.types.get(data_type) {
-                        for property in &c_type.properties {
-                            ensure!(
-                                properties.get(&property.name).is_some(),
-                                "Missing '{}' in {} object.",
-                                property.name,
-                                data_type
-                            );
-                            let actual_property = properties.get(&property.name).unwrap();
-
-                            ensure!(
-                                actual_property.data_type() == property.data_type,
-                                "Mismatch in datatype '{}' should be {} but is {}.",
-                                property.name,
-                                property.data_type,
-                                actual_property.data_type()
-                            );
-                        }
-
-                        ensure!(
-                            properties.len() == c_type.properties.len(),
-                            "Mismatch in number of actual and expected properties."
-                        );
-                    } else {
-                        bail!(
-                            "Cannot find type information for {}. If it is custom type, please bring it into scope.",
-                            data_type
-                        );
-                    }
-
-                    (Some(value.clone()), data_type.to_string())
-                } else {
-                    (Some(value.clone()), data_type.to_string())
-                }
-            }
-            AstTerm::Name(variable) => {
-                debug!("name: {}", variable);
-
-                let data_type = if variable.contains(".") {
-                    let segments: Vec<_> = variable.split('.').collect();
-                    if let Some(arch_type) = self.state.variables.get(segments[0]) {
-                        if arch_type.ends_with("[]") && segments[1] == "length" {
-                            String::from("integer")
-                        } else {
-                            debug!("Resolving {} within type {}", variable, arch_type);
-                            if let Some(arch_type) = self.state.types.get(arch_type) {
-                                // TODO: use hashmap in Type struct
-                                let mut properties = Map::<Property>::new();
-                                for p in &arch_type.properties {
-                                    properties.insert(p.name.clone(), p.clone());
-                                }
-
-                                if let Some(p) = properties.get(segments[1]) {
-                                    p.data_type.clone()
-                                } else {
-                                    bail!("Property {} doesn't exist on type {}", segments[1], arch_type.name);
-                                }
-                            } else {
-                                bail!("Cannot find type information for {}. If it is custom type, please bring it into scope.", arch_type);
-                            }
-                        }
-                    } else {
-                        bail!("Cannot find variable: {}", segments[0]);
-                    }
-                } else {
-                    self.state.variables.get(variable).unwrap().clone()
-                };
-
-                let value = Value::Pointer {
-                    variable: variable.clone(),
-                    data_type: data_type.clone(),
-                    secret: false,
-                };
-
-                (Some(value), data_type.clone())
-            }
-        };
-
-        let variable = Variable::new(name, data_type, None, value);
-        let instruction = VarInstruction::new(Default::default(), vec![variable.clone()], Default::default());
-
-        Ok((Some(variable), Some(instruction)))
     }
 
     ///
@@ -261,7 +155,7 @@ impl Compiler {
     fn handle_assignment_call_node(
         &mut self,
         name: String,
-        terms: Vec<AstTerm>,
+        terms: Vec<AstNode>,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
         let (instructions, data_type) = terms_to_instructions(terms, Some(name.clone()), &self.state)?;
         let subroutine = SubInstruction::new(instructions, Default::default());
@@ -274,9 +168,110 @@ impl Compiler {
     ///
     ///
     ///
+    fn handle_assignment_literal_node(
+        &mut self,
+        name: String,
+        value: Value,
+    ) -> Result<(Option<Variable>, Option<Instruction>)> {
+        let data_type = value.data_type();
+
+        if let Value::Struct { data_type, properties } = &value {
+            if let Some(c_type) = self.state.types.get(data_type) {
+                for property in &c_type.properties {
+                    ensure!(
+                        properties.get(&property.name).is_some(),
+                        "Missing '{}' in {} object.",
+                        property.name,
+                        data_type
+                    );
+
+                    let actual_property = properties.get(&property.name).unwrap();
+
+                    ensure!(
+                        actual_property.data_type() == property.data_type,
+                        "Mismatch in datatype '{}' should be {} but is {}.",
+                        property.name,
+                        property.data_type,
+                        actual_property.data_type()
+                    );
+                }
+
+                ensure!(
+                    properties.len() == c_type.properties.len(),
+                    "Mismatch in number of actual and expected properties."
+                );
+            } else {
+                bail!(
+                    "Cannot find type information for {}. If it is custom type, please bring it into scope.",
+                    data_type
+                );
+            }
+        }
+
+        let variable = Variable::new(name, data_type.to_string(), None, Some(value.clone()));
+        let instruction = VarInstruction::new(Default::default(), vec![variable.clone()], Default::default());
+
+        Ok((Some(variable), Some(instruction)))
+    }    
+
+    ///
+    ///
+    ///
+    fn handle_assignment_variable_node(
+        &mut self,
+        name: String,
+        variable: String,
+    ) -> Result<(Option<Variable>, Option<Instruction>)> {
+        debug!("name: {}", variable);
+
+        let data_type = if variable.contains(".") {
+            let segments: Vec<_> = variable.split('.').collect();
+            if let Some(arch_type) = self.state.variables.get(segments[0]) {
+                if arch_type.ends_with("[]") && segments[1] == "length" {
+                    String::from("integer")
+                } else {
+                    debug!("Resolving {} within type {}", variable, arch_type);
+                    if let Some(arch_type) = self.state.types.get(arch_type) {
+                        // TODO: use hashmap in Type struct
+                        let mut properties = Map::<Property>::new();
+                        for p in &arch_type.properties {
+                            properties.insert(p.name.clone(), p.clone());
+                        }
+
+                        if let Some(p) = properties.get(segments[1]) {
+                            p.data_type.clone()
+                        } else {
+                            bail!("Property {} doesn't exist on type {}", segments[1], arch_type.name);
+                        }
+                    } else {
+                        bail!("Cannot find type information for {}. If it is custom type, please bring it into scope.", arch_type);
+                    }
+                }
+            } else {
+                bail!("Cannot find variable: {}", segments[0]);
+            }
+        } else {
+            self.state.variables.get(&variable).unwrap().clone()
+        };
+
+        let value = Value::Pointer {
+            variable: variable.clone(),
+            data_type: data_type.clone(),
+            secret: false,
+        };
+
+        let variable = Variable::new(name, data_type, None, Some(value));
+        let instruction = VarInstruction::new(Default::default(), vec![variable.clone()], Default::default());
+
+        Ok((Some(variable), Some(instruction)))
+    }
+
+    ///
+    ///
+    ///
     fn handle_call_node(
         &mut self,
-        terms: Vec<AstTerm>,
+        terms: Vec<AstNode>,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
         let (instructions, _) = terms_to_instructions(terms, None, &self.state)?;
         let subroutine = SubInstruction::new(instructions, Default::default());
@@ -297,7 +292,7 @@ impl Compiler {
 
         let (poll, condition) = match predicate {
             AstPredicate::Call { terms } => {
-                let (variable, poll) = self.handle_assignment_node(create_temp_var(false), terms)?;
+                let (variable, poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms })?;
                 let condition = Condition::eq(variable.unwrap().as_pointer(), Value::Boolean(true));
 
                 (poll.unwrap(), condition)
@@ -307,8 +302,8 @@ impl Compiler {
                 relation,
                 rhs_terms,
             } => {
-                let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), lhs_terms)?;
-                let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), rhs_terms)?;
+                let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: lhs_terms })?;
+                let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: rhs_terms })?;
                 let poll = SubInstruction::new(vec![lhs_poll.unwrap(), rhs_poll.unwrap()], Default::default());
 
                 let condition = match relation {
@@ -337,7 +332,7 @@ impl Compiler {
         );
 
         let (_, if_exec) = match if_exec {
-            AstNode::Assignment { name, terms } => self.handle_assignment_node(name, terms)?,
+            AstNode::Assignment { name, expr } => self.handle_assignment_node(name, *expr)?,
             AstNode::Call { terms } => self.handle_call_node(terms)?,
             AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
             _ => unreachable!(),
@@ -345,7 +340,7 @@ impl Compiler {
 
         let instruction = if let Some(el_exec) = el_exec {
             let (_, el_exec) = match el_exec {
-                AstNode::Assignment { name, terms } => self.handle_assignment_node(name, terms)?,
+                AstNode::Assignment { name, expr } => self.handle_assignment_node(name, *expr)?,
                 AstNode::Call { terms } => self.handle_call_node(terms)?,
                 AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
                 _ => unreachable!(),
@@ -428,7 +423,7 @@ impl Compiler {
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
         let (poll, condition) = match predicate {
             AstPredicate::Call { terms } => {
-                let (variable, poll) = self.handle_assignment_node(create_temp_var(false), terms)?;
+                let (variable, poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms })?;
                 let condition = Condition::eq(variable.unwrap().as_pointer(), Value::Boolean(true));
 
                 (poll.unwrap(), condition)
@@ -438,8 +433,8 @@ impl Compiler {
                 relation,
                 rhs_terms,
             } => {
-                let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), lhs_terms)?;
-                let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), rhs_terms)?;
+                let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: lhs_terms })?;
+                let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: rhs_terms })?;
                 let poll = SubInstruction::new(vec![lhs_poll.unwrap(), rhs_poll.unwrap()], Default::default());
 
                 let condition = match relation {
@@ -480,7 +475,7 @@ impl Compiler {
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
         let (poll, condition) = match predicate {
             AstPredicate::Call { terms } => {
-                let (variable, poll) = self.handle_assignment_node(create_temp_var(false), terms)?;
+                let (variable, poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms })?;
                 let condition = Condition::eq(variable.unwrap().as_pointer(), Value::Boolean(true));
 
                 (poll.unwrap(), condition)
@@ -490,8 +485,8 @@ impl Compiler {
                 relation,
                 rhs_terms,
             } => {
-                let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), lhs_terms)?;
-                let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), rhs_terms)?;
+                let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: lhs_terms })?;
+                let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: rhs_terms })?;
                 let poll = SubInstruction::new(vec![lhs_poll.unwrap(), rhs_poll.unwrap()], Default::default());
 
                 let condition = match relation {
@@ -514,7 +509,7 @@ impl Compiler {
         };
 
         let (_, exec) = match exec {
-            AstNode::Assignment { name, terms } => self.handle_assignment_node(name, terms)?,
+            AstNode::Assignment { name, expr } => self.handle_assignment_node(name, *expr)?,
             AstNode::Call { terms } => self.handle_call_node(terms)?,
             AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
             _ => unreachable!(),
@@ -542,7 +537,7 @@ impl Compiler {
     ///
     fn handle_terminate_node(
         &mut self,
-        terms: Option<Vec<AstTerm>>,
+        terms: Option<Vec<AstNode>>,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
         debug!("Terminate: {:?}", terms);
 
@@ -558,14 +553,14 @@ impl Compiler {
     ///
     fn set_terminate_variable_locally(
         &mut self,
-        terms: Option<Vec<AstTerm>>,
+        terms: Option<Vec<AstNode>>,
     ) -> Result<(Vec<Instruction>, String)> {
         let terminate = "terminate".to_string();
 
         if let Some(terms) = terms {
             // If the term is an existing variable, set that variable as terminate variable.
             if terms.len() == 1 {
-                if let AstTerm::Name(name) = &terms[0] {
+                if let AstNode::Variable { name } = &terms[0] {
                     if let Some(data_type) = self.state.variables.get(name) {
                         let value = Value::Pointer {
                             variable: name.clone(),
@@ -594,7 +589,7 @@ impl Compiler {
 ///
 ///
 pub fn terms_to_instructions(
-    terms: Vec<AstTerm>,
+    terms: Vec<AstNode>,
     result_var: Option<String>,
     state: &CompilerState,
 ) -> Result<(Vec<Instruction>, String)> {
@@ -606,17 +601,17 @@ pub fn terms_to_instructions(
 
     // Replace literals in terms with names
     let mut literals = Map::<Value>::new();
-    let terms: Vec<AstTerm> = terms
+    let terms: Vec<AstNode> = terms
         .iter()
         .map(|t| match t {
-            AstTerm::Value(value) => {
+            AstNode::Literal { value } => {
                 let temp_var = create_temp_var(true);
                 literals.insert(temp_var.clone(), value.clone());
                 variables.insert(temp_var.clone(), value.data_type().to_string());
 
-                AstTerm::Name(temp_var)
+                AstNode::Variable { name: temp_var }
             }
-            AstTerm::Name(n) => AstTerm::Name(n.clone()),
+            _ => t.clone()
         })
         .collect();
 
@@ -780,14 +775,14 @@ pub fn terms_to_instructions(
 ///
 ///
 fn build_terms_pattern(
-    terms: &Vec<AstTerm>,
+    terms: &Vec<AstNode>,
     variables: &Map<String>,
     types: &Map<Type>,
 ) -> Result<String> {
     let mut term_pattern_segments = vec![];
     for term in terms {
         match term {
-            AstTerm::Name(name) => {
+            AstNode::Word { text: name } | AstNode::Variable { name } => {
                 if name.contains('.') {
                     let segments: Vec<_> = name.split('.').collect();
                     if let Some(arch_type) = variables.get(segments[0]) {
@@ -823,10 +818,11 @@ fn build_terms_pattern(
                 // If the above attempt(s) faile, just add the name.
                 term_pattern_segments.push(name.to_string());
             }
-            AstTerm::Value(value) => {
+            AstNode::Literal { value } => {
                 let segment = format!("<{}>", value.data_type());
                 term_pattern_segments.push(segment);
-            }
+            },
+            _ => unreachable!()
         }
     }
 

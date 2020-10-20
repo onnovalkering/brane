@@ -3,8 +3,8 @@ COMMENT         = _{ COMMENT_BLOCK | COMMENT_LINE }
 COMMENT_BLOCK   = @{ "---" ~ (!"---" ~ ANY)* ~ "---" }
 COMMENT_LINE    = @{ "//" ~ (!("\r" | "\n") ~ ANY)* }
 
-program = _{ SOI ~ "\n"* ~ (statement ~ "\n"+) * ~ statement? ~ EOI }
-reserved = { "??" | "as" | "else" | "false" | "if" | "import" | "new" | "return" | "true" | "until" | "wait" | "while" }
+program  = _{ SOI ~ "\n"* ~ (statement ~ "\n"+) * ~ statement? ~ EOI }
+reserved =  { "??" | "as" | "else" | "false" | "if" | "import" | "new" | "return" | "true" | "until" | "wait" | "while" }
 
 // Utilities
 WS = _{ WHITESPACE }
@@ -29,39 +29,41 @@ statement = _{
     | while_loop
 }
 
-assignment      = { name ~ ":=" ~ call }
-call            = { term+ }
-comparison      = { call ~ relational ~ call }
-condition       = { "if" ~ predicate ~ ":" ~ execution ~ (NL ~ "else" ~ ":" ~ execution)? }
-import          = { "import" ~ string ~ ("version" ~ string)? }
-parameter       = { name ~ ":=" ~ "??" ~ "as" ~ complex }
+assignment      =  { name ~ ":=" ~ call }
+call            =  { term+ }
+comparison      =  { call ~ relational ~ call }
+condition       =  { "if" ~ predicate ~ ":" ~ execution ~ (NL ~ "else" ~ ":" ~ execution)? }
+import          =  { "import" ~ string ~ ("version" ~ string)? }
+parameter       =  { name ~ ":=" ~ "??" ~ "as" ~ complex }
 complex         = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHA* ~ "[]"? }
-terminate       = { "return" ~ call? }
-wait_until      = { "wait" ~ "until" ~ predicate }
-while_loop      = { "while" ~ predicate ~ ":" ~ execution }
+terminate       =  { "return" ~ call? }
+wait_until      =  { "wait" ~ "until" ~ predicate }
+while_loop      =  { "while" ~ predicate ~ ":" ~ execution }
 
 // Terms
-term            = { name | symbol | value }
-value 		      = { array | object | literal }
-literal         = { boolean | decimal | integer | string }
+term            =  { name | symbol | value }
+value 		      =  { array | object | literal }
+literal         =  { boolean | decimal | integer | string }
 name            = @{ name_sg ~ ("." ~ name_sg)* }
 name_sg         = @{ !(reserved ~ WS) ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
-symbol          = { "+" | "-" | "/" | "*" | "%" }
+symbol          =  { "+" | "-" | "/" | "*" | "%" }
 
 // Operators
-relational      = { "=" | "!=" | ">" | "<" | ">=" | "<=" }
-logical         = { "and" | "or" | "not" }
+relational      =  { "=" | "!=" | ">" | "<" | ">=" | "<=" }
+logical         =  { "and" | "or" | "not" }
 
 // Literals
-boolean         = { "true" | "false" }
+boolean         =  { "true" | "false" }
 decimal         = @{ "-"? ~ ASCII_DIGIT* ~ "." ~ ASCII_DIGIT+ }
 integer         = @{ "-"? ~ ASCII_DIGIT+ }
 string          = ${ string_sq | string_dq }
-string_sq       = { (PUSH("'") ~ string_body? ~ POP) }
-string_dq       = { (PUSH("\"") ~ string_body? ~ POP) }
+string_sq       =  { (PUSH("'") ~ string_body? ~ POP) }
+string_dq       =  { (PUSH("\"") ~ string_body? ~ POP) }
 string_body     = _{ (!(NL | PEEK) ~ ANY)+ }
 
 // Structures
-array 		      = { "[" ~ NL* ~ "]" | "[" ~ NL* ~ value ~ ("," ~ NL* ~ value)* ~ NL* ~ "]" }
-object 		      = { "new" ~ complex ~ ("{" ~ NL* ~ "}" | "{" ~ NL* ~ entry ~ ("," ~ NL* ~ entry)* ~ NL* ~ "}") }
-entry 		      = { name ~ ":" ~ value }
+array 		      =  { "[" ~ NL* ~ "]" | "[" ~ NL* ~ element ~ ("," ~ NL* ~ element)* ~ NL* ~ "]" }
+element         = _{ value | name }
+
+object 		      =  { "new" ~ complex ~ ("{" ~ NL* ~ "}" | "{" ~ NL* ~ entry ~ ("," ~ NL* ~ entry)* ~ NL* ~ "}") }
+entry 		      =  { name ~ ":" ~ (value | name) }

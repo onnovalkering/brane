@@ -11,14 +11,14 @@ pub struct BakeryParser;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum AstNode {
     Assignment {
         name: String,
-        terms: Vec<AstTerm>,
+        expr: Box<AstNode>,
     },
     Call {
-        terms: Vec<AstTerm>,
+        terms: Vec<AstNode>,
     },
     Condition {
         predicate: AstPredicate,
@@ -29,12 +29,18 @@ pub enum AstNode {
         module: String,
         version: Option<Version>,
     },
+    Literal {
+        value: Value,
+    },
+    Variable {
+        name: String,
+    },
     Parameter {
         name: String,
         complex: String,
     },
     Terminate {
-        terms: Option<Vec<AstTerm>>,
+        terms: Option<Vec<AstNode>>,
     },
     WaitUntil {
         predicate: AstPredicate,
@@ -43,6 +49,9 @@ pub enum AstNode {
         predicate: AstPredicate,
         exec: Box<AstNode>,
     },
+    Word {
+        text: String,
+    }
 }
 
 impl AstNode {
@@ -50,57 +59,65 @@ impl AstNode {
     ///
     ///
     pub fn is_import(&self) -> bool {
-        match self {
-            AstNode::Import { module: _, version: _ } => true,
-            _ => false,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum AstTerm {
-    Name(String),
-    Value(Value),
-}
-
-impl AstTerm {
-    ///
-    ///
-    ///
-    pub fn is_value(&self) -> bool {
-        if let AstTerm::Value(_) = self {
+        if let AstNode::Import { .. } = self {
             true
         } else {
             false
         }
     }
+
+    ///
+    ///
+    ///
+    pub fn is_literal(&self) -> bool {
+        if let AstNode::Literal { .. } = self {
+            true
+        } else {
+            false
+        }
+    }    
+
+    ///
+    ///
+    ///
+    pub fn is_term(&self) -> bool {
+        use AstNode::*;
+        match self {
+            Literal { .. } | Variable { .. } | Word { .. } => true,
+            _ => false
+        }
+    }        
 }
 
-impl Display for AstTerm {
+impl Display for AstNode {
     fn fmt(
         &self,
         f: &mut Formatter,
     ) -> fmt::Result {
         match self {
-            AstTerm::Name(name) => write!(f, "{}", name),
-            AstTerm::Value(value) => write!(f, "{}", value),
+            AstNode::Literal { value } => write!(f, "{}", value),
+            AstNode::Variable { name } => write!(f, "{}", name),
+            AstNode::Word { text } => write!(f, "{}", text),
+            _ => unimplemented!()
         }
     }
 }
 
-#[derive(Debug)]
+
+
+#[derive(Clone, Debug)]
 pub enum AstPredicate {
     Call {
-        terms: Vec<AstTerm>,
+        terms: Vec<AstNode>,
     },
     Comparison {
-        lhs_terms: Vec<AstTerm>,
+        lhs_terms: Vec<AstNode>,
         relation: AstRelation,
-        rhs_terms: Vec<AstTerm>,
+        rhs_terms: Vec<AstNode>,
     },
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum AstRelation {
     Equals = 1,
     NotEquals = 2,
@@ -138,11 +155,12 @@ pub fn parse(input: &str) -> Result<Vec<AstNode>> {
 ///
 ///
 fn parse_array_rule(rule: Pair<Rule>) -> Result<Vec<Value>> {
-    let entries = rule.into_inner();
+    let array = rule.into_inner();
 
     let mut values = vec![];
-    for entry in entries {
-        values.push(parse_value_rule(entry)?);
+    for element in array {
+        let inner = element.into_inner().next().unwrap();
+        values.push(parse_value_rule(inner)?);
     }
 
     Ok(values)
@@ -155,14 +173,27 @@ fn parse_assignment_rule(rule: Pair<Rule>) -> Result<AstNode> {
     let mut assignment = rule.into_inner();
 
     let name = assignment.next().unwrap().as_str().to_string();
-    let call = assignment.next().unwrap().into_inner();
-
+    let expr = assignment.next().unwrap().into_inner();
+    
     let mut terms = vec![];
-    for term in call {
+    for term in expr {
         terms.push(parse_term_rule(term)?);
     }
 
-    Ok(AstNode::Assignment { name, terms })
+    if terms.len() == 1 {
+        let term = terms.first().unwrap();
+        match term {
+            AstNode::Word { .. } => { }
+            _ => {
+                // It's not a call, but assignment from literal or variable
+                let expr = Box::new(term.clone());
+                return Ok(AstNode::Assignment { name, expr });
+            }
+        }
+    }
+    
+    let expr = Box::new(AstNode::Call { terms });
+    Ok(AstNode::Assignment { name, expr })
 }
 
 ///
@@ -221,7 +252,6 @@ fn parse_import_rule(rule: Pair<Rule>) -> Result<AstNode> {
     let mut import = rule.into_inner();
 
     let module = parse_string_rule(import.next().unwrap())?;
-
     let version = if let Some(version) = import.next() {
         Some(Version::parse(&parse_string_rule(version)?)?)
     } else {
@@ -378,13 +408,17 @@ fn parse_string_rule(rule: Pair<Rule>) -> Result<String> {
 ///
 ///
 ///
-fn parse_term_rule(rule: Pair<Rule>) -> Result<AstTerm> {
+fn parse_term_rule(rule: Pair<Rule>) -> Result<AstNode> {
     let term = rule.into_inner().next().unwrap();
 
     match term.as_rule() {
-        Rule::value => Ok(AstTerm::Value(parse_value_rule(term)?)),
-        Rule::name => Ok(AstTerm::Name(parse_name_rule(term)?)),
-        Rule::symbol => Ok(AstTerm::Name(parse_name_rule(term)?)),
+        Rule::name => {
+            // TODO: check if is in variable table
+
+            Ok(AstNode::Word { text: parse_name_rule(term)? })
+        },
+        Rule::symbol => Ok(AstNode::Word { text: parse_name_rule(term)? }),
+        Rule::value => Ok(AstNode::Literal { value: parse_value_rule(term)? }),
         _ => unreachable!(),
     }
 }
@@ -439,6 +473,16 @@ fn parse_value_rule(rule: Pair<Rule>) -> Result<Value> {
         }
         Rule::object => parse_object_rule(value),
         Rule::literal => parse_literal_rule(value),
+        Rule::name => {
+            let variable = parse_name_rule(value)?;
+            let data_type = String::from("???");
+
+            Ok(Value::Pointer { 
+                variable,
+                data_type,
+                secret: false,
+            })
+        }
         _ => unreachable!(),
     }
 }
