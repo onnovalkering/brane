@@ -10,7 +10,7 @@ Brane provides a programmatic approach to constructing workflows and research in
 See the [documentation](https://onnovalkering.github.io/brane) for more information.
 
 ## Development
-The following dependencies must be installed (Ubuntu 20.04):
+The following system dependencies must be installed (assuming Ubuntu 20.04):
 
 - build-essential
 - cmake
@@ -18,12 +18,29 @@ The following dependencies must be installed (Ubuntu 20.04):
 - libssl-dev
 - pkg-config
 
-To compile all components: 
+### Compiling
+To compile all components:
 ```shell
 cargo build
 ```
 
-To start a development instance:
+To create release version of the binaries (`cli` and `init`):
 ```shell
-docker-compose up -d
+make binaries
 ```
+
+To create the Docker images: (`brane-api`, `brane-ide`, and `brane-loop`):
+```shell
+make docker
+```
+
+### Running
+To start a development instance from the source code:
+
+```shell
+make start
+```
+
+This will create a new `tmux` session with a pane for different components.
+
+<img src="https://raw.githubusercontent.com/onnovalkering/brane/develop/docs/assets/img/tmux-dev.png" alt="preview" width="400"/>
