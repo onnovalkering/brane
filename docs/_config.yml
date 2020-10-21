@@ -5,6 +5,9 @@ url: "https://onnovalkering.github.io"
 
 remote_theme: pmarsceill/just-the-docs
 
+# Set sidebar logo
+logo: "https://raw.githubusercontent.com/onnovalkering/brane/develop/docs/assets/img/logo-small.png"
+
 # Enable or disable the site search
 search_enabled: true
 
