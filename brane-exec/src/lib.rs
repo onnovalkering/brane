@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 pub mod docker;
+pub mod hpc;
 pub mod kubernetes;
 pub mod schedule;
 

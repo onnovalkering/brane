@@ -1,5 +1,5 @@
 use crate::ExecuteInfo;
-use crate::{docker, kubernetes};
+use crate::{docker, hpc, kubernetes};
 use anyhow::{Context, Result};
 use brane_sys::System;
 use reqwest::Client;
@@ -233,6 +233,7 @@ fn determine_cwl_command(
 async fn run(exec: ExecuteInfo) -> Result<()> {
     match SYSTEM.as_str() {
         "local" => docker::run(exec).await?,
+        "hpc" => hpc::run(exec).await?,
         "kubernetes" => kubernetes::run(exec).await?,
         _ => unimplemented!(),
     }
