@@ -7,4 +7,15 @@ has_toc: false
 ---
 
 # Demonstrations
-Coming soon.
+This pages provides an overview of demonstrations using Brane.
+
+<div style="width: 300px">
+    <p style="text-align: center;">
+        <a class="no" href="/brane/demonstrations/lofar.html">
+            <img src="/brane/assets/img/demo-lofar.jpg" alt="The LOFAR calibration pipeline.">
+        </a>
+        <a href="/brane/demonstrations/lofar.html">
+            <strong>LOFAR</strong> – creating sky maps
+        </a>
+    </p>
+</div>
