@@ -122,10 +122,9 @@ git checkout -b ###-issue-name
 
 - **Follow the code conventions**: Through this project we use the following
   conventions:
-    - Use [semantic linewrapping] with a hard limit at 80 columns when editing
-      markdown files
-    - Linting rules
-    - Additional rules
+    - Use indentation, and related config, as specified in the `.editorconfig` file
+    - Format Rust code, using `cargo fmt`, based on the `rustfmt.toml` file
+    - Lint Rust code, using `cargo clippy`, based on the `clippy.toml` file
 
 - **Document your changes**: Add or update the relevant entries for your change
   in the documentation to reflect your work and inform the users about it.
@@ -202,6 +201,10 @@ Please do not submit patches that fail either check.
 cargo test
 ```
 
+```sh
+cargo clippy
+```
+
 ### Step 7: Push
 
 When your work is ready and complies with the project conventions,
@@ -219,10 +222,6 @@ Add a reference to the related issue with `Fix: ###` or `Close: ###`,
 depending if the pull request fixes a bug or adds a new feature,
 at the end of the PR message, where ### is the number of the issue.
 
-### Step 9: Review and approval
-
-**Note**: Add here your approval process.
-
 ### Sign your work
 
 Please sign your work using your real name because your signature certifies
@@ -230,7 +229,8 @@ that you wrote it or otherwise have the right to contribute it according to
 the DCO below.
 To do it just add a line to every git commit message:
 `Signed-off-by: Joe Smith <joe.smith@email.com>`.
-You can sign your commit automatically with git commit -s. 
+
+You can sign your commit automatically with `git commit -s`. 
 
 ```
 Developer Certificate of Origin
