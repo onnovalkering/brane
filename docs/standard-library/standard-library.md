@@ -1,10 +1,10 @@
 ---
 layout: default
 title: Standard library
-nav_order: 9
+nav_order: 8
 has_children: true
-has_toc: false
+has_toc: true
 ---
 
 # Standard library
-Coming soon.
+The framework offers built-in packages with generic functions.
