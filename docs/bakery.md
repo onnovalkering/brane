@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Bakery
-nav_order: 7
+nav_order: 6
 description: "bakery"
 permalink: /bakery
 ---
