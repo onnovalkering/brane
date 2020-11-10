@@ -31,6 +31,8 @@ RUN apt-get update && apt-get install -y \
     gnupg2 \
     libpq-dev \
     libssl-dev \
+    openssh-client \
+    sshpass \
     wget \
  && rm -rf /var/lib/apt/lists/*
 

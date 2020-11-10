@@ -13,3 +13,5 @@ log = "0.4"
 specifications = { path = "../specifications" }
 url = "2.1"
 uuid = { version = "0.8", features = ["v4"] }
+grpcio = { version = "0.4", features = ["openssl"] }
+xenon-rs = "0.2"

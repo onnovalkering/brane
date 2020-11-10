@@ -1,3 +1,4 @@
+use anyhow::Result;
 use crate::models::{Invocation, NewSession, NewVariable, Session, Variable};
 use crate::schema::{self, invocations::dsl as inv_db, sessions::dsl as db, variables::dsl as var_db};
 use actix_files::NamedFile;
@@ -9,12 +10,28 @@ use serde::Deserialize;
 use specifications::common::Value;
 use std::path::PathBuf;
 use url::Url;
+use std::env;
+use std::process::Command;
+use std::fs;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 type Map<T> = std::collections::HashMap<String, T>;
 
 const MSG_NO_DB_CONNECTION: &str = "Couldn't get connection from db pool.";
 const MSG_ONLY_STOPPED_DELETED: &str = "Only stopped sessions can be deleted.";
+
+lazy_static! {
+    static ref SYSTEM: String = env::var("SYSTEM").unwrap_or_else(|_| String::from("local"));
+    static ref HOSTNAME: String = env::var("HPC_HOSTNAME").unwrap_or_else(|_| String::from("slurm"));
+    static ref PORT: String = env::var("HPC_PORT").unwrap_or_else(|_| String::from("22"));
+    static ref FILE_SYTEM: String = env::var("HPC_FILESYSTEM").unwrap_or_else(|_| String::from("sftp"));
+    static ref XENON: String = env::var("HPC_XENON").unwrap_or_else(|_| String::from("localhost:50051"));
+    static ref DATA_DIR: String = env::var("HPC_DATA_DIR").unwrap_or_else(|_| String::from("/home/xenon/"));
+
+    // TODO: fetch credentials from vault (requires some refactoring to avoid circular dependencies).
+    static ref USERNAME: String = env::var("HPC_USERNAME").unwrap_or_else(|_| String::from("xenon"));
+    static ref PASSWORD: String = env::var("HPC_PASSWORD").unwrap_or_else(|_| String::from("javagat"));
+}
 
 ///
 ///
@@ -215,13 +232,13 @@ async fn get_session_file(
                 if let Some(value) = properties.get(segments[1]) {
                     value.clone()
                 } else {
-                    return HttpResponse::NotFound().body("Variable not found. 1");
+                    return HttpResponse::NotFound().body("Variable not found.");
                 }
             } else {
                 return HttpResponse::BadRequest().body("Variable is not a object.");
             }
         } else {
-            return HttpResponse::NotFound().body("Variable not found. 2");
+            return HttpResponse::NotFound().body("Variable not found.");
         }
     } else {
         let variable = Variable::belonging_to(&session.unwrap())
@@ -242,9 +259,9 @@ async fn get_session_file(
 
     if let Value::Struct { properties, .. } = variable {
         let url = properties.get("url").expect("Missing `url` property on File.");
-        let path = PathBuf::from(Url::parse(&url.as_string().unwrap()).unwrap().path());
+        let path = to_local_file(Url::parse(&url.as_string().unwrap()).unwrap()).await.unwrap();
         if !path.exists() {
-            return HttpResponse::BadRequest().body("");
+            return HttpResponse::InternalServerError().body("");
         }
 
         let file = NamedFile::open(path).unwrap();
@@ -252,6 +269,46 @@ async fn get_session_file(
     } else {
         return HttpResponse::InternalServerError().body("Illegal internal state.");
     }
+}
+
+///
+///
+///
+async fn to_local_file(url: Url) -> Result<PathBuf> {
+    let original = PathBuf::from(&url.path());
+
+    if SYSTEM.as_str() == "local" || SYSTEM.as_str() == "kubernetes" {
+        return Ok(original);
+    }
+
+    let path = original.to_string_lossy();
+    let path = path.strip_prefix(DATA_DIR.as_str()).expect("Failed to strip DATA_DIR from path.");
+
+    info!("{:?}", path);
+
+    let path = PathBuf::from("/tmp/brane").join(path);
+    if path.exists() {
+        return Ok(path);
+    }
+
+    info!("{:?}", path.parent().unwrap());
+
+    fs::create_dir_all(path.parent().unwrap())?;
+    info!("Created dirs");
+
+    let output = Command::new("sshpass")
+        .args(vec!["-p", PASSWORD.as_str()])
+        .args(vec!["scp", "-P", PORT.as_str()])
+        .arg(format!("{}@{}:{}", USERNAME.as_str(), HOSTNAME.as_str(), url.path()))
+        .arg(&path)
+        .output()?;
+
+    info!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+    warn!("stderr: {}", String::from_utf8_lossy(&output.stderr));
+
+    ensure!(output.status.success(), "Failed to download!");
+
+    Ok(path)
 }
 
 ///

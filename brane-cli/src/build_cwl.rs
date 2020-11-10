@@ -434,9 +434,7 @@ fn generate_dockerfile(
     // Copy files
     writeln!(contents, "ADD wd.tar.gz /opt")?;
     writeln!(contents, "WORKDIR /opt/wd")?;
-
-    writeln!(contents, "WORKDIR /")?;
-    writeln!(contents, "ENTRYPOINT [\"./init\"]")?;
+    writeln!(contents, "ENTRYPOINT [\"/init\"]")?;
 
     Ok(contents)
 }

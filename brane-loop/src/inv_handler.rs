@@ -1,7 +1,7 @@
 use crate::models::{Invocation, NewVariable, Session, Variable};
 use crate::schema::{invocations::dsl as inv_db, sessions::dsl as ses_db, variables::dsl as var_db};
 use anyhow::Result;
-use brane_sys::{kubernetes::K8sSystem, local::LocalSystem, System};
+use brane_sys::{kubernetes::K8sSystem, local::LocalSystem, System, hpc::HpcSystem};
 use brane_vm::cursor::RedisCursor;
 use brane_vm::environment::{Environment, RedisEnvironment};
 use brane_vm::machine::{AsyncMachine, MachineResult};
@@ -243,6 +243,11 @@ async fn on_created(
         }
     }
 
+    // Make sure the session directories exist
+    let system = setup_system(session.uuid)?;
+    system.create_dir(&system.get_session_dir().as_os_str().to_string_lossy(), None, false)?;
+    system.create_dir(&system.get_temp_dir().as_os_str().to_string_lossy(), None, true)?;
+
     // Update invocation status
     diesel::update(inv_db::invocations.find(invocation_id))
         .set(inv_db::status.eq("ready"))
@@ -323,7 +328,7 @@ fn setup_system(session_uuid: String) -> Result<Box<dyn System>> {
     let system: Box<dyn System> = match SYSTEM.as_str() {
         "local" => Box::new(LocalSystem::new(session_uuid.parse()?)),
         "kubernetes" => Box::new(K8sSystem::new(session_uuid.parse()?)),
-        "xenon" => unimplemented!(),
+        "hpc" => Box::new(HpcSystem::new(session_uuid.parse()?)),
         _ => bail!("Unrecognized system: {}", SYSTEM.as_str()),
     };
 

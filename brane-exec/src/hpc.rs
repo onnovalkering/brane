@@ -11,11 +11,10 @@ use std::sync::Arc;
 type Map<T> = std::collections::HashMap<String, T>;
 
 lazy_static! {
-    static ref HOSTNAME: String = env::var("HPC_HOSTNAME").unwrap_or_else(|_| String::from("slurm"));
+    static ref HOSTNAME: String = env::var("HPC_HOSTNAME").unwrap_or_else(|_| String::from("slurm:22"));
     static ref RUNTIME: String = env::var("HPC_RUNTIME").unwrap_or_else(|_| String::from("singularity"));
     static ref SCHEDULER: String = env::var("HPC_SCHEDULER").unwrap_or_else(|_| String::from("slurm"));
     static ref XENON: String = env::var("HPC_XENON").unwrap_or_else(|_| String::from("localhost:50051"));
-
 
     // TODO: fetch credentials from vault (requires some refactoring to avoid circular dependencies).
     static ref USERNAME: String = env::var("HPC_USERNAME").unwrap_or_else(|_| String::from("xenon"));
@@ -28,6 +27,8 @@ lazy_static! {
 pub async fn run(exec: ExecuteInfo) -> Result<()> {
     let scheduler = create_slurm_scheduler()?;
     let (executable, arguments) = determine_command(&exec)?;
+
+    info!("{:?} {:?}", executable, arguments);
 
     let identifier = rand::thread_rng()
         .sample_iter(&Alphanumeric)
@@ -81,7 +82,7 @@ fn create_slurm_scheduler() -> Result<Scheduler> {
         SCHEDULER.to_string(),
         channel,
         credential,
-        format!("ssh://{}:22", HOSTNAME.as_str()),
+        format!("ssh://{}", HOSTNAME.as_str()),
         properties,
     ).unwrap();
 
@@ -110,9 +111,9 @@ fn determine_command(exec: &ExecuteInfo) -> Result<(Option<String>, Option<Vec<S
 
     // Add arguments
     if let Some(command) = &exec.command {
-        arguments.push(String::from("sh"));
-        arguments.push(String::from("-c"));
-        arguments.push(command.join(" "));
+        for arg in command {
+            arguments.push(arg.clone());
+        }
     }
 
     Ok((executable, Some(arguments)))

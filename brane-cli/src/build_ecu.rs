@@ -147,8 +147,7 @@ fn generate_dockerfile(
         }
     }
 
-    writeln!(contents, "WORKDIR /")?;
-    writeln!(contents, "ENTRYPOINT [\"./init\"]")?;
+    writeln!(contents, "ENTRYPOINT [\"/init\"]")?;
 
     Ok(contents)
 }
