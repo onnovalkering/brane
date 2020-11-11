@@ -264,6 +264,7 @@ fn prompt_for_input(
     for p in &function.parameters {
         let data_type = p.data_type.as_str();
 
+        debug!("{:?}", types);
         let value = if let Some(input_type) = types.get(data_type) {
             let mut properties = Map::<Value>::new();
 
@@ -360,7 +361,10 @@ fn prompt_for_value(
 
                 Value::Unicode(value)
             }
-            _ => unreachable!(),
+            _ => {
+                error!("Unreachable, because data type is '{}'", data_type);
+                unreachable!()
+            }
         }
     };
 

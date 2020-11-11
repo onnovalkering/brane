@@ -6,7 +6,7 @@ use bollard::container::{
 };
 use bollard::errors::Error;
 use bollard::image::{CreateImageOptions, ImportImageOptions, RemoveImageOptions};
-use bollard::models::HostConfig;
+use bollard::models::{HostConfig, DeviceRequest};
 use bollard::Docker;
 use futures_util::stream::TryStreamExt;
 use hyper::Body;
@@ -20,6 +20,8 @@ use uuid::Uuid;
 
 lazy_static! {
     static ref DOCKER_NETWORK: String = env::var("DOCKER_NETWORK").unwrap_or_else(|_| String::from("host"));
+    static ref DOCKER_GPUS: String = env::var("DOCKER_GPUS").unwrap_or_else(|_| String::from(""));
+    static ref DOCKER_PRIVILEGED: String = env::var("DOCKER_PRIVILEGED").unwrap_or_else(|_| String::from(""));
 }
 
 ///
@@ -90,9 +92,25 @@ async fn create_and_start_container(
     let name = Uuid::new_v4().to_string().chars().take(8).collect::<String>();
     let create_options = CreateContainerOptions { name: &name };
 
+    let device_requests = if DOCKER_GPUS.as_str() != "" {
+        let device_request = DeviceRequest {
+            driver: None,
+            count: Some(-1),
+            device_i_ds: None,
+            capabilities: Some(vec![vec![String::from("gpu")]]),
+            options: None,
+        };
+
+        Some(vec![device_request])
+    } else {
+        None
+    };
+
     let host_config = HostConfig {
         binds: exec.mounts.clone(),
         network_mode: Some(DOCKER_NETWORK.to_string()),
+        privileged: Some(DOCKER_PRIVILEGED.as_str() == "true"),
+        device_requests,
         ..Default::default()
     };
 
@@ -100,6 +118,7 @@ async fn create_and_start_container(
         image: Some(exec.image.clone()),
         cmd: exec.command.clone(),
         host_config: Some(host_config),
+
         ..Default::default()
     };
 

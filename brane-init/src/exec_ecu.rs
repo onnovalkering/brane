@@ -213,7 +213,16 @@ fn construct_struct_envs(
             Value::Integer(value) => value.to_string(),
             Value::Real(value) => value.to_string(),
             Value::Unicode(value) => value.to_string(),
-            Value::Struct { properties: _, .. } => unimplemented!(),
+            Value::Struct { data_type, properties } => {
+                match data_type.as_str() {
+                    "Directory" | "File" => {
+                        let value = properties.get("url").expect("Missing `url` property.").to_string();
+                        envs.insert(format!("{}_{}_URL", &name, key.to_ascii_uppercase()), value);
+                        continue;
+                    },
+                    _ => unimplemented!()
+                }
+            },
             _ => unreachable!(),
         };
 
@@ -234,6 +243,8 @@ fn capture_output(
     mode: &Option<String>,
     c_types: &Option<Map<Type>>,
 ) -> Result<Map<Value>> {
+    debug!("Capture output using mode: {:?}", mode);
+
     let stdout = preprocess_stdout(stdout, &mode)?;
     let docs = YamlLoader::load_from_str(&stdout)?;
 
@@ -249,7 +260,7 @@ fn capture_output(
 fn unwrap_yaml_hash(
     value: &Yaml,
     parameters: &[Parameter],
-    _types: &Map<Type>,
+    types: &Map<Type>,
 ) -> Result<Map<Value>> {
     let map = value.as_hash().unwrap();
 
@@ -272,7 +283,7 @@ fn unwrap_yaml_hash(
                 let data_type = p.data_type.to_string();
                 Value::Array { data_type, entries }
             }
-            Yaml::Hash(_) => unimplemented!(),
+            Yaml::Hash(_) => unwrap_yaml_struct(&value, &p.data_type, types)?,
             _ => unwrap_yaml_value(&map[&key], &p.data_type)?,
         };
 
@@ -280,6 +291,27 @@ fn unwrap_yaml_hash(
     }
 
     Ok(output)
+}
+
+fn unwrap_yaml_struct(
+    value: &Yaml,
+    data_type: &str,
+    types: &Map<Type>
+) -> Result<Value> {
+    let arch_type = types.get(data_type).expect(&format!("Missing type `{}`", data_type));
+    let mut properties = Map::<Value>::new();
+
+    for p in &arch_type.properties {
+        let prop_value = value[p.name.as_str()].clone();
+        let prop = unwrap_yaml_value(&prop_value, &p.data_type)?;
+
+        properties.insert(p.name.to_string(), prop);
+    }
+
+    Ok(Value::Struct {
+        data_type: data_type.to_string(),
+        properties
+    })
 }
 
 ///

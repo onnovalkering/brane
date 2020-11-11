@@ -84,7 +84,7 @@ fn generate_package_info(container_info: &ContainerInfo) -> Result<PackageInfo> 
         container_info.description.clone(),
         String::from("ecu"),
         Some(functions),
-        None,
+        container_info.types.clone(),
     );
 
     Ok(package_info)
@@ -118,7 +118,7 @@ fn generate_dockerfile(
     if base.starts_with("alpine") {
         write!(contents, "RUN apk add --no-cache ")?;
     } else {
-        write!(contents, "RUN apt-get update && apt-get install -y ")?;
+        write!(contents, "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-change-held-packages --allow-downgrades ")?;
     }
     if let Some(dependencies) = &ecu_document.dependencies {
         for dependency in dependencies {

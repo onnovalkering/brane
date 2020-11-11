@@ -270,9 +270,29 @@ fn prepare_arguments(
                     arguments.insert(name.clone(), value.clone());
                 } else {
                     let value = resolve_variable(variable, environment);
+
+                    let value = if let Value::Struct { data_type, properties } = &value {
+                        Value::Struct {
+                            data_type: data_type.to_string(),
+                            properties: prepare_arguments(properties, environment, vault)?
+                        }
+                    } else {
+                        value
+                    };
+
                     arguments.insert(name.clone(), value);
                 }
             }
+            Value::Struct { data_type, properties } => {
+                let new_value = Value::Struct {
+                    data_type: data_type.to_string(),
+                    properties: prepare_arguments(properties, environment, vault)?
+                };
+
+                debug!("prepared struct: {:?}", new_value);
+
+                arguments.insert(name.clone(), new_value);
+            },
             _ => {
                 arguments.insert(name.clone(), value.clone());
             }
