@@ -3,6 +3,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 
+pub mod docker;
 pub mod hpc;
 pub mod kubernetes;
 pub mod local;

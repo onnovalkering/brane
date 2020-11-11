@@ -1,7 +1,7 @@
 use crate::models::{Invocation, NewVariable, Session, Variable};
 use crate::schema::{invocations::dsl as inv_db, sessions::dsl as ses_db, variables::dsl as var_db};
 use anyhow::Result;
-use brane_sys::{kubernetes::K8sSystem, local::LocalSystem, System, hpc::HpcSystem};
+use brane_sys::{kubernetes::K8sSystem, local::LocalSystem, System, hpc::HpcSystem, docker::DockerSystem};
 use brane_vm::cursor::RedisCursor;
 use brane_vm::environment::{Environment, RedisEnvironment};
 use brane_vm::machine::{AsyncMachine, MachineResult};
@@ -326,7 +326,8 @@ fn setup_machine(
 ///
 fn setup_system(session_uuid: String) -> Result<Box<dyn System>> {
     let system: Box<dyn System> = match SYSTEM.as_str() {
-        "docker" | "local" => Box::new(LocalSystem::new(session_uuid.parse()?)),
+        "docker" => Box::new(DockerSystem::new(session_uuid.parse()?)),
+        "local" => Box::new(LocalSystem::new(session_uuid.parse()?)),
         "kubernetes" => Box::new(K8sSystem::new(session_uuid.parse()?)),
         "hpc" => Box::new(HpcSystem::new(session_uuid.parse()?)),
         _ => bail!("Unrecognized system: {}", SYSTEM.as_str()),
