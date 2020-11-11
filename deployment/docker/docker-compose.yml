@@ -1,33 +1,43 @@
 version: '3'
 
+volumes:
+  brane_data:
+
 services:
   brane-api:
-    image: onnovalkering/brane-api:0.1.0
+    image: onnovalkering/brane-api
     hostname: brane-api
     depends_on:
       - kafka
       - postgres
     ports:
       - 8080:8080
+    volumes:
+      - brane_data:/brane:ro
     environment:
       HOST: 0.0.0.0
+      SYSTEM: docker
 
   brane-loop:
-    image: onnovalkering/brane-loop:0.1.0
+    image: onnovalkering/brane-loop
+    command: ["./brane-loop", "-d"]
     hostname: brane-loop
     depends_on:
       - kafka
       - postgres
     volumes:
-      - /tmp:/tmp
+      - brane_data:/brane
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
+      SYSTEM: docker
       DOCKER_NETWORK: docker_default
+      DOCKER_GPUS: all
+      DOCKER_PRIVILEGED: "true"
       VAULT_HOST: vault:8200
       VAULT_TOKEN: mytoken
 
   jupyterlab:
-    image: onnovalkering/brane-jupyterlab:0.1.0
+    image: onnovalkering/brane-ide
     command: ["jupyter", "lab", "--allow-root", "--LabApp.token=''"]
     ports:
       - 8888:8888
