@@ -22,6 +22,8 @@ lazy_static! {
     static ref DOCKER_NETWORK: String = env::var("DOCKER_NETWORK").unwrap_or_else(|_| String::from("host"));
     static ref DOCKER_GPUS: String = env::var("DOCKER_GPUS").unwrap_or_else(|_| String::from(""));
     static ref DOCKER_PRIVILEGED: String = env::var("DOCKER_PRIVILEGED").unwrap_or_else(|_| String::from(""));
+    static ref DOCKER_VOLUME: String = env::var("DOCKER_VOLUME").unwrap_or_else(|_| String::from(""));
+    static ref DOCKER_VOLUMES_FROM: String = env::var("DOCKER_VOLUMES_FROM").unwrap_or_else(|_| String::from(""));
 }
 
 ///
@@ -106,10 +108,23 @@ async fn create_and_start_container(
         None
     };
 
+    let volumes_from = if DOCKER_VOLUMES_FROM.as_str() != "" {
+        Some(vec![DOCKER_VOLUMES_FROM.to_string()])
+    } else {
+        None
+    };
+
+    let binds = if DOCKER_VOLUME.as_str() != "" {
+        Some(vec![format!("{}:/brane", DOCKER_VOLUME.as_str())])
+    } else {
+        exec.mounts.clone()
+    };
+
     let host_config = HostConfig {
-        binds: exec.mounts.clone(),
+        binds,
         network_mode: Some(DOCKER_NETWORK.to_string()),
         privileged: Some(DOCKER_PRIVILEGED.as_str() == "true"),
+        volumes_from,
         device_requests,
         ..Default::default()
     };
@@ -118,7 +133,6 @@ async fn create_and_start_container(
         image: Some(exec.image.clone()),
         cmd: exec.command.clone(),
         host_config: Some(host_config),
-
         ..Default::default()
     };
 

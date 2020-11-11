@@ -31,6 +31,8 @@ services:
     environment:
       SYSTEM: docker
       DOCKER_NETWORK: docker_default
+      DOCKER_VOLUME: docker_brane_data
+      DOCKER_VOLUMES_FROM: docker_brane-loop_1
       DOCKER_GPUS: all
       DOCKER_PRIVILEGED: "true"
       VAULT_HOST: vault:8200
