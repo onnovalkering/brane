@@ -326,7 +326,7 @@ fn setup_machine(
 ///
 fn setup_system(session_uuid: String) -> Result<Box<dyn System>> {
     let system: Box<dyn System> = match SYSTEM.as_str() {
-        "local" => Box::new(LocalSystem::new(session_uuid.parse()?)),
+        "docker" | "local" => Box::new(LocalSystem::new(session_uuid.parse()?)),
         "kubernetes" => Box::new(K8sSystem::new(session_uuid.parse()?)),
         "hpc" => Box::new(HpcSystem::new(session_uuid.parse()?)),
         _ => bail!("Unrecognized system: {}", SYSTEM.as_str()),

@@ -277,7 +277,7 @@ async fn get_session_file(
 async fn to_local_file(url: Url) -> Result<PathBuf> {
     let original = PathBuf::from(&url.path());
 
-    if SYSTEM.as_str() == "local" || SYSTEM.as_str() == "kubernetes" {
+    if SYSTEM.as_str() == "local" || SYSTEM.as_str() == "kubernetes" || SYSTEM.as_str() == "docker" {
         return Ok(original);
     }
 
