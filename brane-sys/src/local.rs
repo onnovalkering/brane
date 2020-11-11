@@ -82,10 +82,14 @@ impl System for LocalSystem {
         temp: bool,
     ) -> Result<Url> {
         let parent = self.determine_parent(&self.uuid, parent, temp)?;
+        debug!("Creating dirs: {:?}", parent);
         fs::create_dir_all(&parent)?;
 
         let dir = parent.join(name);
-        fs::create_dir(&dir)?;
+        if !dir.exists() {
+            debug!("Creating dir: {:?}", dir);
+            fs::create_dir(&dir)?;
+        }
 
         path_to_url(&dir)
     }
