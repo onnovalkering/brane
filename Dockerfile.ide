@@ -41,10 +41,10 @@ USER root
 RUN brane-cli -s login http://brane-api:8080 --username jovyan
 
 WORKDIR /kernel
-RUN python setup.py install \ 
+RUN python setup.py install \
  && python install.py
 
-RUN jupyter labextension install /registry
+# RUN jupyter labextension install /registry
 RUN jupyter labextension install /renderer
 
 # Switch back to jovyan to avoid accidental container runs as root
