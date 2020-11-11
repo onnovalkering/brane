@@ -91,5 +91,5 @@ cp "results/${PATIENT}.png" $OUTPUT_DIR
 cp "results/${PATIENT}_interpolated.png" $OUTPUT_DIR
 
 echo "output:"
-echo "  heatmap: ${OUTPUT_DIR}/${PATIENT}.png"
-echo "  heatmap_interpolated: ${OUTPUT_DIR}/${PATIENT}_interpolated.png"
+echo "  heatmap: file://${OUTPUT_DIR}/${PATIENT}.png"
+echo "  heatmap_interpolated: file://${OUTPUT_DIR}/${PATIENT}_interpolated.png"
