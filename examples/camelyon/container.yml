@@ -130,7 +130,7 @@ types:
 actions:
   'dheatmap':
     pattern:
-      prefix: dheatmap
+      prefix: heatmap_of
       infix:
         - with
         - and
