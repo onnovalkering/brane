@@ -44,6 +44,39 @@ entrypoint:
   exec: run.sh
 
 types:
+  Input:
+    name: Input
+    properties:
+      - name: file_name
+        type: string
+        default:
+          v: unicode
+          c: "patient_051_node_2"
+
+      - name: imagenet_weights
+        type: string
+        default:
+          v: unicode
+          c: "resnet101_weights_tf.h5"
+
+      - name: model_weights
+        type: string
+        default:
+          v: unicode
+          c: "tumor_classifier.h5"
+
+      - name: interpret
+        type: boolean
+        default:
+          v: boolean
+          c: true
+
+      - name: n_samples
+        type: integer
+        default:
+          v: integer
+          c: 5
+
   Settings:
     name: Settings
     properties:
@@ -52,16 +85,25 @@ types:
         default:
           v: unicode
           c: "0,1,2,3"
+
       - name: slide_level
         type: integer
         default:
           v: integer
           c: 7
+
       - name: patch_size
         type: integer
         default:
           v: integer
           c: 224
+
+      - name: n_samples
+        type: integer
+        default:
+          v: integer
+          c: 500
+
       - name: output_dir
         type: Directory
 
@@ -73,46 +115,55 @@ types:
         default:
           v: unicode
           c: "resnet101"
+
       - name: loss
         type: string
         default:
           v: unicode
           c: "binary_crossentropy"
+
       - name: activation
         type: string
         default:
           v: unicode
           c: "sigmoid"
+
       - name: lr
         type: string
         default:
           v: unicode
           c: "1e-4"
+
       - name: decay
         type: string
         default:
           v: unicode
           c: "1e-6"
+
       - name: momentum
         type: real
         default:
           v: real
           c: 0.9
+
       - name: nesterov
         type: boolean
         default:
           v: boolean
           c: true
+
       - name: batch_size
         type: integer
         default:
           v: integer
           c: 32
+
       - name: epochs
         type: integer
         default:
           v: integer
           c: 15
+
       - name: verbose
         type: integer
         default:
@@ -136,11 +187,8 @@ actions:
         - and
 
     input:
-      - type: string
-        name: patient
-        default:
-          v: unicode
-          c: "patient_051_node_2"
+      - type: Input
+        name: input
 
       - type: Model
         name: model
@@ -149,8 +197,44 @@ actions:
         name: settings
 
       - type: string
-        name: id_rsa
-        secret: ID_RSA
+        name: dtn_hostname
+        secret: DTN_HOSTNAME
+
+      - type: string
+        name: dtn_port
+        secret: DTN_PORT
+
+      - type: string
+        name: dtn_mount
+        secret: DTN_MOUNT
+
+      - type: string
+        name: dtn_id_rsa
+        secret: DTN_ID_RSA
+
+      - type: string
+        name: camelyon17_data_dir
+        secret: CAMELYON17_DATA_DIR
+
+      - type: string
+        name: intermediate_results_data_dir
+        secret: INTERMEDIATE_RESULTS_DATA_DIR
+
+      - type: string
+        name: image_weights_dir
+        secret: IMAGE_WEIGHTS_DIR
+
+      - type: string
+        name: model_weights_dir
+        secret: MODEL_WEIGHTS_DIR
+
+      - type: string
+        name: pwd
+        secret: PWD
+
+      - type: string
+        name: h5file
+        secret: H5FILE
 
     output:
       - type: Output

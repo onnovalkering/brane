@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # Original author: Ivan Eggel (medGIFT group, HES-SO)
 # https://github.com/ieggel/process-uc1-integration
-
-set -euo pipefail
 
 function cleanup {
   echo "# Unmounting $target_mnt_dir..."
@@ -13,51 +12,49 @@ function cleanup {
 trap cleanup EXIT
 trap cleanup ERR
 
-ssh_server_host="sne-dtn-03.vlan7.uvalight.net"
-ssh_server_port_nbr=30909
-target_mnt_dir="${HOME}/snedtn"
-camelyon17_data_dir="${target_mnt_dir}/camelyon17/working_subset"
-intermediate_results_data_dir="${target_mnt_dir}/L3/data/IntermediateResults"
+CAMELYON17_DATA_DIR="${DTN_MOUNT}${CAMELYON17_DATA_DIR}"
+INTERMEDIATE_RESULTS_DATA_DIR="${DTN_MOUNT}${INTERMEDIATE_RESULTS_DATA_DIR}"
 
 # Create target mount dir if necessary
-if [[ -d "$target_mnt_dir" ]]; then
-    echo "# Target mount dir ${target_mnt_dir} already exist. Skip creation."
+if [[ -d "$DTN_MOUNT" ]]; then
+    echo "# Target mount dir ${DTN_MOUNT} already exist. Skip creation."
 else
-    echo "# Creating target mount dir ${target_mnt_dir}."
-    mkdir -p $target_mnt_dir
+    echo "# Creating target mount dir ${DTN_MOUNT}."
+    mkdir -p $DTN_MOUNT
 fi
 
 # Add SSH identify file
 mkdir -p "${HOME}/.ssh"
-echo "${ID_RSA}" | base64 -d > ~/.ssh/id_rsa
+echo "${DTN_ID_RSA}" | base64 -d > ~/.ssh/id_rsa
 chmod 400 ~/.ssh/id_rsa
 
 # Add key to known hosts
-ssh-keyscan -p $ssh_server_port_nbr -H $ssh_server_host >> ~/.ssh/known_hosts
+ssh-keyscan -p $DTN_PORT -H $DTN_HOSTNAME >> ~/.ssh/known_hosts
 
 # Check if snetdn already mounted
-if grep -qs "${target_mnt_dir} " /proc/mounts; then
+if grep -qs "${DTN_MOUNT} " /proc/mounts; then
     echo "# SNEDTN already mounted."
 else
     # Mount snetdn via sshfs to target mount dir
-    sshfs -o allow_other root@$ssh_server_host:/mnt $target_mnt_dir -p $ssh_server_port_nbr
+    sshfs -o allow_other root@$DTN_HOSTNAME:/mnt $DTN_MOUNT -p $DTN_PORT
 fi
 
 cd "PROCESS_L3"
-CONFIG_FILE="doc/config.cfg"
 
-# Overwrite default configuration
-INPUT_FILE_NAME="${PATIENT}"
-INPUT_IMAGENET_WEIGHTS="${intermediate_results_data_dir}/Mara/imagenet_models/resnet101_weights_tf.h5"
-INPUT_MODEL_WEIGHTS="${intermediate_results_data_dir}/Mara/camnet_models/cam1617_2009/tumor_classifier.h5"
-SETTINGS_SOURCE_FLD="${camelyon17_data_dir}/"
-SETTINGS_XML_SOURCE_FLD="${camelyon17_data_dir}/lesion_annotations/"
-LOAD_PWD="${intermediate_results_data_dir}/Camelyon/all500"
+CONFIG_FILE="doc/config.cfg"
+INPUT_IMAGENET_WEIGHTS="${INTERMEDIATE_RESULTS_DATA_DIR}${IMAGENET_WEIGHTS_DIR}/${INPUT_IMAGENET_WEIGHTS}"
+INPUT_MODEL_WEIGHTS="${INTERMEDIATE_RESULTS_DATA_DIR}${MODEL_WEIGHTS_DIR}/${INPUT_MODEL_WEIGHTS}"
+SETTINGS_SOURCE_FLD="${CAMELYON17_DATA_DIR}/"
+SETTINGS_XML_SOURCE_FLD="${CAMELYON17_DATA_DIR}/lesion_annotations/"
+LOAD_PWD="${INTERMEDIATE_RESULTS_DATA_DIR}${PWD}"
+LOAD_H5FILE="${H5FILE}"
 
 # [input]
 sed -i "s|\(file_name *= *\).*|\1$INPUT_FILE_NAME|" $CONFIG_FILE
 sed -i "s|\(imagenet_weights *= *\).*|\1$INPUT_IMAGENET_WEIGHTS|" $CONFIG_FILE
 sed -i "s|\(model_weights *= *\).*|\1$INPUT_MODEL_WEIGHTS|" $CONFIG_FILE
+sed -i "s|\(interpret *= *\).*|\1$INPUT_INTERPRET|" $CONFIG_FILE
+sed -i "s|\(i_n_samples *= *\).*|\1$INPUT_N_SAMPLES|" $CONFIG_FILE
 
 # [settings]
 sed -i "s|\(training_centres *= *\).*|\1$SETTINGS_TRAINING_CENTRES|" $CONFIG_FILE
@@ -65,6 +62,7 @@ sed -i "s|\(source_fld *= *\).*|\1$SETTINGS_SOURCE_FLD|" $CONFIG_FILE
 sed -i "s|\(xml_source_fld *= *\).*|\1$SETTINGS_XML_SOURCE_FLD|" $CONFIG_FILE
 sed -i "s|\(slide_level *= *\).*|\1$SETTINGS_SLIDE_LEVEL|" $CONFIG_FILE
 sed -i "s|\(patch_size *= *\).*|\1$SETTINGS_PATCH_SIZE|" $CONFIG_FILE
+sed -i "s|\(n_samples *= *\).*|\1$SETTINGS_N_SAMPLES|" $CONFIG_FILE
 
 # [model]
 sed -i "s|\(model_type *= *\).*|\1$MODEL_TYPE|" $CONFIG_FILE
@@ -80,6 +78,10 @@ sed -i "s|\(verbose *= *\).*|\1$MODEL_VERBOSE|" $CONFIG_FILE
 
 # [load]
 sed -i "s|\(PWD *= *\).*|\1$LOAD_PWD|" $CONFIG_FILE
+sed -i "s|\(h5file *= *\).*|\1$LOAD_H5FILE|" $CONFIG_FILE
+
+# Remove prefix on first 'n_samples'
+sed -e '0,/i_n_samples/ s|i_n_samples|n_samples|' $CONFIG_FILE
 
 # Run pipeline
 python DHeatmap.py &>/dev/null
@@ -87,9 +89,9 @@ python DHeatmap.py &>/dev/null
 # Copy output to Brane directory
 OUTPUT_DIR="${SETTINGS_OUTPUT_DIR_URL:7}"
 
-cp "results/${PATIENT}.png" $OUTPUT_DIR
-cp "results/${PATIENT}_interpolated.png" $OUTPUT_DIR
+cp "results/${INPUT_FILE_NAME}.png" $OUTPUT_DIR
+cp "results/${INPUT_FILE_NAME}_interpolated.png" $OUTPUT_DIR
 
 echo "output:"
-echo "  heatmap: file://${OUTPUT_DIR}/${PATIENT}.png"
-echo "  heatmap_interpolated: file://${OUTPUT_DIR}/${PATIENT}_interpolated.png"
+echo "  heatmap: file://${OUTPUT_DIR}/${INPUT_FILE_NAME}.png"
+echo "  heatmap_interpolated: file://${OUTPUT_DIR}/${INPUT_FILE_NAME}_interpolated.png"
