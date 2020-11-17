@@ -328,6 +328,23 @@ fn unwrap_yaml_value(
             let value = value.as_bool().unwrap();
             Value::Boolean(value)
         }
+        "File[]" => {
+            if let Yaml::Array(elements) = value {
+                let mut entries = vec![];
+                for element in elements.iter() {
+                    let variable = unwrap_yaml_value(&element, "File")?;
+                    entries.push(variable);
+                }
+
+                Value::Array {
+                    data_type: data_type.to_string(),
+                    entries
+                }
+
+            } else {
+                bail!("Expected an array, but it was not.");
+            }
+        }
         "Directory" | "File" => {
             let value = String::from(value.as_str().unwrap());
             let url = Value::Unicode(value);
