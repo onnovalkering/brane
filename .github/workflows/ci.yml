@@ -8,10 +8,7 @@ on:
 jobs:
   unit-tests:
     name: Unit Tests (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-10.15, ubuntu-18.04]
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
@@ -19,15 +16,7 @@ jobs:
           fetch-depth: 1
 
       - name: Install dependencies
-        run: |
-          if [ `uname` = 'Linux' ]; then
-            sudo apt-get install -y libpq-dev libssl-dev
-          fi
-
-          if [ `uname` = 'Darwin' ]; then
-            brew install libpq openssl
-            export OPENSSL_ROOT_DIR='/usr/local/opt/openssl'
-          fi
+        run: sudo apt-get install -y libpq-dev libssl-dev
 
       - name: Build project
         run: cargo build -v
@@ -37,7 +26,7 @@ jobs:
 
   integration-tests:
     name: Integration Tests
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2

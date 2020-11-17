@@ -14,9 +14,8 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Install musl
-        run: |
-          sudo apt-get install -y musl-tools
+      - name: Install dependencies
+        run: sudo apt-get install -y libpq-dev libssl-dev musl-tools
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
