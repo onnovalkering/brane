@@ -11,7 +11,7 @@ services:
       - kafka
       - postgres
     ports:
-      - 8080:8080
+      - 127.0.0.1:8080:8080
     volumes:
       - brane_data:/brane:ro
     environment:
@@ -42,7 +42,7 @@ services:
     image: onnovalkering/brane-ide
     command: ["jupyter", "lab", "--allow-root", "--LabApp.token=''"]
     ports:
-      - 8888:8888
+      - 127.0.0.1:8888:8888
 
   kafka:
     image: confluentinc/cp-kafka:5.5.1
@@ -50,7 +50,7 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - 9092:9092
+      - 127.0.0.1:9092:9092
     environment:
       KAFKA_BROKER_ID: 0
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -62,37 +62,37 @@ services:
   postgres:
     image: postgres:12
     ports:
-      - 5432:5432
+      - 127.0.0.1:5432:5432
     environment:
       POSTGRES_PASSWORD: postgres
 
   redis:
     image: redis:6-alpine
     ports:
-      - 6379:6379
+      - 127.0.0.1:6379:6379
 
   registry:
     image: registry:2
     ports:
-      - 5000:5000
+      - 127.0.0.1:5000:5000
 
   vault:
     image: vault:1.5.3
     cap_add:
       - IPC_LOCK
     ports:
-      - 8200:8200
+      - 127.0.0.1:8200:8200
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: mytoken
 
   xenon:
     image: onnovalkering/xenon-grpc
     ports:
-      - 50051:50051
+      - 127.0.0.1:50051:50051
 
   zookeeper:
     image: confluentinc/cp-zookeeper:5.5.1
     ports:
-      - 2181:2181
+      - 127.0.0.1:2181:2181
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
