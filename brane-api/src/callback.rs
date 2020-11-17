@@ -1,5 +1,5 @@
 use actix_web::Scope;
-use actix_web::{web, HttpRequest, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse, FromRequest};
 use anyhow::Result;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use serde::Deserialize;
@@ -13,6 +13,9 @@ const TOPIC_CONTROL: &str = "control";
 ///
 pub fn scope() -> Scope {
     web::scope("/callback")
+        .app_data(web::Json::<ActCallback>::configure(|cfg| {
+            cfg.limit(1024000)
+        }))
         .route("act", web::post().to(act_callback))
         .route("status", web::post().to(status_callback))
 }
