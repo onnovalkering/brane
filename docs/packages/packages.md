@@ -7,4 +7,6 @@ has_toc: true
 ---
 
 # Packages
-Coming soon.
+Packages are used to bundle custom functions, and make them available to the [runtime system](/brane/overview#runtime-system).
+
+There are four package builders, which one to use depends on the function's implementation. 

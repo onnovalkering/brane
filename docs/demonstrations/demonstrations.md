@@ -9,13 +9,16 @@ has_toc: false
 # Demonstrations
 This pages provides an overview of demonstrations using Brane.
 
+## PROCESS 
+These are the demonstrations created as part of the PROCESS project. 
+
 <div style="width: 300px">
     <p style="text-align: center;">
         <a class="no" href="/brane/demonstrations/lofar.html">
-            <img src="/brane/assets/img/demo-lofar.jpg" alt="The LOFAR calibration pipeline.">
+            <img src="/brane/assets/img/demo-uc2.jpg" alt="Creating sky maps from LOFAR data.">
         </a>
         <a href="/brane/demonstrations/lofar.html">
-            <strong>LOFAR</strong> – creating sky maps
+            Creating sky maps from LOFAR data
         </a>
     </p>
 </div>
