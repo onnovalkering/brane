@@ -5,8 +5,8 @@ set -euo pipefail
 # https://github.com/ieggel/process-uc1-integration
 
 function cleanup {
-  echo "# Unmounting $target_mnt_dir..."
-  umount $target_mnt_dir
+  echo "# Unmounting $DTN_MOUNT..."
+  umount $DTN_MOUNT
 }
 
 trap cleanup EXIT
@@ -46,15 +46,8 @@ INPUT_IMAGENET_WEIGHTS="${INTERMEDIATE_RESULTS_DATA_DIR}${IMAGENET_WEIGHTS_DIR}/
 INPUT_MODEL_WEIGHTS="${INTERMEDIATE_RESULTS_DATA_DIR}${MODEL_WEIGHTS_DIR}/${INPUT_MODEL_WEIGHTS}"
 SETTINGS_SOURCE_FLD="${CAMELYON17_DATA_DIR}/"
 SETTINGS_XML_SOURCE_FLD="${CAMELYON17_DATA_DIR}/lesion_annotations/"
-LOAD_PWD="${INTERMEDIATE_RESULTS_DATA_DIR}${PWD}"
+LOAD_PWD="${INTERMEDIATE_RESULTS_DATA_DIR}${PWD_DIR}"
 LOAD_H5FILE="${H5FILE}"
-
-# [input]
-sed -i "s|\(file_name *= *\).*|\1$INPUT_FILE_NAME|" $CONFIG_FILE
-sed -i "s|\(imagenet_weights *= *\).*|\1$INPUT_IMAGENET_WEIGHTS|" $CONFIG_FILE
-sed -i "s|\(model_weights *= *\).*|\1$INPUT_MODEL_WEIGHTS|" $CONFIG_FILE
-sed -i "s|\(interpret *= *\).*|\1$INPUT_INTERPRET|" $CONFIG_FILE
-sed -i "s|\(i_n_samples *= *\).*|\1$INPUT_N_SAMPLES|" $CONFIG_FILE
 
 # [settings]
 sed -i "s|\(training_centres *= *\).*|\1$SETTINGS_TRAINING_CENTRES|" $CONFIG_FILE
@@ -63,6 +56,14 @@ sed -i "s|\(xml_source_fld *= *\).*|\1$SETTINGS_XML_SOURCE_FLD|" $CONFIG_FILE
 sed -i "s|\(slide_level *= *\).*|\1$SETTINGS_SLIDE_LEVEL|" $CONFIG_FILE
 sed -i "s|\(patch_size *= *\).*|\1$SETTINGS_PATCH_SIZE|" $CONFIG_FILE
 sed -i "s|\(n_samples *= *\).*|\1$SETTINGS_N_SAMPLES|" $CONFIG_FILE
+
+# [input]
+sed -i "s|\(file_name *= *\).*|\1$INPUT_FILE_NAME|" $CONFIG_FILE
+sed -i "s|\(imagenet_weights *= *\).*|\1$INPUT_IMAGENET_WEIGHTS|" $CONFIG_FILE
+sed -i "s|\(model_weights *= *\).*|\1$INPUT_MODEL_WEIGHTS|" $CONFIG_FILE
+sed -i "s|\(interpret *= *\).*|\1$INPUT_INTERPRET|" $CONFIG_FILE
+sed -i "s|\(i_n_samples *= *\).*|\1$INPUT_N_SAMPLES|" $CONFIG_FILE
+sed -ie '0,/i_n_samples/ s|i_n_samples|n_samples|' $CONFIG_FILE # Remove prefix on first 'n_samples'
 
 # [model]
 sed -i "s|\(model_type *= *\).*|\1$MODEL_TYPE|" $CONFIG_FILE
@@ -80,18 +81,20 @@ sed -i "s|\(verbose *= *\).*|\1$MODEL_VERBOSE|" $CONFIG_FILE
 sed -i "s|\(PWD *= *\).*|\1$LOAD_PWD|" $CONFIG_FILE
 sed -i "s|\(h5file *= *\).*|\1$LOAD_H5FILE|" $CONFIG_FILE
 
-# Remove prefix on first 'n_samples'
-sed -e '0,/i_n_samples/ s|i_n_samples|n_samples|' $CONFIG_FILE
-
-# Run pipeline
-python DHeatmap.py &>/dev/null
-
 # Copy output to Brane directory
 OUTPUT_DIR="${SETTINGS_OUTPUT_DIR_URL:7}"
 
-cp "results/${INPUT_FILE_NAME}.png" $OUTPUT_DIR
-cp "results/${INPUT_FILE_NAME}_interpolated.png" $OUTPUT_DIR
+# Run pipeline
+python DHeatmap.py &>"${OUTPUT_DIR}/dheatmap_logs.txt"
+
+cp -r "results" $OUTPUT_DIR
 
 echo "output:"
-echo "  heatmap: file://${OUTPUT_DIR}/${INPUT_FILE_NAME}.png"
-echo "  heatmap_interpolated: file://${OUTPUT_DIR}/${INPUT_FILE_NAME}_interpolated.png"
+echo "  heatmap: file://${OUTPUT_DIR}/results/${INPUT_FILE_NAME}.png"
+echo "  heatmap_interpolated: file://${OUTPUT_DIR}/results/${INPUT_FILE_NAME}_interpolated.png"
+echo "  interpretability:"
+
+FILES="${OUTPUT_DIR}/results/interpretability/${INPUT_FILE_NAME}/*.png"
+for filename in $FILES; do
+    echo "    - file://${filename}"
+done

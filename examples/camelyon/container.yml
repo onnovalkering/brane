@@ -177,6 +177,8 @@ types:
         type: File
       - name: heatmap_interpolated
         type: File
+      - name: interpretability
+        type: File[]
 
 actions:
   'dheatmap':
@@ -221,16 +223,16 @@ actions:
         secret: INTERMEDIATE_RESULTS_DATA_DIR
 
       - type: string
-        name: image_weights_dir
-        secret: IMAGE_WEIGHTS_DIR
+        name: imagenet_weights_dir
+        secret: IMAGENET_WEIGHTS_DIR
 
       - type: string
         name: model_weights_dir
         secret: MODEL_WEIGHTS_DIR
 
       - type: string
-        name: pwd
-        secret: PWD
+        name: pwd_dir
+        secret: PWD_DIR
 
       - type: string
         name: h5file
