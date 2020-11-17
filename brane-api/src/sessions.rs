@@ -229,10 +229,24 @@ async fn get_session_file(
         if let Ok(object) = object {
             let object: Value = serde_json::from_str(&object.content_json.unwrap()).unwrap();
             if let Value::Struct { properties, .. } = object {
-                if let Some(value) = properties.get(segments[1]) {
-                    value.clone()
+                if segments[1].contains('[') {
+                    let sub_segments: Vec<_> = segments[1].split('[').collect();
+                    if let Some(value) = properties.get(sub_segments[0]) {
+                        let index: usize = sub_segments[1].strip_suffix(']').unwrap().to_string().parse().unwrap();
+                        if let Value::Array { entries, .. } = value {
+                            entries.get(index).unwrap().clone()
+                        } else {
+                            return HttpResponse::BadRequest().body("Variable is not an array.");
+                        }
+                    } else {
+                        return HttpResponse::NotFound().body("Variable not found.");
+                    }
                 } else {
-                    return HttpResponse::NotFound().body("Variable not found.");
+                    if let Some(value) = properties.get(segments[1]) {
+                        value.clone()
+                    } else {
+                        return HttpResponse::NotFound().body("Variable not found.");
+                    }
                 }
             } else {
                 return HttpResponse::BadRequest().body("Variable is not a object.");
