@@ -85,15 +85,25 @@ sed -i "s|\(h5file *= *\).*|\1$LOAD_H5FILE|" $CONFIG_FILE
 OUTPUT_DIR="${SETTINGS_OUTPUT_DIR_URL:7}"
 
 # Run pipeline
-python DHeatmap.py &>"${OUTPUT_DIR}/dheatmap_logs.txt"
+LOG_FILE="${OUTPUT_DIR}/dheatmap_logs.txt"
+python DHeatmap.py &>"${LOG_FILE}"
 
+# Copy results to persistent storage (accessible by Brane)
 cp -r "results" $OUTPUT_DIR
 
+# Parse some values
+export N_MODEL=$(awk '/^Distributing inference/ {print $4; exit}' ${LOG_FILE})
+export N_PATCHES=$(awk '/^Number of patches/ {print $5; exit}' ${LOG_FILE})
+export ELAPSED_TIME=$(awk '/^Elapsed time/ {print $3; exit}' ${LOG_FILE})
+
 echo "output:"
+echo "  logs: file://${LOG_FILE}"
+echo "  elapsed_time: $ELAPSED_TIME"
+echo "  n_model: $N_MODEL"
+echo "  n_patches: $N_PATCHES"
 echo "  heatmap: file://${OUTPUT_DIR}/results/${INPUT_FILE_NAME}.png"
 echo "  heatmap_interpolated: file://${OUTPUT_DIR}/results/${INPUT_FILE_NAME}_interpolated.png"
 echo "  interpretability:"
-
 FILES="${OUTPUT_DIR}/results/interpretability/${INPUT_FILE_NAME}/*.png"
 for filename in $FILES; do
     echo "    - file://${filename}"

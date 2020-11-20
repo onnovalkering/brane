@@ -33,6 +33,7 @@ dependencies:
 
 install:
   - ./install.sh
+  - rm -rf PROCESS_L3/results/*
 
 files:
   - requirements.txt
@@ -179,6 +180,14 @@ types:
         type: File
       - name: interpretability
         type: File[]
+      - name: logs
+        type: File
+      - name: elapsed_time
+        type: real
+      - name: n_model
+        type: integer
+      - name: n_patches
+        type: real
 
 actions:
   'dheatmap':
