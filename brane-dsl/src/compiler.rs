@@ -251,7 +251,7 @@ impl Compiler {
         let instruction = VarInstruction::new(Default::default(), vec![variable.clone()], Default::default());
 
         Ok((Some(variable), Some(instruction)))
-    }    
+    }
 
     ///
     ///
@@ -592,14 +592,39 @@ pub fn terms_to_instructions(
     // Check if is variable assignment
     if terms.len() == 1 && result_var.is_some() {
         if let Some(AstNode::Word { text: name }) = terms.first() {
-            if let Some(data_type) = variables.get(name) {
-                // TODO: create set
-                let pointer = Value::Pointer { data_type: data_type.clone(), variable: name.clone(), secret: false };
-                let set = vec![Variable::new(result_var.unwrap(), data_type.clone(), None, Some(pointer))];
-                let instruction = VarInstruction::new(vec!(), set, Default::default());
-                instructions.push(instruction);
-                
-                return Ok((instructions, data_type.clone()))
+            if name.contains('.') {
+                let segments: Vec<_> = name.split('.').collect();
+                if let Some(arch_type) = variables.get(segments[0]) {
+                    debug!("Resolving {} within type {}", name, arch_type);
+
+                    if let Some(arch_type) = state.types.get(arch_type) {
+                        // TODO: use hashmap in Type struct
+                        let mut properties = Map::<Property>::new();
+                        for p in &arch_type.properties {
+                            properties.insert(p.name.clone(), p.clone());
+                        }
+
+                        if let Some(p) = properties.get(segments[1]) {
+                            let pointer = Value::Pointer { data_type: p.data_type.clone(), variable: name.clone(), secret: false };
+                            let set = vec![Variable::new(result_var.unwrap(), p.data_type.clone(), None, Some(pointer))];
+                            let instruction = VarInstruction::new(vec!(), set, Default::default());
+                            instructions.push(instruction);
+
+                            return Ok((instructions, p.data_type.clone()))
+                        }
+                    }
+                }
+
+            } else {
+                if let Some(data_type) = variables.get(name) {
+                    // TODO: create set
+                    let pointer = Value::Pointer { data_type: data_type.clone(), variable: name.clone(), secret: false };
+                    let set = vec![Variable::new(result_var.unwrap(), data_type.clone(), None, Some(pointer))];
+                    let instruction = VarInstruction::new(vec!(), set, Default::default());
+                    instructions.push(instruction);
+
+                    return Ok((instructions, data_type.clone()))
+                }
             }
         }
     }

@@ -72,7 +72,7 @@ impl AstNode {
         } else {
             false
         }
-    }    
+    }
 
     ///
     ///
@@ -82,7 +82,7 @@ impl AstNode {
             AstNode::Literal { .. } | AstNode::Word { .. } => true,
             _ => false
         }
-    }        
+    }
 }
 
 impl Display for AstNode {
@@ -143,7 +143,7 @@ pub fn parse(input: &str) -> Result<Vec<AstNode>> {
         }
     }
 
-    println!("{:#?}", ast);
+    debug!("AST: {:#?}", ast);
 
     Ok(ast)
 }
@@ -151,7 +151,7 @@ pub fn parse(input: &str) -> Result<Vec<AstNode>> {
 ///
 ///
 ///
-fn parse_array_rule(rule: Pair<Rule>) -> Result<Vec<Value>> {    
+fn parse_array_rule(rule: Pair<Rule>) -> Result<Vec<Value>> {
     let array = rule.into_inner();
 
     let mut values = vec![];
@@ -164,7 +164,7 @@ fn parse_array_rule(rule: Pair<Rule>) -> Result<Vec<Value>> {
                 } else {
                     String::from("Array")
                 };
-    
+
                 Value::Array { data_type, entries }
             }
             Rule::object => parse_object_rule(element)?,
@@ -172,8 +172,8 @@ fn parse_array_rule(rule: Pair<Rule>) -> Result<Vec<Value>> {
             Rule::name => {
                 let variable = parse_name_rule(element)?;
                 let data_type = String::from("??");
-    
-                Value::Pointer { 
+
+                Value::Pointer {
                     variable,
                     data_type,
                     secret: false,
@@ -196,7 +196,7 @@ fn parse_assignment_rule(rule: Pair<Rule>) -> Result<AstNode> {
 
     let name = assignment.next().unwrap().as_str().to_string();
     let expr = assignment.next().unwrap().into_inner();
-    
+
     let mut terms = vec![];
     for term in expr {
         terms.push(parse_term_rule(term)?);
@@ -213,7 +213,7 @@ fn parse_assignment_rule(rule: Pair<Rule>) -> Result<AstNode> {
             }
         }
     }
-    
+
     let expr = Box::new(AstNode::Call { terms });
     Ok(AstNode::Assignment { name, expr })
 }
@@ -325,7 +325,7 @@ fn parse_object_rule(rule: Pair<Rule>) -> Result<Value> {
             Rule::name => {
                 let variable = parse_name_rule(value)?;
                 let data_type = String::from("??");
-                let pointer = Value::Pointer { 
+                let pointer = Value::Pointer {
                     variable,
                     data_type,
                     secret: false,
@@ -512,7 +512,7 @@ fn parse_value_rule(rule: Pair<Rule>) -> Result<Value> {
             let variable = parse_name_rule(value)?;
             let data_type = String::from("???");
 
-            Ok(Value::Pointer { 
+            Ok(Value::Pointer {
                 variable,
                 data_type,
                 secret: false,
