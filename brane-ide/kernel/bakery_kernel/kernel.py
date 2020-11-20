@@ -48,7 +48,7 @@ class BakeryKernel(Kernel):
         else:
             self.publish_stream("stderr", result['content'])
 
-        return self.complete()      
+        return self.complete()
 
     def complete(self):
         # This marks the current cell as complete
@@ -70,7 +70,7 @@ class BakeryKernel(Kernel):
             counter += 1
 
             if status["invocation"]["status"] == "complete":
-                break        
+                break
 
     def intercept_magic(self, code):
         """
@@ -106,25 +106,33 @@ class BakeryKernel(Kernel):
 
         invocation_uuid = get_active_invocation(session_uuid)
         if invocation_uuid is not None:
-            self.poll_invocation(invocation_uuid)                
-        
+            self.poll_invocation(invocation_uuid)
+
     def display(self, variable):
         """
         Retreives and displays a 'File' variable.
         """
         response = get(f"{SESSIONS_ENDPOINT}/{self.session_uuid}/files/{variable}")
-        with BytesIO(response.content) as b:
-            image = b.read()
+        if response.headers['content-type'] == 'text/plain':
+            content = {
+                'data': {
+                    'text/plain': response.text
+                },
+                'metadata': {}
+            }
+        else:
+            with BytesIO(response.content) as b:
+                image = b.read()
 
-        image_type = what(None, image)
-        image_data = b64encode(image).decode('ascii')
-        
-        content = {
-            'data': {
-                f'image/{image_type}': image_data
-            },
-            'metadata': {}
-        }
+            image_type = what(None, image)
+            image_data = b64encode(image).decode('ascii')
+
+            content = {
+                'data': {
+                    f'image/{image_type}': image_data
+                },
+                'metadata': {}
+            }
 
         self.send_response(self.iopub_socket, "display_data", content)
 
