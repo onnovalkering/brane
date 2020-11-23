@@ -1,6 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ "$1" = "precomputed" ]; then
+    OUTPUT_DIR="${OUTPUT_DIR_URL:7}"
+
+    cd "PROCESS_L3"
+    cp -r "precomputed" $OUTPUT_DIR
+
+    echo "precomputed:"
+    echo "  patient_015_node_1: file://${OUTPUT_DIR}/precomputed/patient_015_node_1.png"
+    echo "  patient_017_node_2: file://${OUTPUT_DIR}/precomputed/patient_017_node_2.png"
+    echo "  patient_020_node_4: file://${OUTPUT_DIR}/precomputed/patient_020_node_4.png"
+    echo "  patient_034_node_3: file://${OUTPUT_DIR}/precomputed/patient_034_node_3.png"
+    echo "  patient_051_node_2: file://${OUTPUT_DIR}/precomputed/patient_051_node_2.png"
+    echo "  patient_051_node_2_interpolated: file://${OUTPUT_DIR}/precomputed/patient_051_node_2_interpolated.png"
+    echo "  patient_051_node_2_log: file://${OUTPUT_DIR}/precomputed/patient_051_node_2_log.txt"
+    echo "  concept_relevance: file://${OUTPUT_DIR}/precomputed/interpretability/concept_attribution/concept_relevance.png"
+    echo "  internal_layers: file://${OUTPUT_DIR}/precomputed/interpretability/concept_attribution/internal_layers.png"
+
+    exit 0
+fi
+
 # Original author: Ivan Eggel (medGIFT group, HES-SO)
 # https://github.com/ieggel/process-uc1-integration
 

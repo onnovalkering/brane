@@ -33,7 +33,8 @@ dependencies:
 
 install:
   - ./install.sh
-  - rm -rf PROCESS_L3/results/*
+  - mv PROCESS_L3/results PROCESS_L3/precomputed
+  - mkdir PROCESS_L3/results
 
 files:
   - requirements.txt
@@ -189,8 +190,50 @@ types:
       - name: n_patches
         type: real
 
+  Precomputed:
+    name: Precomputed
+    properties:
+      - name: patient_015_node_1
+        type: File
+      - name: patient_017_node_2
+        type: File
+      - name: patient_020_node_4
+        type: File
+      - name: patient_034_node_3
+        type: File
+      - name: patient_051_node_2
+        type: File
+      - name: patient_051_node_2_interpolated
+        type: File
+      - name: patient_051_node_2_log
+        type: File
+      - name: concept_relevance
+        type: File
+      - name: internal_layers
+        type: File
+
 actions:
+  'precomputed':
+    command:
+      args:
+        - precomputed
+
+    pattern:
+      prefix: precomputed_to
+
+    input:
+      - name: output_dir
+        type: Directory
+
+    output:
+      - type: Precomputed
+        name: precomputed
+
   'dheatmap':
+    command:
+      args:
+        - dheatmap
+
     pattern:
       prefix: heatmap_of
       infix:
