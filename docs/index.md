@@ -41,13 +41,15 @@ Brane features...
 [![DOI](https://zenodo.org/badge/258514017.svg)](https://zenodo.org/badge/latestdoi/258514017)
 {: .no-lnk }
 
-Brane &copy; 2020 University of Amsterdam
+Brane &copy; 2020-2021 University of Amsterdam
 
 <a class="no" href="https://mns-research.nl" target="_blank">
-    <img src="/brane/assets/img/mns.png" width="150px" alt="MNS">
+    <img src="/brane/assets/img/mns.png" alt="MNS">
 </a>
 
-_The Brane framework has been developed as part of [PROCESS](https://www.process-project.eu), which has received funding from the European Union's Horizon 2020 research and innovation programme under grant agreement 777533._
+_Development of Brane started as part of the <a href="https://www.process-project.eu" target="_blank">PROCESS</a> project, which has received funding from the European Union's Horizon 2020 research and innovation programme under grant agreement 777533._
+
+_Development of Brane continued with support of the Dutch Science Foundation in the Commit2Data program, through the <a href="https://enablingpersonalizedinterventions.nl">Enabling Personalized Interventions</a> (EPI) project (grant no. 628.011.028)._
 
 ### License
 
