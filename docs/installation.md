@@ -19,7 +19,8 @@ Both Linux and macOS are supported. When on Windows, use [Windows Subsystem for 
 
 Download the pre-built binary for your platform from the [releases](https://github.com/onnovalkering/brane/releases) page and place it in a `$PATH` directory, with execute permission. It's recommended to use `brane` as the binary's name:   
 ```shell
-$ curl -L github.com/onnovalkering/brane/releases/download/v0.1.0/brane-`uname` -o brane
+$ VERSION=$(curl -s "https://api.github.com/repos/onnovalkering/brane/tags" | jq -r '.[0].name')
+$ curl -L github.com/onnovalkering/brane/releases/download/$VERSION/brane-`uname` -o brane
 $ chmod +x brane 
 $ sudo mv brane /usr/local/bin/
 ```
