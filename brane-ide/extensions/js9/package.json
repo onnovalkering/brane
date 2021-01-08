@@ -1,0 +1,34 @@
+{
+  "name": "brane-js9",
+  "version": "0.1.0",
+  "description": "Integration with JS9.",
+  "author": "Onno Valkering",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "style": "style/index.css",
+  "files": [
+    "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}",
+    "style/**/*.{css,eot,gif,html,jpg,json,png,svg,woff2,ttf}"
+  ],
+  "jupyterlab": {
+    "mimeExtension": true
+  },
+  "scripts": {
+    "clean": "rimraf lib && rimraf tsconfig.tsbuildinfo",
+    "build": "tsc",
+    "prepare": "npm run clean && npm run build",
+    "watch": "tsc -w",
+    "extension:install": "jupyter labextension install brane-js9",
+    "extension:uninstall": "jupyter labextension uninstall brane-js9",
+    "extension:enable": "jupyter labextension enable brane-js9",
+    "extension:disable": "jupyter labextension disable brane-js9"
+  },
+  "dependencies": {
+    "@jupyterlab/rendermime-interfaces": "3.0.0",
+    "@lumino/widgets": "1.17.0"
+  },
+  "devDependencies": {
+    "rimraf": "^2.6.3",
+    "typescript": "4.1.3"
+  }
+}

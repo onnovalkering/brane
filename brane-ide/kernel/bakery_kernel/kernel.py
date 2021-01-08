@@ -80,6 +80,7 @@ class BakeryKernel(Kernel):
         magics = {
             'attach': self.attach,
             'display': self.display,
+            'js9': self.js9,
             'session': lambda: self.publish_stream('stdout', self.session_uuid),
             'variables': lambda: self.publish_json(get_session_variables(self.session_uuid), False)
         }
@@ -133,6 +134,20 @@ class BakeryKernel(Kernel):
                 },
                 'metadata': {}
             }
+
+        self.send_response(self.iopub_socket, "display_data", content)
+
+    def js9(self, variable):
+        """
+        Displays a 'File' variable using JS9, only FITS files are supported.
+        """
+        file_url = get(f"{SESSIONS_ENDPOINT}/{self.session_uuid}/files/{variable}")
+        content = {
+            'data': {
+                'image/fits': file_url
+            },
+            'metadata': {}
+        }
 
         self.send_response(self.iopub_socket, "display_data", content)
 

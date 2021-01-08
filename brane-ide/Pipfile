@@ -6,12 +6,11 @@ verify_ssl = true
 [dev-packages]
 
 [packages]
-ipykernel = "*"
-ipython = "*"
-jupyter-client = "*"
+ipykernel = "==5.4.2"
+ipython = "==7.19.0"
+jupyter-client = "==6.1.7"
 requests = "*"
-zmq = "*"
-jupyterlab = "==2.2.5"
+jupyterlab = "==3.0.1"
 
 [requires]
 python_version = "3.8"

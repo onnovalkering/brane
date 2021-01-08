@@ -3,8 +3,8 @@ brane-api/packages
 brane-api/temporary
 brane-dsl/resources
 brane-exec/resources
-brane-ide/registry/node_modules
-brane-ide/renderer/node_modules
+brane-ide/extensions/js9/node_modules
+brane-ide/extensions/renderer/node_modules
 brane-init/
 deployment/
 docs/

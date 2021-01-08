@@ -1,0 +1,18 @@
+### Jupyter ###
+
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# IPython
+profile_default/
+ipython_config.py
+
+### Custom ###
+*.bundle.*
+lib/
+*.egg-info/
+.ipynb_checkpoints
+*.tsbuildinfo
+venv
+package-lock.json
+yarn.lock
