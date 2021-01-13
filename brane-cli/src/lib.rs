@@ -12,6 +12,7 @@ pub mod build_oas;
 pub mod packages;
 pub mod registry;
 pub mod repl;
+pub mod run;
 pub mod test;
 pub mod utils;
 

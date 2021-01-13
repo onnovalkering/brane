@@ -2,7 +2,7 @@
 extern crate human_panic;
 
 use anyhow::Result;
-use brane_cli::{build_cwl, build_dsl, build_ecu, build_oas, packages, registry, repl, test};
+use brane_cli::{build_cwl, build_dsl, build_ecu, build_oas, packages, registry, repl, run, test};
 use dotenv::dotenv;
 use log::LevelFilter;
 use std::path::PathBuf;
@@ -93,6 +93,14 @@ enum SubCommand {
             help = "Start compile-only service at the provided IPC pathname"
         )]
         co_address: Option<PathBuf>,
+    },
+
+    #[structopt(name = "run", about = "Run a DSL script locally")]
+    Run {
+        #[structopt(name = "FILE", help = "Path to the file to run")]
+        file: PathBuf,
+        #[structopt(short, long, name = "SECRETS", help = "File containing secrets")]
+        secrets: Option<PathBuf>,
     },
 
     #[structopt(name = "test", about = "Test a package locally")]
@@ -207,6 +215,9 @@ async fn run(options: CLI) -> Result<()> {
         }
         Repl { secrets, co_address } => {
             repl::start(secrets, co_address).await?;
+        }
+        Run { file, secrets } => {
+            run::handle(file, secrets).await?;
         }
         Test { name, version } => {
             test::handle(name, version).await?;
