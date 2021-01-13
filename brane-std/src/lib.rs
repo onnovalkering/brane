@@ -2,6 +2,7 @@
 extern crate lazy_static;
 
 mod fs;
+mod math;
 mod text;
 
 use anyhow::Result;
@@ -16,6 +17,7 @@ lazy_static! {
     pub static ref PACKAGES: Map<PackageInfo> = {
         let mut packages = Map::new();
         packages.insert(fs::PACKAGE.name.clone(), fs::PACKAGE.clone());
+        packages.insert(math::PACKAGE.name.clone(), math::PACKAGE.clone());
         packages.insert(text::PACKAGE.name.clone(), text::PACKAGE.clone());
 
         packages
@@ -23,6 +25,7 @@ lazy_static! {
     pub static ref FUNCTIONS: Map<Map<Func>> = {
         let mut functions = Map::new();
         functions.insert(fs::PACKAGE.name.clone(), fs::FUNCTIONS.clone());
+        functions.insert(math::PACKAGE.name.clone(), math::FUNCTIONS.clone());
         functions.insert(text::PACKAGE.name.clone(), text::FUNCTIONS.clone());
 
         functions
