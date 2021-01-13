@@ -44,7 +44,7 @@ pub enum AstNode {
     },
     WhileLoop {
         predicate: AstPredicate,
-        exec: Box<AstNode>,
+        exec: Vec<AstNode>,
     },
     Word {
         text: String,
@@ -422,7 +422,11 @@ fn parse_while_loop_rule(rule: Pair<Rule>) -> Result<AstNode> {
     let mut while_loop = rule.into_inner();
 
     let predicate = parse_predicate_rule(while_loop.next().unwrap())?;
-    let exec = Box::new(parse_execution_rule(while_loop.next().unwrap())?);
+    let mut exec = vec![];
+
+    while let Some(rule) = while_loop.next() {
+        exec.push(parse_execution_rule(rule)?);
+    }
 
     Ok(AstNode::WhileLoop { predicate, exec })
 }

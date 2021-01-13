@@ -16,8 +16,8 @@ execution  = _{
     | call
     | terminate
 }
-predicate = _{ 
-      comparison 
+predicate = _{
+      comparison
     | call
 }
 statement = _{
@@ -38,11 +38,11 @@ parameter       =  { name ~ ":=" ~ "??" ~ "as" ~ complex }
 complex         = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHA* ~ "[]"? }
 terminate       =  { "return" ~ call? }
 wait_until      =  { "wait" ~ "until" ~ predicate }
-while_loop      =  { "while" ~ predicate ~ ":" ~ execution }
+while_loop      =  { "while" ~ predicate ~ ":" ~ (execution | ( "{" ~ NL* ~ (execution ~ NL)* ~ NL* ~ "}" )) }
 
 // Terms
 term            =  { name | symbol | value }
-value 		      =  { array | object | literal }
+value 		    =  { array | object | literal }
 literal         =  { boolean | decimal | integer | string }
 name            = @{ name_sg ~ ("." ~ name_sg)* }
 name_sg         = @{ !(reserved ~ WS) ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
@@ -63,7 +63,8 @@ string_body     = _{ (!(NL | PEEK) ~ ANY)+ }
 
 // Structures
 array 		      =  { "[" ~ NL* ~ "]" | "[" ~ NL* ~ element ~ ("," ~ NL* ~ element)* ~ NL* ~ "]" }
-element         = _{ value | name }
+element           = _{ value | name }
 
 object 		      =  { "new" ~ complex ~ ("{" ~ NL* ~ "}" | "{" ~ NL* ~ entry ~ ("," ~ NL* ~ entry)* ~ NL* ~ "}") }
 entry 		      =  { name ~ ":" ~ (value | name) }
+

@@ -104,7 +104,7 @@ impl Compiler {
                 AstNode::Parameter { name, complex } => self.handle_parameter_node(name, complex)?,
                 AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
                 AstNode::WaitUntil { predicate } => self.handle_wait_until_node(predicate)?,
-                AstNode::WhileLoop { predicate, exec } => self.handle_while_loop_node(predicate, *exec)?,
+                AstNode::WhileLoop { predicate, exec } => self.handle_while_loop_node(predicate, exec)?,
                 AstNode::Literal { .. } | AstNode::Word { .. } => {
                     debug!("Encountered standalone literal or word.");
                     (None, None)
@@ -458,7 +458,7 @@ impl Compiler {
     fn handle_while_loop_node(
         &mut self,
         predicate: AstPredicate,
-        exec: AstNode,
+        exec: Vec<AstNode>,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
         let (poll, condition) = match predicate {
             AstPredicate::Call { terms } => {
@@ -495,12 +495,23 @@ impl Compiler {
             }
         };
 
-        let (_, exec) = match exec {
-            AstNode::Assignment { name, expr } => self.handle_assignment_node(name, *expr)?,
-            AstNode::Call { terms } => self.handle_call_node(terms)?,
-            AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
-            _ => unreachable!(),
-        };
+        let mut exec_instructions = vec![];
+        for e in exec.iter() {
+            let (variable, i) = match e {
+                AstNode::Assignment { name, expr } => self.handle_assignment_node(name.clone(), *expr.clone())?,
+                AstNode::Call { terms } => self.handle_call_node(terms.clone())?,
+                AstNode::Terminate { terms } => self.handle_terminate_node(terms.clone())?,
+                _ => unreachable!(),
+            };
+
+            // Variable bookkeeping
+            if let Some(variable) = variable {
+                self.state.variables.insert(variable.name, variable.data_type);
+            }
+
+            exec_instructions.push(i.unwrap());
+        }
+        exec_instructions.push(poll.clone());
 
         let check_before = MovInstruction::new(
             vec![condition.clone()],
@@ -513,7 +524,7 @@ impl Compiler {
             Default::default(),
         );
 
-        let exec_and_poll = SubInstruction::new(vec![exec.unwrap(), poll.clone()], Default::default());
+        let exec_and_poll = SubInstruction::new(exec_instructions, Default::default());
         let instruction = SubInstruction::new(vec![poll, check_before, exec_and_poll, check_after], Default::default());
 
         Ok((None, Some(instruction)))
@@ -662,7 +673,7 @@ pub fn terms_to_instructions(
     let mut temp_vars: Vec<String> = vec![];
 
     let mut term_pattern = build_terms_pattern(&terms, &variables, &state.types)?;
-    println!("{:?}", term_pattern);
+    debug!("term pattern: {:?}", term_pattern);
 
     loop {
         let term_pattern_clone = term_pattern.clone();
@@ -671,7 +682,6 @@ pub fn terms_to_instructions(
         if let Some(coverage) = placeholders_regex.find(&term_pattern_clone) {
             if coverage.start() == 0 && coverage.end() == term_pattern_clone.len() {
                 debug!("Done: no more unkowns to eliminate.");
-                println!("DONE");
                 break;
             }
         }
@@ -780,7 +790,7 @@ pub fn terms_to_instructions(
 
     // Modify assignment of last ACT instruction, if specified.
     if let Some(result_var) = result_var {
-        println!("{:#?}", terms);
+        debug!("terms: {:#?}", terms);
 
         ensure!(!instructions.is_empty(), "Created no ACT instructions.");
 
