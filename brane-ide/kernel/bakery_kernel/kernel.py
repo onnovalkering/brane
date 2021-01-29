@@ -40,11 +40,11 @@ class BakeryKernel(Kernel):
             self.session_uuid = create_session()
 
         result = self.bakery.compile(code)
-        if result["variant"] == "ok" and len(result['content']) > 0:
-            instructions = result["content"]
-            invocation_uuid = create_invocation(instructions, self.session_uuid)
-
-            self.poll_invocation(invocation_uuid)
+        instructions = result["content"]
+        if result["variant"] == "ok":
+            if len(instructions) > 0:
+                invocation_uuid = create_invocation(instructions, self.session_uuid)
+                self.poll_invocation(invocation_uuid)
         else:
             self.publish_stream("stderr", result['content'])
 
@@ -185,7 +185,7 @@ class BakeryKernel(Kernel):
         """
         content = {
             'data': {
-                'application/vnd.brane.status+json': status
+                'application/vnd.brane.invocation+json': status
             },
             'metadata': {},
             'transient': {
