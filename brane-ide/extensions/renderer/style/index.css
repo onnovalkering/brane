@@ -2,30 +2,6 @@
     text-transform: uppercase;
 }
 
-.hide {
-    display: none;
-}
-
-@keyframes spinner {
-    to {transform: rotate(360deg);}
-}
-   
-.brane-output-renderer__spinner:before {
-    content: '';
-    box-sizing: border-box;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 18px;
-    height: 18px;
-    margin-top: -10px;
-    margin-left: -10px;
-    border-radius: 50%;
-    border-top: 2px solid #07d;
-    border-right: 2px solid transparent;
-    animation: spinner .6s linear infinite;
-}
-
 .react-tabs__tab-list {
     margin: 0;
     padding: 0;
@@ -36,7 +12,7 @@
     background-color: white;
     line-height: 13px;
     font-size: 13px;
-    margin-right: 2px; 
+    margin-right: 2px;
     padding: 3px 6px;
 }
 
@@ -44,12 +20,17 @@
     background-color: #EEEEEE;
 }
 
-.output-renderer__output {
+.invocation-renderer__output {
     position: relative;
     margin-top: 5px;
 }
 
-.output-renderer__instructions {
+.invocation-renderer__information {
+    position: relative;
+    margin-top: 5px;
+}
+
+.invocation-renderer__ir {
     margin-top: -8px;
     margin-bottom: -5px;
 }
