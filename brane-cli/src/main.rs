@@ -4,10 +4,12 @@ extern crate human_panic;
 use anyhow::Result;
 use brane_cli::{build_cwl, build_dsl, build_ecu, build_oas, packages, registry, repl, run, test};
 use dotenv::dotenv;
+use git2::Repository;
 use log::LevelFilter;
 use std::path::PathBuf;
 use std::process;
 use structopt::StructOpt;
+use tempfile::tempdir;
 
 #[derive(StructOpt)]
 #[structopt(name = "brane", about = "The Brane command-line interface.")]
@@ -28,6 +30,20 @@ enum SubCommand {
         context: PathBuf,
         #[structopt(name = "FILE", help = "Path to the file to build, relative to the context")]
         file: PathBuf,
+        #[structopt(short, long, help = "Kind of package: cwl, dsl, ecu or oas")]
+        kind: Option<String>,
+        #[structopt(short, long, help = "Path to the init binary to use (override Brane's binary)")]
+        init: Option<PathBuf>,
+    },
+
+    #[structopt(name = "import", about = "Import a package")]
+    Import {
+        #[structopt(name = "REPO", help = "Name of the GitHub repository containt the package")]
+        repo: String,
+        #[structopt(short, long, help = "Path to the directory to use as context", default_value = ".")]
+        context: PathBuf,
+        #[structopt(short, long, help = "Path to the file to build, relative to the context")]
+        file: Option<PathBuf>,
         #[structopt(short, long, help = "Kind of package: cwl, dsl, ecu or oas")]
         kind: Option<String>,
         #[structopt(short, long, help = "Path to the init binary to use (override Brane's binary)")]
@@ -192,6 +208,43 @@ async fn run(options: CLI) -> Result<()> {
                 _ => println!("Unsupported package kind: {}", kind),
             }
         }
+        Import {
+            repo,
+            context,
+            file,
+            kind,
+            init,
+        } => {
+            let url = format!("https://github.com/{}", repo);
+            let dir = tempdir()?;
+
+            if let Err(e) = Repository::clone(&url, &dir) {
+                panic!("Failed to clone: {}", e);
+            };
+
+            let context = dir.path().join(context);
+
+            let file = if let Some(file) = file {
+                file
+            } else {
+                brane_cli::determine_file(&context)?
+            };
+
+            let kind = if let Some(kind) = kind {
+                kind.to_lowercase()
+            } else {
+                brane_cli::determine_kind(&context, &file)?
+            };
+
+            match kind.as_str() {
+                "cwl" => build_cwl::handle(context, file, init)?,
+                "dsl" => build_dsl::handle(context, file).await?,
+                "ecu" => build_ecu::handle(context, file, init)?,
+                "oas" => build_oas::handle(context, file, init)?,
+                _ => println!("Unsupported package kind: {}", kind),
+            }
+        }
+
         Inspect { name, version } => {
             packages::inspect(name, version)?;
         }

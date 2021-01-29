@@ -18,7 +18,7 @@ pub mod utils;
 
 use anyhow::Result;
 use semver::Version;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::Command;
@@ -40,6 +40,30 @@ pub fn check_dependencies() -> Result<()> {
     }
 
     Ok(())
+}
+
+///
+///
+///
+pub fn determine_file(context: &PathBuf) -> Result<PathBuf> {
+    let files = fs::read_dir(context)?;
+    for file in files {
+        let file_name = file?.file_name();
+        let file_name = file_name.into_string().unwrap();
+
+        if file_name == "container.yml"
+            || file_name == "container.yaml"
+            || file_name.ends_with(".bk")
+            || file_name.ends_with(".cwl")
+        {
+            return Ok(PathBuf::from(file_name));
+        }
+    }
+
+    Err(anyhow!(
+        "Cannot determine suitable build file in: {:?}. Please use the --file option.",
+        context
+    ))
 }
 
 ///
