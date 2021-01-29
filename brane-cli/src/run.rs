@@ -29,6 +29,13 @@ pub async fn handle(
 
     debug!("Using {:?} as input DSL file", dsl_file);
 
+    // Remove shebang, if present
+    let dsl_document = if dsl_document.starts_with("#!") {
+        dsl_document.split('\n').skip(1).collect::<Vec<&str>>().join("\n")
+    } else {
+        dsl_document
+    };
+
     // Compile to instructions
     let package_index = registry::get_package_index().await?;
     let instructions = Compiler::quick_compile(package_index, &dsl_document)?;
