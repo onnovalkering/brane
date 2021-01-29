@@ -16,4 +16,4 @@ install-renderer:
 	jupyter labextension install extensions/renderer
 
 start:
-	API_HOST="`hostname`:8080" jupyter lab --ip 0.0.0.0 --LabApp.token=''
+	API_HOST="`hostname`:8080" pipenv shell "jupyter lab --ip 0.0.0.0 --LabApp.token=''"

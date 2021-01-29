@@ -47,7 +47,7 @@ start-api:
 	cd brane-api && cargo run
 
 start-ide:
-	cd brane-ide && API_HOST="`hostname`:8080" pipenv shell "jupyter lab --ip 0.0.0.0 --LabApp.token=''"
+	cd brane-ide && make start
 
 start-loop:
 	cd brane-loop && cargo run
