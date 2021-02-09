@@ -12,6 +12,9 @@ install-extensions: install-js9 install-renderer
 install-js9:
 	jupyter labextension install extensions/js9
 
+install-registry:
+	jupyter labextension install extensions/registry
+
 install-renderer:
 	jupyter labextension install extensions/renderer
 
