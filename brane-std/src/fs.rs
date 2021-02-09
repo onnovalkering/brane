@@ -11,7 +11,7 @@ type Func = fn(&Map<Value>, &Box<dyn System>) -> Result<Value>;
 
 lazy_static! {
     pub static ref PACKAGE: PackageInfo = {
-        let name = String::from("fs");
+        let name = String::from("filesystem");
         let version = env!("CARGO_PKG_VERSION").into();
         let kind = String::from("std");
 
