@@ -29,6 +29,9 @@ pub enum AstNode {
         module: String,
         version: Option<Version>,
     },
+    Imports {
+        modules: Vec<String>,
+    },
     Literal {
         value: Value,
     },
@@ -135,6 +138,7 @@ pub fn parse(input: &str) -> Result<Vec<AstNode>> {
             Rule::call => ast.push(parse_call_rule(pair)?),
             Rule::condition => ast.push(parse_condition_rule(pair)?),
             Rule::import => ast.push(parse_import_rule(pair)?),
+            Rule::imports => ast.push(parse_imports_rule(pair)?),
             Rule::parameter => ast.push(parse_parameter_rule(pair)?),
             Rule::terminate => ast.push(parse_terminate_rule(pair)?),
             Rule::wait_until => ast.push(parse_wait_until_rule(pair)?),
@@ -281,6 +285,20 @@ fn parse_import_rule(rule: Pair<Rule>) -> Result<AstNode> {
     };
 
     Ok(AstNode::Import { module, version })
+}
+
+///
+///
+///
+fn parse_imports_rule(rule: Pair<Rule>) -> Result<AstNode> {
+    let mut import = rule.into_inner();
+
+    let mut modules = vec![];
+    while let Some(module) = import.next() {
+        modules.push(parse_string_rule(module)?);
+    }
+
+    Ok(AstNode::Imports { modules })
 }
 
 ///

@@ -71,3 +71,17 @@ fn files() {
     assert!(instructions.len() > 0);
     println!("{:#?}", instructions);
 }
+
+
+#[test]
+fn imports() {
+    let index = PackageIndex::from_path(&PathBuf::from("./resources/packages.json")).unwrap();
+
+    let options = CompilerOptions::default();
+    let mut compiler = Compiler::new(options, index).unwrap();
+
+    let program = fs::read_to_string("./resources/imports.bk").unwrap();
+    let _ = compiler.compile(&program).unwrap();
+
+    assert!(compiler.state.imports.len() > 0);
+}

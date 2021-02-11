@@ -101,6 +101,7 @@ impl Compiler {
                     el_exec,
                 } => self.handle_condition_node(predicate, *if_exec, el_exec.map(|e| *e))?,
                 AstNode::Import { module, version } => self.handle_import_node(module, version)?,
+                AstNode::Imports { modules } => self.handle_imports_node(modules)?,
                 AstNode::Parameter { name, complex } => self.handle_parameter_node(name, complex)?,
                 AstNode::Terminate { terms } => self.handle_terminate_node(terms)?,
                 AstNode::WaitUntil { predicate } => self.handle_wait_until_node(predicate)?,
@@ -374,6 +375,20 @@ impl Compiler {
             }
         } else {
             return Err(anyhow!("No package found with name: {}", package));
+        }
+
+        Ok((None, None))
+    }
+
+    ///
+    ///
+    ///
+    fn handle_imports_node(
+        &mut self,
+        packages: Vec<String>
+    ) -> Result<(Option<Variable>, Option<Instruction>)> {
+        for package in packages {
+            self.handle_import_node(package, None)?;
         }
 
         Ok((None, None))

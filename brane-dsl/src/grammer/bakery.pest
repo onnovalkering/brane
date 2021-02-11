@@ -21,7 +21,8 @@ predicate = _{
     | call
 }
 statement = _{
-      import
+      imports
+    | import
     | parameter
     | condition
     | execution
@@ -34,6 +35,7 @@ call            =  { term+ }
 comparison      =  { call ~ relational ~ call }
 condition       =  { "if" ~ predicate ~ ":" ~ execution ~ (NL ~ "else" ~ ":" ~ execution)? }
 import          =  { "import" ~ string ~ ("version" ~ string)? }
+imports         =  { "import" ~ string ~ ("," ~ string)* }
 parameter       =  { name ~ ":=" ~ "??" ~ "as" ~ complex }
 complex         = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHA* ~ "[]"? }
 terminate       =  { "return" ~ call? }

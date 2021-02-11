@@ -1,4 +1,4 @@
-import "fs"
+import "filesystem"
 
 file1_url := "file:///tmp/1"
 
