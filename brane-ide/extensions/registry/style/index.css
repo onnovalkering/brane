@@ -1,3 +1,16 @@
+:root {
+    --b-icon-registry: url('icons/registry.svg');
+    --b-icon-brane: url('icons/logo.png');
+}
+
+.b-RegistryIcon {
+    background-image: var(--b-icon-registry);
+}
+
+.jp-Launcher-sectionHeader .b-RegistryIcon {
+    background-image: var(--b-icon-brane) !important;
+}
+
 .brane-registry > div {
     margin: 15px 25px;
 }

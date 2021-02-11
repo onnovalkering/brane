@@ -11,7 +11,7 @@ import {
   } from '@jupyterlab/settingregistry';
 
   import {
-    ILauncher, Launcher
+    ILauncher
   } from '@jupyterlab/launcher';
 
   import {
@@ -34,6 +34,7 @@ import {
   import * as React from 'react';
 
   const PLUGIN_ID = 'brane-registry:registry';
+  const REGISTRY_ICON_CLASS = "b-RegistryIcon"
 
   interface Package {
     name: string,
@@ -206,6 +207,7 @@ import {
     const command: string = 'brane:open-registry';
     app.commands.addCommand(command, {
       label: 'Registry',
+      iconClass: args => (args['isPalette'] ? '' : REGISTRY_ICON_CLASS),
       execute: () => {
         if (!widget || widget.isDisposed) {
           const apiHost = registrySettings.get("apiHost").composite as string;
@@ -217,6 +219,7 @@ import {
           widget.id = 'registry';
           widget.title.label = 'Registry';
           widget.title.closable = true;
+          widget.title.iconClass = REGISTRY_ICON_CLASS;
         }
         if (!tracker.has(widget)) {
           // Track the state of the widget for later restoration
@@ -240,7 +243,6 @@ import {
         command,
         category: 'Brane',
         rank: 1,
-
       });
     }
 

@@ -16,7 +16,7 @@
     "schemaDir": "schema"
   },
   "sideEffects": [
-    "style/*.css"
+    "style/**/*"
   ],
   "scripts": {
     "clean": "rimraf lib && rimraf tsconfig.tsbuildinfo",
