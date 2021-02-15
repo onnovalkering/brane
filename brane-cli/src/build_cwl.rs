@@ -130,17 +130,17 @@ fn build_cwl_functions(cwl_document: &CwlDocument) -> Result<(Map<Function>, Map
     };
 
     let type_name = utils::uppercase_first_letter(&name);
+    let input_data_type = format!("{}Input", type_name);
 
     // Convert input properties to parameters
     let input_parameters = if input_properties.len() > 3 {
-        let input_data_type = format!("{}Input", type_name);
         let input_type = Type {
             name: input_data_type.clone(),
             properties: input_properties,
         };
         types.insert(input_data_type.clone(), input_type);
 
-        let input_parameter = Parameter::new(String::from("input"), input_data_type, None, None, None);
+        let input_parameter = Parameter::new(String::from("input"), input_data_type.clone(), None, None, None);
         vec![input_parameter]
     } else {
         input_properties
@@ -172,8 +172,21 @@ fn build_cwl_functions(cwl_document: &CwlDocument) -> Result<(Map<Function>, Map
 
     // Construct function
     let call_pattern = CallPattern::new(Some(name.to_lowercase()), None, None);
-    let function = Function::new(input_parameters, Some(call_pattern), return_type);
+    let function = Function::new(input_parameters.clone(), Some(call_pattern.clone()), return_type.clone());
     functions.insert(name.to_lowercase(), function);
+
+    // Construct convience function, if there is only one required parameter
+    let input_type = types.get(&input_data_type).expect("unreachable");
+    let req_parameters: Vec<Parameter> = input_type.properties
+        .iter()
+        .filter(|p| p.default.is_none())
+        .map(|p| p.clone().into_parameter())
+        .collect();
+
+    if req_parameters.len() == 1 {
+        let function = Function::new(req_parameters, Some(call_pattern), return_type);
+        functions.insert(format!("{}_conv", name.to_lowercase()), function);
+    }
 
     Ok((functions, types))
 }
