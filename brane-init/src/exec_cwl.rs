@@ -84,6 +84,10 @@ fn initialize(
         for (name, value) in properties.iter() {
             input.insert(name.clone(), value.as_json());
         }
+    } else {
+        for (name, value) in arguments.iter() {
+            input.insert(name.clone(), value.as_json());
+        }
     };
 
     let input_path = working_dir.join("input.json");
