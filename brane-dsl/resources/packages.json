@@ -268,5 +268,158 @@
         "name": "arithmetic-task",
         "types": {},
         "version": "1.1.0"
-    }
+    },
+    {
+      "created": "2021-02-15T11:08:53.704249778Z",
+      "functions": {
+         "calibrate": {
+            "parameters": [
+               {
+                  "type": "CalibrateInput",
+                  "name": "input"
+               }
+            ],
+            "pattern": {
+               "prefix": "calibrate"
+            },
+            "returnType": "CalibrateOutput"
+         }
+      },
+      "id": "59ab7174-7a02-4c48-b9a2-44db5e8c652c",
+      "kind": "cwl",
+      "name": "prefactor",
+      "types": {
+         "CalibrateInput": {
+            "name": "CalibrateInput",
+            "properties": [
+               {
+                  "type": "real",
+                  "default": {
+                     "v": "real",
+                     "c": 1.4
+                  },
+                  "name": "image_padding"
+               },
+               {
+                  "type": "Directory[]",
+                  "name": "ms_array"
+               },
+               {
+                  "type": "string",
+                  "default": {
+                     "v": "unicode",
+                     "c": "CS001HBA0"
+                  },
+                  "name": "reference_station"
+               },
+               {
+                  "type": "integer",
+                  "default": {
+                     "v": "integer",
+                     "c": 2
+                  },
+                  "name": "avg.freqstep"
+               },
+               {
+                  "type": "integer",
+                  "default": {
+                     "v": "integer",
+                     "c": 2000
+                  },
+                  "name": "maxlambda_lowres"
+               },
+               {
+                  "type": "real",
+                  "default": {
+                     "v": "real",
+                     "c": 0.00694
+                  },
+                  "name": "cellsize_lowres_deg"
+               },
+               {
+                  "type": "string",
+                  "default": {
+                     "v": "unicode",
+                     "c": "[ CS013HBA* ]"
+                  },
+                  "name": "flag.baseline"
+               },
+               {
+                  "type": "integer",
+                  "default": {
+                     "v": "integer",
+                     "c": 2
+                  },
+                  "name": "avg.timestep"
+               }
+            ]
+         },
+         "CalibrateOutput": {
+            "name": "CalibrateOutput",
+            "properties": [
+               {
+                  "type": "File",
+                  "name": "dTEC_1st"
+               },
+               {
+                  "type": "File",
+                  "name": "phase_xx_yy_offset"
+               },
+               {
+                  "type": "File",
+                  "name": "dclock_1st_sm"
+               },
+               {
+                  "type": "File",
+                  "name": "freqs_for_phase_array"
+               },
+               {
+                  "type": "File",
+                  "name": "dTEC_1st_sm"
+               },
+               {
+                  "type": "File",
+                  "name": "model"
+               },
+               {
+                  "type": "File",
+                  "name": "polYY_dirpointing"
+               },
+               {
+                  "type": "File",
+                  "name": "dclock_1st"
+               },
+               {
+                  "type": "File",
+                  "name": "dirty"
+               },
+               {
+                  "type": "File",
+                  "name": "psf"
+               },
+               {
+                  "type": "File",
+                  "name": "station_names"
+               },
+               {
+                  "type": "File",
+                  "name": "residual"
+               },
+               {
+                  "type": "File",
+                  "name": "phase_array"
+               },
+               {
+                  "type": "File",
+                  "name": "losoto_h5"
+               },
+               {
+                  "type": "File",
+                  "name": "polXX_dirpointing"
+               }
+            ]
+         }
+      },
+      "version": "1.0.0"
+   }
 ]

@@ -51,7 +51,7 @@ pub enum AstNode {
     },
     Word {
         text: String,
-    }
+    },
 }
 
 impl AstNode {
@@ -83,7 +83,7 @@ impl AstNode {
     pub fn is_term(&self) -> bool {
         match self {
             AstNode::Literal { .. } | AstNode::Word { .. } => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -96,12 +96,10 @@ impl Display for AstNode {
         match self {
             AstNode::Literal { value } => write!(f, "{}", value),
             AstNode::Word { text } => write!(f, "{}", text),
-            _ => unimplemented!()
+            _ => unimplemented!(),
         }
     }
 }
-
-
 
 #[derive(Clone, Debug)]
 pub enum AstPredicate {
@@ -160,7 +158,7 @@ fn parse_array_rule(rule: Pair<Rule>) -> Result<Vec<Value>> {
 
     let mut values = vec![];
     for element in array {
-       let value = match element.as_rule() {
+        let value = match element.as_rule() {
             Rule::array => {
                 let entries = parse_array_rule(element)?;
                 let data_type = if !entries.is_empty() {
@@ -182,7 +180,8 @@ fn parse_array_rule(rule: Pair<Rule>) -> Result<Vec<Value>> {
                     data_type,
                     secret: false,
                 }
-            }
+            },
+            Rule::value => parse_value_rule(element)?,
             _ => unreachable!(),
         };
 
@@ -209,7 +208,7 @@ fn parse_assignment_rule(rule: Pair<Rule>) -> Result<AstNode> {
     if terms.len() == 1 {
         let term = terms.first().unwrap();
         match term {
-            AstNode::Word { .. } => { }
+            AstNode::Word { .. } => {}
             _ => {
                 // It's not a call, but assignment from literal or variable
                 let expr = Box::new(term.clone());
@@ -351,7 +350,9 @@ fn parse_object_rule(rule: Pair<Rule>) -> Result<Value> {
 
                 properties.insert(name, pointer);
             }
-            _ => { properties.insert(name, parse_value_rule(value)?); }
+            _ => {
+                properties.insert(name, parse_value_rule(value)?);
+            }
         }
     }
 
@@ -472,10 +473,16 @@ fn parse_term_rule(rule: Pair<Rule>) -> Result<AstNode> {
         Rule::name => {
             // TODO: check if is in variable table
 
-            Ok(AstNode::Word { text: parse_name_rule(term)? })
-        },
-        Rule::symbol => Ok(AstNode::Word { text: parse_name_rule(term)? }),
-        Rule::value => Ok(AstNode::Literal { value: parse_value_rule(term)? }),
+            Ok(AstNode::Word {
+                text: parse_name_rule(term)?,
+            })
+        }
+        Rule::symbol => Ok(AstNode::Word {
+            text: parse_name_rule(term)?,
+        }),
+        Rule::value => Ok(AstNode::Literal {
+            value: parse_value_rule(term)?,
+        }),
         _ => unreachable!(),
     }
 }

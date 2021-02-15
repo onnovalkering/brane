@@ -72,7 +72,6 @@ fn files() {
     println!("{:#?}", instructions);
 }
 
-
 #[test]
 fn imports() {
     let index = PackageIndex::from_path(&PathBuf::from("./resources/packages.json")).unwrap();
@@ -84,4 +83,18 @@ fn imports() {
     let _ = compiler.compile(&program).unwrap();
 
     assert!(compiler.state.imports.len() > 0);
+}
+
+#[test]
+fn defaults() {
+    let index = PackageIndex::from_path(&PathBuf::from("./resources/packages.json")).unwrap();
+
+    let options = CompilerOptions::default();
+    let mut compiler = Compiler::new(options, index).unwrap();
+
+    let program = fs::read_to_string("./resources/defaults.bk").unwrap();
+    let instructions = compiler.compile(&program).unwrap();
+
+    assert!(instructions.len() > 0);
+    println!("{:#?}", instructions);
 }

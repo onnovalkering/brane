@@ -144,7 +144,7 @@ impl Compiler {
         match expr {
             AstNode::Call { terms } => self.handle_assignment_call_node(name, terms),
             AstNode::Literal { value } => self.handle_assignment_literal_node(name, value),
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 
@@ -176,7 +176,11 @@ impl Compiler {
         let data_type = if data_type == "??[]" {
             if let Value::Array { entries, .. } = &value {
                 if let Some(Value::Pointer { variable, .. }) = entries.first() {
-                    let element_type = self.state.variables.get(variable).expect(&format!("Not a valid variable pointer from array: {}.", variable));
+                    let element_type = self
+                        .state
+                        .variables
+                        .get(variable)
+                        .expect(&format!("Not a valid variable pointer from array: {}.", variable));
                     format!("{}[]", element_type)
                 } else {
                     unreachable!();
@@ -193,15 +197,20 @@ impl Compiler {
                 let mut resolved_properties = Map::<Value>::new();
 
                 for property in &c_type.properties {
+                    let actual_property = properties.get(&property.name).map(|p| p.clone());
+
                     ensure!(
-                        properties.get(&property.name).is_some(),
-                        "Missing '{}' in {} object.",
+                        actual_property.is_some() || property.default.is_some(),
+                        "Missing required '{}' property in '{}' object.",
                         property.name,
                         data_type
                     );
 
-                    let actual_property = properties.get(&property.name).unwrap();
-                    let actual_data_type = if let Value::Pointer { variable, data_type, .. } = actual_property {
+                    let property_value = actual_property.unwrap_or_else(|| property.default.clone().unwrap());
+                    let actual_data_type = if let Value::Pointer {
+                        variable, data_type, ..
+                    } = &property_value
+                    {
                         if data_type == "??" {
                             if let Some(ref_data_typed) = self.state.variables.get(variable) {
                                 ref_data_typed.clone()
@@ -212,7 +221,7 @@ impl Compiler {
                             data_type.clone()
                         }
                     } else {
-                        actual_property.data_type().to_string()
+                        property_value.data_type().to_string()
                     };
 
                     ensure!(
@@ -223,21 +232,23 @@ impl Compiler {
                         actual_data_type
                     );
 
-                    let resolved_value = if let Value::Pointer { variable, secret, .. } = actual_property {
-                        Value::Pointer { variable: variable.clone(), secret: secret.clone(), data_type: actual_data_type }
+                    let resolved_value = if let Value::Pointer { variable, secret, .. } = &property_value {
+                        Value::Pointer {
+                            variable: variable.clone(),
+                            secret: secret.clone(),
+                            data_type: actual_data_type,
+                        }
                     } else {
-                        actual_property.clone()
+                        property_value.clone()
                     };
 
                     resolved_properties.insert(property.name.clone(), resolved_value);
                 }
 
-                ensure!(
-                    properties.len() == c_type.properties.len(),
-                    "Mismatch in number of actual and expected properties."
-                );
-
-                Value::Struct { data_type, properties: resolved_properties }
+                Value::Struct {
+                    data_type,
+                    properties: resolved_properties,
+                }
             } else {
                 bail!(
                     "Cannot find type information for {}. If it is custom type, please bring it into scope.",
@@ -290,8 +301,10 @@ impl Compiler {
                 relation,
                 rhs_terms,
             } => {
-                let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: lhs_terms })?;
-                let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: rhs_terms })?;
+                let (lhs_var, lhs_poll) =
+                    self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: lhs_terms })?;
+                let (rhs_var, rhs_poll) =
+                    self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: rhs_terms })?;
                 let poll = SubInstruction::new(vec![lhs_poll.unwrap(), rhs_poll.unwrap()], Default::default());
 
                 let condition = match relation {
@@ -385,7 +398,7 @@ impl Compiler {
     ///
     fn handle_imports_node(
         &mut self,
-        packages: Vec<String>
+        packages: Vec<String>,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
         for package in packages {
             self.handle_import_node(package, None)?;
@@ -435,8 +448,10 @@ impl Compiler {
                 relation,
                 rhs_terms,
             } => {
-                let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: lhs_terms })?;
-                let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: rhs_terms })?;
+                let (lhs_var, lhs_poll) =
+                    self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: lhs_terms })?;
+                let (rhs_var, rhs_poll) =
+                    self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: rhs_terms })?;
                 let poll = SubInstruction::new(vec![lhs_poll.unwrap(), rhs_poll.unwrap()], Default::default());
 
                 let condition = match relation {
@@ -487,8 +502,10 @@ impl Compiler {
                 relation,
                 rhs_terms,
             } => {
-                let (lhs_var, lhs_poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: lhs_terms })?;
-                let (rhs_var, rhs_poll) = self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: rhs_terms })?;
+                let (lhs_var, lhs_poll) =
+                    self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: lhs_terms })?;
+                let (rhs_var, rhs_poll) =
+                    self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: rhs_terms })?;
                 let poll = SubInstruction::new(vec![lhs_poll.unwrap(), rhs_poll.unwrap()], Default::default());
 
                 let condition = match relation {
@@ -631,25 +648,42 @@ pub fn terms_to_instructions(
                         }
 
                         if let Some(p) = properties.get(segments[1]) {
-                            let pointer = Value::Pointer { data_type: p.data_type.clone(), variable: name.clone(), secret: false };
-                            let set = vec![Variable::new(result_var.unwrap(), p.data_type.clone(), None, Some(pointer))];
-                            let instruction = VarInstruction::new(vec!(), set, Default::default());
+                            let pointer = Value::Pointer {
+                                data_type: p.data_type.clone(),
+                                variable: name.clone(),
+                                secret: false,
+                            };
+                            let set = vec![Variable::new(
+                                result_var.unwrap(),
+                                p.data_type.clone(),
+                                None,
+                                Some(pointer),
+                            )];
+                            let instruction = VarInstruction::new(vec![], set, Default::default());
                             instructions.push(instruction);
 
-                            return Ok((instructions, p.data_type.clone()))
+                            return Ok((instructions, p.data_type.clone()));
                         }
                     }
                 }
-
             } else {
                 if let Some(data_type) = variables.get(name) {
                     // TODO: create set
-                    let pointer = Value::Pointer { data_type: data_type.clone(), variable: name.clone(), secret: false };
-                    let set = vec![Variable::new(result_var.unwrap(), data_type.clone(), None, Some(pointer))];
-                    let instruction = VarInstruction::new(vec!(), set, Default::default());
+                    let pointer = Value::Pointer {
+                        data_type: data_type.clone(),
+                        variable: name.clone(),
+                        secret: false,
+                    };
+                    let set = vec![Variable::new(
+                        result_var.unwrap(),
+                        data_type.clone(),
+                        None,
+                        Some(pointer),
+                    )];
+                    let instruction = VarInstruction::new(vec![], set, Default::default());
                     instructions.push(instruction);
 
-                    return Ok((instructions, data_type.clone()))
+                    return Ok((instructions, data_type.clone()));
                 }
             }
         }
@@ -667,7 +701,7 @@ pub fn terms_to_instructions(
 
                 AstNode::Word { text: temp_var }
             }
-            _ => t.clone()
+            _ => t.clone(),
         })
         .collect();
 
@@ -877,8 +911,8 @@ fn build_terms_pattern(
             AstNode::Literal { value } => {
                 let segment = format!("<{}>", value.data_type());
                 term_pattern_segments.push(segment);
-            },
-            _ => unreachable!()
+            }
+            _ => unreachable!(),
         }
     }
 
