@@ -1,0 +1,43 @@
+{
+  "name": "brane-vault",
+  "version": "0.1.0",
+  "description": "Vault viewer",
+  "author": "Onno Valkering",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "style": "style/index.css",
+  "files": [
+    "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}",
+    "schema/**/*.json",
+    "style/**/*.{css,eot,gif,html,jpg,json,png,svg,woff2,ttf}"
+  ],
+  "jupyterlab": {
+    "extension": true,
+    "schemaDir": "schema"
+  },
+  "sideEffects": [
+    "style/**/*"
+  ],
+  "scripts": {
+    "clean": "rimraf lib && rimraf tsconfig.tsbuildinfo",
+    "build": "tsc",
+    "prepare": "npm run clean && npm run build",
+    "watch": "tsc -w",
+    "extension:install": "jupyter labextension install brane-vault",
+    "extension:uninstall": "jupyter labextension uninstall brane-vault",
+    "extension:enable": "jupyter labextension enable brane-vault",
+    "extension:disable": "jupyter labextension disable brane-vault"
+  },
+  "dependencies": {
+    "@jupyterlab/application": "3.0.0",
+    "@jupyterlab/launcher": "3.0.0",
+    "react": "^17.0.1",
+    "react-dom": "^17.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "^17.0.0",
+    "@types/react-dom": "^17.0.0",
+    "rimraf": "^2.6.3",
+    "typescript": "4.1.3"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "title": "Vault",
+  "description": "Settings of the Brane vault browser.",
+  "type": "object",
+  "properties": {
+    "apiHost": {
+      "type": "string",
+      "title": "apiHost",
+      "description": "The host of the Brane API.",
+      "default": "localhost:8080"
+    }
+  }
+}
