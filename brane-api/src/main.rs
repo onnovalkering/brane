@@ -32,15 +32,17 @@ mod models;
 mod packages;
 mod schema;
 mod sessions;
+mod vault;
 
 embed_migrations!();
 
 const DEF_DATABASE_URL: &str = "postgres://postgres:postgres@postgres/postgres";
-const DEF_REGISTRY_HOST: &str = "registry:5000";
 const DEF_KAFKA_BROKERS: &str = "kafka:9092";
 const DEF_PACKAGES_DIR: &str = "./packages";
 const DEF_REDIS_URL: &str = "redis://redis";
+const DEF_REGISTRY_HOST: &str = "registry:5000";
 const DEF_TEMPORARY_DIR: &str = "./temporary";
+
 
 #[derive(StructOpt)]
 #[structopt(name = "brane-api", about = "The Brane API service.")]
@@ -128,6 +130,7 @@ async fn main() -> std::io::Result<()> {
             .service(invocations::scope())
             .service(packages::scope())
             .service(sessions::scope())
+            .service(vault::scope())
     });
 
     let address = format!("{}:{}", options.host, options.port);

@@ -5,14 +5,17 @@ authors = ["Onno Valkering"]
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0"
 actix-cors = "0.2"
 actix-files = "0.2"
 actix-multipart = "0.2"
 actix-rt = "1"
 actix-web = "2"
+anyhow = "1.0"
 chrono = "0.4"
 crc32fast = "1.2"
+diesel = { version = "1.4", features = ["r2d2", "postgres", "chrono"] }
+diesel_migrations = "1.4"
+dotenv = "0.15"
 env_logger = "0.7"
 failure = "0.1"
 flate2 = { version = "1.0", features = ["zlib"], default-features = false }
@@ -20,12 +23,10 @@ futures = "0.3"
 lazy_static = "1.4"
 log = "0.4"
 r2d2 = "0.8"
-diesel = { version = "1.4", features = ["r2d2", "postgres", "chrono"] }
-diesel_migrations = "1.4"
-dotenv = "0.15"
 rand = "0.7"
 rdkafka = { version = "0.23", features = ["cmake-build"] }
 redis = { version = "0.17", features = ["r2d2"] }
+reqwest = { version = "0.11", features = ["json", "blocking"] }
 semver = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -33,7 +34,6 @@ serde_yaml = "0.8"
 specifications = { path = "../specifications" }
 structopt = "0.3"
 tar = "0.4"
+tokio = { version = "1", features = ["full"] }
 url = "2.1"
-tokio = { version = "0.2", features = ["full"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
-
