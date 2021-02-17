@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import shutil
 import sys
 
 from jupyter_client.kernelspec import KernelSpecManager
@@ -19,10 +20,15 @@ kernel_json = {
 }
 
 def install_my_kernel_spec(user=True, prefix=None):
+    icons_dir = os.path.join(os.path.dirname(__file__), "icons")
+
     with TemporaryDirectory() as td:
         os.chmod(td, 0o755) # Starts off as 700, not user readable
         with open(os.path.join(td, 'kernel.json'), 'w') as f:
             json.dump(kernel_json, f, sort_keys=True)
+
+        shutil.copy(os.path.join(icons_dir, "logo-32x32.png"), td)
+        shutil.copy(os.path.join(icons_dir, "logo-64x64.png"), td)
 
         print('Installing Jupyter kernel spec')
         KernelSpecManager().install_kernel_spec(td, 'bakery', user=user, prefix=prefix)
