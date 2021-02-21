@@ -127,7 +127,7 @@ impl System for LocalSystem {
 ///
 fn path_to_url(path: &PathBuf) -> Result<Url> {
     Ok(Url::parse(&format!(
-        "file://{}",
+        "file:///{}",
         path.clone().into_os_string().into_string().unwrap()
     ))?)
 }
@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn pathtourl_valid_ok() {
         let path = PathBuf::from("/tmp/some/dir/file.txt");
-        let expected = Url::parse("file:///tmp/some/dir/file.txt").unwrap();
+        let expected = Url::parse("file:////tmp/some/dir/file.txt").unwrap();
 
         let actual = path_to_url(&path).unwrap();
 
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn urltopath_valid_ok() {
-        let url = Url::parse("file:///tmp/some/dir/file.txt").unwrap();
+        let url = Url::parse("file:////tmp/some/dir/file.txt").unwrap();
         let expected = PathBuf::from("/tmp/some/dir/file.txt");
 
         let actual = url_to_path(&url).unwrap();
