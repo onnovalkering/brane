@@ -156,6 +156,12 @@ impl Compiler {
         name: String,
         terms: Vec<AstNode>,
     ) -> Result<(Option<Variable>, Option<Instruction>)> {
+        if terms.len() == 1 {
+            if let Some(AstNode::Literal { value }) = terms.first() {
+                return self.handle_assignment_literal_node(name, value.clone());
+            }
+        }
+
         let (instructions, data_type) = terms_to_instructions(terms, Some(name.clone()), &self.state)?;
         let subroutine = SubInstruction::new(instructions, Default::default());
 
@@ -448,10 +454,15 @@ impl Compiler {
                 relation,
                 rhs_terms,
             } => {
+                dbg!(&lhs_terms);
+                dbg!(&rhs_terms);
+
                 let (lhs_var, lhs_poll) =
                     self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: lhs_terms })?;
+
                 let (rhs_var, rhs_poll) =
                     self.handle_assignment_node(create_temp_var(false), AstNode::Call { terms: rhs_terms })?;
+
                 let poll = SubInstruction::new(vec![lhs_poll.unwrap(), rhs_poll.unwrap()], Default::default());
 
                 let condition = match relation {
