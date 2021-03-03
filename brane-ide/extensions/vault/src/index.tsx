@@ -29,7 +29,21 @@ const PLUGIN_ID = 'brane-vault:vault';
 const VAULT_ICON_CLASS = "b-VaultIcon"
 
 interface Secrets {
-    keys: String[]
+    keys: string[]
+}
+
+function RenderSecrets(props: { secrets: Secrets }) {
+    const keys = props.secrets.keys;
+
+    return (
+        <div>
+        {keys.map(k => (
+            <div className="brane-vault__secret">
+                <span>Key: {k}</span>
+            </div>
+        ))}
+        </div>
+    )
 }
 
 class VaultWidget extends Widget {
@@ -55,13 +69,14 @@ class VaultWidget extends Widget {
         ReactDOM.render(
             <div>
                 <h1>Vault</h1>
+                <RenderSecrets secrets={this.secrets} />
             </div>,
             this.node
         );
     }
 
     /**
-     * Retreives a list of packages from the Brane API.
+     * Retreives a list of secrets from the Brane API.
      */
     private async getSecrets(apiHost: String): Promise<Secrets> {
         const response = await fetch(`http://${apiHost}/vault`);
