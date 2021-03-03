@@ -98,7 +98,7 @@ async fn create_and_start_container(
         let device_request = DeviceRequest {
             driver: None,
             count: Some(-1),
-            device_i_ds: None,
+            device_ids: None,
             capabilities: Some(vec![vec![String::from("gpu")]]),
             options: None,
         };
