@@ -141,7 +141,7 @@ class BakeryKernel(Kernel):
         """
         Displays a 'File' variable using JS9, only FITS files are supported.
         """
-        file_url = get(f"{SESSIONS_ENDPOINT}/{self.session_uuid}/files/{variable}")
+        file_url = f"{SESSIONS_ENDPOINT}/{self.session_uuid}/files/{variable}"
         content = {
             'data': {
                 'image/fits': file_url
