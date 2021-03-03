@@ -108,7 +108,7 @@ fn execute(
     let output_dir = output_dir.as_os_str().to_string_lossy();
 
     let result = Command::new("cwltool")
-        .args(vec!["--quiet", "--outdir", &output_dir, "document.cwl", "input.json"])
+        .args(vec!["--quiet", "--parallel", "--outdir", &output_dir, "document.cwl", "input.json"])
         .current_dir(&working_dir)
         .output()
         .expect("Couldn't execute cwltool.");
