@@ -333,7 +333,7 @@ fn prompt_for_value(
             }
             "Directory" | "File" => {
                 let default = p.clone().default.map(|d| d.as_string().unwrap());
-                let url = Value::Unicode(format!("file://{}", prompt(&p, default)?));
+                let url = Value::Unicode(format!("file:///{}", prompt(&p, default)?));
 
                 let mut properties = Map::<Value>::default();
                 properties.insert(String::from("url"), url);
