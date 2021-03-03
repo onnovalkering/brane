@@ -13,8 +13,9 @@ from os.path import dirname
 from urllib.parse import urlparse
 
 
-def download(): 
+def download():
     target = os.environ["TARGET_URL"]
+    target = target.replace("///", "////") # srmcp needs four slashes
 
     # Write proxy to /opt/wd/proxy
     proxy = base64.b64decode(os.environ["PROXY"]).decode("UTF-8")
@@ -49,7 +50,7 @@ def download():
 def extract():
     target = urlparse(environ["TARGET_URL"]).path
     files = [urlparse(environ[f"FILES_{i}_URL"]).path for i in range(int(environ["FILES"]))]
-    
+
     directories = []
     for file in files:
         with tarfile.open(file, 'r') as tar:
@@ -81,7 +82,7 @@ def files():
     for observation in query_observations:
         dataproduct_query = cdp.observations.contains(observation)
         dataproduct_query &= cdp.isValid == 1
-        
+
         for dataproduct in dataproduct_query:
             fileobject = ((FileObject.data_object == dataproduct) & (FileObject.isValid > 0)).max('creation_date')
             if fileobject:
@@ -107,7 +108,7 @@ def status():
     try:
         status = lta_proxy.LtaStager.getstatus(int(request_id))
     except:
-        status = "unkown" 
+        status = "unkown"
 
     return {"status": status}
 
@@ -127,7 +128,7 @@ if __name__ == "__main__":
         "stage": stage,
         "status": status
     }
-    
+
     command = sys.argv[1]
     output = functions[command]()
 
