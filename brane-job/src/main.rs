@@ -1,22 +1,25 @@
-#[macro_use]
-extern crate log;
-
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
+use brane_cfg::{Infrastructure, Secrets};
+use brane_job::cmd_create;
 use brane_job::interface::{Command, CommandKind};
-use brane_job::{cmd_cancel, cmd_check, cmd_create};
 use bytes::BytesMut;
 use clap::Clap;
 use dotenv::dotenv;
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
 use log::LevelFilter;
+use log::{debug, error, info, warn};
 use prost::Message;
-use rdkafka::consumer::stream_consumer::StreamConsumer;
-use rdkafka::consumer::Consumer;
-use rdkafka::producer::FutureProducer;
-use rdkafka::util::Timeout;
-use rdkafka::{config::ClientConfig, Message as KafkaMesage};
-use rdkafka::{message::ToBytes, producer::FutureRecord};
+use rdkafka::{
+    admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
+    config::ClientConfig,
+    consumer::{stream_consumer::StreamConsumer, Consumer},
+    message::ToBytes,
+    producer::{FutureProducer, FutureRecord},
+    types::RDKafkaErrorCode,
+    util::Timeout,
+    Message as KafkaMesage,
+};
 use tokio::task::JoinHandle;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -25,7 +28,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[clap(version = VERSION)]
 struct Opts {
     /// Topic to receive commands from
-    #[clap(long = "cmd-topic", env = "COMMAND_TOPIC")]
+    #[clap(short, long = "cmd-topic", env = "COMMAND_TOPIC")]
     command_topic: String,
     /// Kafka brokers
     #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
@@ -34,18 +37,24 @@ struct Opts {
     #[clap(short, long, env = "DEBUG", takes_value = false)]
     debug: bool,
     /// Topic to send events to
-    #[clap(long = "evt-topic", env = "EVENT_TOPIC")]
+    #[clap(short, long = "evt-topic", env = "EVENT_TOPIC")]
     event_topic: String,
     /// Consumer group id
     #[clap(short, long, default_value = "brane-job", env = "GROUP_ID")]
     group_id: String,
+    /// Infra metadata store
+    #[clap(short, long, default_value = "./infra.yml", env = "INFRA")]
+    infra: String,
     /// Number of workers
     #[clap(short = 'w', long, default_value = "1", env = "NUM_WORKERS")]
     num_workers: u8,
+    /// Secrets store
+    #[clap(short, long, default_value = "./secrets.yml", env = "SECRETS")]
+    secrets: String,
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     dotenv().ok();
     let opts = Opts::parse();
 
@@ -59,15 +68,26 @@ async fn main() {
         logger.filter_level(LevelFilter::Info).init();
     }
 
+    let infra = Infrastructure::new(opts.infra.clone())?;
+    let secrets = Secrets::new(opts.secrets.clone())?;
+
+    // Ensure that the input (commands) topic exists.
+    ensure_input_topic(&opts.command_topic, &opts.brokers).await?;
+
     // Spawn workers, using Tokio tasks and thread pool.
     let workers = (0..opts.num_workers)
-        .map(|_| {
-            tokio::spawn(start_worker(
+        .map(|i| {
+            let handle = tokio::spawn(start_worker(
                 opts.brokers.clone(),
                 opts.group_id.clone(),
                 opts.command_topic.clone(),
                 opts.event_topic.clone(),
-            ))
+                infra.clone(),
+                secrets.clone(),
+            ));
+
+            info!("Spawned asynchronous worker #{}.", i + 1);
+            handle
         })
         .collect::<FuturesUnordered<JoinHandle<_>>>();
 
@@ -80,18 +100,65 @@ async fn main() {
             };
         })
         .await;
+
+    Ok(())
 }
 
 ///
 ///
 ///
-pub async fn start_worker(
+async fn ensure_input_topic(
+    input_topic: &str,
+    brokers: &str,
+) -> Result<()> {
+    let admin_client: AdminClient<_> = ClientConfig::new()
+        .set("bootstrap.servers", brokers)
+        .create()
+        .context("Failed to create Kafka admin client.")?;
+
+    let results = admin_client
+        .create_topics(
+            &[NewTopic::new(input_topic, 1, TopicReplication::Fixed(1))],
+            &AdminOptions::new(),
+        )
+        .await?;
+
+    // Report on the results. Don't consider 'TopicAlreadyExists' an error.
+    for result in results {
+        match result {
+            Ok(topic) => info!("Input topic '{}' created.", topic),
+            Err((topic, error)) => match error {
+                RDKafkaErrorCode::TopicAlreadyExists => {
+                    info!("Input topic '{}' already exists", topic);
+                }
+                _ => {
+                    bail!("Input topic '{}' not created: {:?}", topic, error);
+                }
+            },
+        }
+    }
+
+    Ok(())
+}
+
+///
+///
+///
+async fn start_worker(
     brokers: String,
     group_id: String,
     input_topic: String,
     output_topic: String,
+    infra: Infrastructure,
+    secrets: Secrets,
 ) -> Result<()> {
     let output_topic = output_topic.as_ref();
+
+    let producer: FutureProducer = ClientConfig::new()
+        .set("bootstrap.servers", &brokers)
+        .set("message.timeout.ms", "5000")
+        .create()
+        .context("Failed to create Kafka producer.")?;
 
     let consumer: StreamConsumer = ClientConfig::new()
         .set("group.id", &group_id)
@@ -106,16 +173,12 @@ pub async fn start_worker(
         .subscribe(&[&input_topic])
         .context(format!("Failed to subscribe to command topic: {}", input_topic))?;
 
-    let producer: FutureProducer = ClientConfig::new()
-        .set("bootstrap.servers", &brokers)
-        .set("message.timeout.ms", "5000")
-        .create()
-        .context("Failed to create Kafka producer.")?;
-
     // Create the outer pipeline on the message stream.
     let stream_processor = consumer.stream().try_for_each(|borrowed_message| {
         let owned_message = borrowed_message.detach();
         let owned_producer = producer.clone();
+        let owned_infra = infra.clone();
+        let owned_secrets = secrets.clone();
 
         async move {
             let cmd_key = owned_message
@@ -145,17 +208,15 @@ pub async fn start_worker(
 
                 // Dispatch command message to appropriate handlers.
                 let events = match kind {
-                    CommandKind::Create => cmd_create::handle(command),
-                    CommandKind::Cancel => cmd_cancel::handle(command),
-                    CommandKind::Check => cmd_check::handle(command),
+                    CommandKind::Create => cmd_create::handle(cmd_key, command, owned_infra, owned_secrets),
+                    CommandKind::Cancel => unimplemented!(),
+                    CommandKind::Check => unimplemented!(),
                     CommandKind::Unknown => unreachable!(),
                 };
 
                 match events {
                     Ok(events) => {
-                        for (i, event) in events.iter().enumerate() {
-                            let evt_key = format!("{}-evt{}", cmd_key, i);
-
+                        for (evt_key, event) in events {
                             // Encode event message into a payload (bytes)
                             let mut payload = BytesMut::with_capacity(64);
                             event.encode(&mut payload).unwrap();
@@ -180,5 +241,7 @@ pub async fn start_worker(
         }
     });
 
-    stream_processor.await.context("Processor failed.")
+    stream_processor
+        .await
+        .context("Stream processor did not run until completion.")
 }

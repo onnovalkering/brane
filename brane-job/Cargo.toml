@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1"
+brane-cfg = { path = "../brane-cfg" }
 bytes = "1"
 clap = "3.0.0-beta.2"
 dotenv = "0.15"

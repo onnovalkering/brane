@@ -16,7 +16,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[clap(version = VERSION)]
 struct Opts {
     /// Topic to receive commands from
-    #[clap(long = "cmd-topic", env = "COMMAND_TOPIC")]
+    #[clap(short, long = "cmd-topic", env = "COMMAND_TOPIC")]
     command_topic: String,
     /// Kafka brokers
     #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
@@ -25,7 +25,7 @@ struct Opts {
     #[clap(short, long, env = "DEBUG")]
     debug: bool,
     /// Topic to send events to
-    #[clap(long = "evt-topic", env = "EVENT_TOPIC")]
+    #[clap(short, long = "evt-topic", env = "EVENT_TOPIC")]
     _event_topic: String,
 }
 
@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
         .create()
         .context("Failed to create Kafka producer.")?;
 
-    let command = Command::new(CommandKind::Create, None, None, Some("busybox"), None, None);
+    let command = Command::new(CommandKind::Create, None, Some("node"), Some("busybox"), None, None);
     let mut payload = BytesMut::with_capacity(64);
     command.encode(&mut payload)?;
 
