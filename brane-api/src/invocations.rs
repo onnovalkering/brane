@@ -9,6 +9,7 @@ use rdkafka::producer::{FutureProducer, FutureRecord};
 use redis::Commands;
 use serde::Deserialize;
 use serde_json::json;
+use rdkafka::util::Timeout;
 use specifications::instructions::Instruction;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
@@ -363,10 +364,8 @@ async fn trigger_event(
         .key(&message_key);
 
     producer
-        .send(message, 0)
+        .send(message, Timeout::Never)
         .map(|delivery| {
-            let delivery = delivery.unwrap();
-
             match delivery {
                 Ok(_) => {
                     info!("Triggered '{}' event for invocation #{}.", event, invocation_id);

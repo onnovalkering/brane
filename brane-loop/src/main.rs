@@ -19,6 +19,7 @@ use rdkafka::consumer::stream_consumer::StreamConsumer;
 use rdkafka::consumer::{CommitMode, Consumer};
 use rdkafka::message::Message;
 use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::util::Timeout;
 use redis::Client;
 use std::env;
 use structopt::StructOpt;
@@ -78,7 +79,7 @@ async fn main() -> Result<()> {
 
     // Start consuming messages
     consumer.subscribe(&[TOPIC_CONTROL]).expect("Failed to subscribe");
-    let mut message_stream = consumer.start();
+    let mut message_stream = consumer.stream();
 
     while let Some(message) = message_stream.next().await {
         match message {
@@ -131,17 +132,13 @@ async fn trigger_event(
     info!("Going to trigger event within context '{}': {}", context, payload);
 
     let _ = producer
-        .send(message, 0)
+        .send(message, Timeout::Never)
         .map(|delivery| match delivery {
-            Ok(Ok(_)) => Ok(()),
-            Ok(Err(error)) => {
-                error!("Unable to trigger event within context '{}':\n{:#?}", context, error);
-                Err(())
-            }
             Err(error) => {
                 error!("Unable to trigger event within context '{}':\n{:#?}", context, error);
                 Err(())
             }
+            Ok(_) => Ok(()),
         })
         .await;
 

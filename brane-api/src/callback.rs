@@ -2,6 +2,7 @@ use actix_web::Scope;
 use actix_web::{web, HttpRequest, HttpResponse, FromRequest};
 use anyhow::Result;
 use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::util::Timeout;
 use serde::Deserialize;
 use serde_json::json;
 use specifications::{common::Value, status::StatusInfo};
@@ -90,8 +91,7 @@ async fn trigger_event(
 ) -> Result<()> {
     let message = FutureRecord::to(TOPIC_CONTROL).key(&context).payload(&payload);
 
-    let delivery = producer.send(message, 0).await?;
-
+    let delivery = producer.send(message, Timeout::Never).await;
     match delivery {
         Ok(_) => Ok(()),
         Err(error) => Err(anyhow!(

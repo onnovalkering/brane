@@ -1,0 +1,11 @@
+locations:
+  epi-02:
+    kind: vm
+    address: epi-02.lab.uvalight.net
+    runtime: Docker
+    credentials:
+      mechanism: ssh
+      username: s$EPI_02_USERNAME
+      identity_file: s$EPI_02_ID_RSA
+
+
