@@ -1,10 +1,12 @@
 [workspace]
 members = [
     "brane-api",
+    "brane-cfg",
     "brane-cli",
     "brane-dsl",
     "brane-exec",
     "brane-init",
+    "brane-job",
     "brane-loop",
     "brane-std",
     "brane-sys",
