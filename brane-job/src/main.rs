@@ -13,12 +13,12 @@ use prost::Message;
 use rdkafka::{
     admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
     config::ClientConfig,
-    consumer::{stream_consumer::StreamConsumer, Consumer},
+    consumer::{stream_consumer::StreamConsumer, CommitMode, Consumer},
     message::ToBytes,
     producer::{FutureProducer, FutureRecord},
     types::RDKafkaErrorCode,
     util::Timeout,
-    Message as KafkaMesage,
+    Message as KafkaMesage, TopicPartitionList,
 };
 use tokio::task::JoinHandle;
 
@@ -169,12 +169,22 @@ async fn start_worker(
         .create()
         .context("Failed to create Kafka consumer.")?;
 
+    // TODO: make use of transactions / exactly-once semantics (EOS)
+
+    // Restore previous topic/partition offset.
+    let mut tpl = TopicPartitionList::new();
+    tpl.add_partition(&input_topic, 0);
+
+    let committed_offsets = consumer.committed_offsets(tpl, Timeout::Never)?;
+    debug!("Restoring commited offsets: {:?}", &committed_offsets);
     consumer
-        .subscribe(&[&input_topic])
-        .context(format!("Failed to subscribe to command topic: {}", input_topic))?;
+        .assign(&committed_offsets)
+        .context("Failed to manually assign topic, partition, and/or offset to consumer.")?;
 
     // Create the outer pipeline on the message stream.
     let stream_processor = consumer.stream().try_for_each(|borrowed_message| {
+        &consumer.commit_message(&borrowed_message, CommitMode::Sync).unwrap();
+
         let owned_message = borrowed_message.detach();
         let owned_producer = producer.clone();
         let owned_infra = infra.clone();
