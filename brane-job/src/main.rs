@@ -7,6 +7,7 @@ use clap::Clap;
 use dotenv::dotenv;
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
+use grpcio::{Channel, ChannelBuilder, EnvBuilder};
 use log::LevelFilter;
 use log::{debug, error, info, warn};
 use prost::Message;
@@ -20,6 +21,8 @@ use rdkafka::{
     util::Timeout,
     Message as KafkaMesage, TopicPartitionList,
 };
+use std::sync::Arc;
+use std::time::Instant;
 use tokio::task::JoinHandle;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -51,6 +54,9 @@ struct Opts {
     /// Secrets store
     #[clap(short, long, default_value = "./secrets.yml", env = "SECRETS")]
     secrets: String,
+    /// Xenon gRPC endpoint
+    #[clap(short, long, default_value = "localhost:50051", env = "XENON")]
+    xenon: String,
 }
 
 #[tokio::main]
@@ -68,11 +74,15 @@ async fn main() -> Result<()> {
         logger.filter_level(LevelFilter::Info).init();
     }
 
+    // Ensure that the input (commands) topic exists.
+    ensure_input_topic(&opts.command_topic, &opts.brokers).await?;
+
     let infra = Infrastructure::new(opts.infra.clone())?;
     let secrets = Secrets::new(opts.secrets.clone())?;
 
-    // Ensure that the input (commands) topic exists.
-    ensure_input_topic(&opts.command_topic, &opts.brokers).await?;
+    // Prepare Xenon gRPC channel.
+    let xenon_env = Arc::new(EnvBuilder::new().build());
+    let xenon_channel = ChannelBuilder::new(xenon_env).connect(&opts.xenon);
 
     // Spawn workers, using Tokio tasks and thread pool.
     let workers = (0..opts.num_workers)
@@ -84,6 +94,7 @@ async fn main() -> Result<()> {
                 opts.event_topic.clone(),
                 infra.clone(),
                 secrets.clone(),
+                xenon_channel.clone(),
             ));
 
             info!("Spawned asynchronous worker #{}.", i + 1);
@@ -151,6 +162,7 @@ async fn start_worker(
     output_topic: String,
     infra: Infrastructure,
     secrets: Secrets,
+    xenon_channel: Channel,
 ) -> Result<()> {
     let output_topic = output_topic.as_ref();
 
@@ -183,12 +195,14 @@ async fn start_worker(
 
     // Create the outer pipeline on the message stream.
     let stream_processor = consumer.stream().try_for_each(|borrowed_message| {
+        let start = Instant::now();
         &consumer.commit_message(&borrowed_message, CommitMode::Sync).unwrap();
 
         let owned_message = borrowed_message.detach();
         let owned_producer = producer.clone();
         let owned_infra = infra.clone();
         let owned_secrets = secrets.clone();
+        let owned_xenon_channel = xenon_channel.clone();
 
         async move {
             let cmd_key = owned_message
@@ -218,7 +232,9 @@ async fn start_worker(
 
                 // Dispatch command message to appropriate handlers.
                 let events = match kind {
-                    CommandKind::Create => cmd_create::handle(cmd_key, command, owned_infra, owned_secrets),
+                    CommandKind::Create => {
+                        cmd_create::handle(&cmd_key, command, owned_infra, owned_secrets, owned_xenon_channel)
+                    }
                     CommandKind::Cancel => unimplemented!(),
                     CommandKind::Check => unimplemented!(),
                     CommandKind::Unknown => unreachable!(),
@@ -243,6 +259,8 @@ async fn start_worker(
                     }
                     Err(error) => error!("{:?}", error),
                 };
+
+                debug!("Command executed in {:?} (key: {}).", start.elapsed(), cmd_key);
             } else {
                 info!("Received message without payload (key: {}).", cmd_key);
             }

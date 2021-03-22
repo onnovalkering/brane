@@ -53,7 +53,14 @@ async fn main() -> Result<()> {
         .create()
         .context("Failed to create Kafka producer.")?;
 
-    let command = Command::new(CommandKind::Create, None, Some("node"), Some("busybox"), None, None);
+    let command = Command::new(
+        CommandKind::Create,
+        None,
+        Some("node"),
+        Some("busybox"),
+        vec!["echo", "HELLOWORLD!"],
+        None,
+    );
     let mut payload = BytesMut::with_capacity(64);
     command.encode(&mut payload)?;
 
