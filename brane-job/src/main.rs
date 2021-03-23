@@ -240,7 +240,7 @@ async fn start_worker(
                     CommandKind::Unknown => unreachable!(),
                 };
 
-                match events {
+                match events.await {
                     Ok(events) => {
                         for (evt_key, event) in events {
                             // Encode event message into a payload (bytes)

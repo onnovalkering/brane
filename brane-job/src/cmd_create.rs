@@ -1,15 +1,26 @@
 use crate::interface::{Command, Event};
 use anyhow::{Context, Result};
+use base64;
 use brane_cfg::infrastructure::{Location, LocationCredentials};
 use brane_cfg::{Infrastructure, Secrets};
 use grpcio::Channel;
+use k8s_openapi::api::batch::v1::Job;
+use k8s_openapi::api::core::v1::Namespace;
+use kube::api::{Api, PostParams};
+use kube::config::{KubeConfigOptions, Kubeconfig};
+use kube::{Client as KubeClient, Config as KubeConfig};
+use rand::distributions::Alphanumeric;
+use rand::{self, Rng};
+use serde_json::json;
+use std::convert::TryFrom;
+use std::iter;
 use xenon::compute::{JobDescription, Scheduler};
 use xenon::credentials::Credential;
 
 ///
 ///
 ///
-pub fn handle(
+pub async fn handle(
     key: &String,
     command: Command,
     infra: Infrastructure,
@@ -21,18 +32,40 @@ pub fn handle(
     validate_command(&command).with_context(context)?;
 
     // Retreive location metadata and credentials.
+    let location_id = command.location.clone().unwrap();
     let location = infra
-        .get_location_metadata(command.location.clone().unwrap())
+        .get_location_metadata(&location_id)
         .with_context(context)?;
 
-    let credentials = location.credentials.resolve_secrets(&secrets).with_context(context)?;
-
     // Branch into specific handlers based on the location kind.
-    match location.kind.as_str() {
-        "k8s" => handle_k8s(command, location, credentials).with_context(context),
-        "slurm" | "vm" => handle_xenon(command, location, credentials, xenon_channel).with_context(context),
-        _ => unreachable!(),
-    }
+    let job_id = match location {
+        Location::Kube {
+            namespace, credentials, ..
+        } => {
+            let credentials = credentials.resolve_secrets(&secrets);
+            handle_k8s(command, namespace, credentials).await?
+        }
+        Location::Slurm {
+            address,
+            runtime,
+            credentials,
+        } => {
+            let credentials = credentials.resolve_secrets(&secrets);
+            handle_xenon(command, address, "slurm", runtime, credentials, xenon_channel)?
+        }
+        Location::Vm {
+            address,
+            runtime,
+            credentials,
+        } => {
+            let credentials = credentials.resolve_secrets(&secrets);
+            handle_xenon(command, address, "ssh", runtime, credentials, xenon_channel)?
+        }
+    };
+
+    info!("Created job '{}' at location '{}'.", job_id, location_id);
+
+    Ok(vec![])
 }
 
 ///
@@ -48,12 +81,120 @@ fn validate_command(command: &Command) -> Result<()> {
 ///
 ///
 ///
-fn handle_k8s(
-    _command: Command,
-    _location: Location,
-    _credentials: LocationCredentials,
-) -> Result<Vec<(String, Event)>> {
-    unimplemented!()
+async fn handle_k8s(
+    command: Command,
+    namespace: String,
+    credentials: LocationCredentials,
+) -> Result<String> {
+    // Create Kubernetes client based on
+    let client = if let LocationCredentials::Config { file } = credentials {
+        let config = construct_k8s_config(file).await?;
+        KubeClient::try_from(config)?
+    } else {
+        bail!("Cannot create KubeClient from non-config credentials.");
+    };
+
+    let identifier = get_random_identifier();
+    let job_description = create_k8s_job_description(&identifier, command)?;
+
+    let jobs: Api<Job> = Api::namespaced(client.clone(), &namespace);
+    let result = jobs.create(&PostParams::default(), &job_description).await;
+
+    // Try again if job creation failed because of missing namespace.
+    if let Err(error) = result {
+        match error {
+            kube::Error::Api(error) => {
+                if error.message.starts_with("namespaces") && error.reason.as_str() == "NotFound" {
+                    warn!(
+                        "Failed to create k8s job because namespace '{}' didn't exist.",
+                        namespace
+                    );
+
+                    // First create namespace
+                    let namespaces: Api<Namespace> = Api::all(client.clone());
+                    let new_namespace = create_k8s_namespace(&namespace)?;
+                    let result = namespaces.create(&PostParams::default(), &new_namespace).await;
+
+                    // Only try again if namespace creation succeeded.
+                    if result.is_ok() {
+                        info!("Created k8s namespace '{}'. Trying again to create k8s job.", namespace);
+                        jobs.create(&PostParams::default(), &job_description).await?;
+                    }
+                }
+            }
+            _ => bail!(error),
+        }
+    }
+
+    Ok(identifier)
+}
+
+///
+///
+///
+async fn construct_k8s_config(config_file: String) -> Result<KubeConfig> {
+    let base64_symbols = ['+', '/', '='];
+
+    // Remove any whitespace and/or newlines.
+    let config_file: String = config_file
+        .chars()
+        .filter(|c| c.is_alphanumeric() || base64_symbols.contains(c))
+        .collect();
+
+    // Decode and parse as YAML.
+    let config_file = String::from_utf8(base64::decode(config_file)?)?;
+    let config_file: Kubeconfig = serde_yaml::from_str(&config_file)?;
+
+    KubeConfig::from_custom_kubeconfig(config_file, &KubeConfigOptions::default())
+        .await
+        .context("Failed to construct Kubernetes configuration object.")
+}
+
+///
+///
+///
+fn create_k8s_job_description(
+    identifier: &String,
+    command: Command,
+) -> Result<Job> {
+    let job_description = serde_json::from_value(json!({
+        "apiVersion": "batch/v1",
+        "kind": "Job",
+        "metadata": {
+            "name": identifier,
+        },
+        "spec": {
+            "backoffLimit": 3,
+            "ttlSecondsAfterFinished": 120,
+            "template": {
+                "spec": {
+                    "containers": [{
+                        "name": identifier,
+                        "image": command.image.expect("unreachable!"),
+                        "command": command.command,
+                    }],
+                    "restartPolicy": "Never",
+                }
+            }
+        }
+    }))?;
+
+    Ok(job_description)
+}
+
+///
+///
+///
+fn create_k8s_namespace(namespace: &String) -> Result<Namespace> {
+    let namespace = serde_json::from_value(json!({
+        "apiVersion": "v1",
+        "kind": "Namespace",
+        "metadata": {
+            "name": namespace,
+        }
+    }))?;
+
+    Ok(namespace)
 }
 
 ///
@@ -61,74 +202,60 @@ fn handle_k8s(
 ///
 fn handle_xenon(
     command: Command,
-    location: Location,
+    address: String,
+    adaptor: &str,
+    runtime: String,
     credentials: LocationCredentials,
     xenon_channel: Channel,
-) -> Result<Vec<(String, Event)>> {
-    let credentials = Credential::new_password(credentials.username, credentials.password);
-
-    let mut scheduler = match location.kind.to_lowercase().as_str() {
-        "vm" => create_vm_scheduler(&location.address, credentials, xenon_channel)?,
-        "slurm" => create_slurm_scheduler(&location.address, credentials, xenon_channel)?,
-        _ => unreachable!(),
+) -> Result<String> {
+    let credentials = match credentials {
+        LocationCredentials::SshCertificate {
+            username,
+            certificate,
+            passphrase,
+        } => Credential::new_certificate(certificate, username, passphrase),
+        LocationCredentials::SshPassword { username, password } => Credential::new_password(username, password),
+        LocationCredentials::Config { .. } => unreachable!(),
     };
 
-    let job_description = match location.runtime.to_lowercase().as_str() {
+    let mut scheduler = create_xenon_scheduler(address, adaptor, credentials, xenon_channel)?;
+
+    let job_description = match runtime.to_lowercase().as_str() {
         "singularity" => create_singularity_job_description(command)?,
         "docker" => create_docker_job_description(command)?,
         _ => unreachable!(),
     };
 
     let job = scheduler.submit_batch_job(job_description)?;
-    debug!("{:?}", job);
-
     scheduler.close()?;
 
-    Ok(vec![])
+    Ok(job.id)
 }
 
 ///
 ///
 ///
-fn create_vm_scheduler(
-    location_address: &String,
+fn create_xenon_scheduler<S1: Into<String>, S2: Into<String>>(
+    address: S1,
+    adaptor: S2,
     xenon_credential: Credential,
     xenon_channel: Channel,
 ) -> Result<Scheduler> {
+    let address = address.into();
+    let adaptor = adaptor.into();
+
     let properties = hashmap! {
         "xenon.adaptors.schedulers.ssh.strictHostKeyChecking" => "false"
     };
 
-    let scheduler = Scheduler::create(
-        "ssh",
-        xenon_channel,
-        xenon_credential,
-        location_address,
-        Some(properties),
-    )?;
-
-    Ok(scheduler)
-}
-
-///
-///
-///
-fn create_slurm_scheduler(
-    location_address: &String,
-    xenon_credential: Credential,
-    xenon_channel: Channel,
-) -> Result<Scheduler> {
-    let properties = hashmap! {
-        "xenon.adaptors.schedulers.ssh.strictHostKeyChecking" => "false"
+    // A SLURM scheduler requires the protocol scheme in the address.
+    let address = if adaptor == String::from("slurm") {
+        format!("ssh://{}", address)
+    } else {
+        address
     };
 
-    let scheduler = Scheduler::create(
-        "slurm",
-        xenon_channel,
-        xenon_credential,
-        format!("ssh://{}", location_address),
-        Some(properties),
-    )?;
+    let scheduler = Scheduler::create(adaptor, xenon_channel, xenon_credential, address, Some(properties))?;
 
     Ok(scheduler)
 }
@@ -189,4 +316,19 @@ fn create_singularity_job_description(command: Command) -> Result<JobDescription
     };
 
     Ok(job_description)
+}
+
+///
+///
+///
+fn get_random_identifier() -> String {
+    let mut rng = rand::thread_rng();
+
+    let identifier: String = iter::repeat(())
+        .map(|()| rng.sample(Alphanumeric))
+        .map(char::from)
+        .take(10)
+        .collect();
+
+    identifier.to_lowercase()
 }
