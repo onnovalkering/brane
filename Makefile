@@ -1,5 +1,3 @@
-.PHONY: all
-
 # Build release binaries
 binaries: cli init
 
@@ -57,3 +55,20 @@ start-services:
 
 stop-services:
 	docker-compose down
+
+restart-services: stop-services start-services
+
+# Kubernetes in Docker (kind)
+
+install-kind:
+	./contrib/kind/install-kubectl.sh		&& \
+	./contrib/kind/install-kind.sh
+
+create-kind-cluster:
+	kind create cluster --config=contrib/kind/config.yml --wait 5m
+
+delete-kind-cluster:
+	kind delete cluster --name kind-brane
+
+kind-cluster-config:
+	kubectl config view --raw=true --cluster kind-brane | base64
