@@ -234,3 +234,5 @@ _site/
 
 ### Custom ###
 vault.yml
+secrets.yml
+infra.yml
