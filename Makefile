@@ -68,7 +68,7 @@ create-kind-cluster:
 	kind create cluster --config=contrib/kind/config.yml --wait 5m
 
 delete-kind-cluster:
-	kind delete cluster --name kind-brane
+	kind delete cluster --name brane
 
 kind-cluster-config:
-	kubectl config view --raw=true --cluster kind-brane | base64
+	kind get kubeconfig --name brane | base64
