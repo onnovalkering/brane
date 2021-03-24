@@ -7,6 +7,7 @@ members = [
     "brane-exec",
     "brane-init",
     "brane-job",
+    "brane-log",
     "brane-loop",
     "brane-std",
     "brane-sys",

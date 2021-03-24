@@ -1,0 +1,21 @@
+[package]
+name = "brane-log"
+version = "0.4.0"
+authors = ["Onno Valkering"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1"
+brane-job = { path = "../brane-job" }
+bytes = "1"
+clap = "3.0.0-beta.2"
+dotenv = "0.15"
+env_logger = "0.8"
+futures = "0.3"
+juniper = "0.15"
+juniper_graphql_ws = "0.2"
+juniper_warp = { version = "0.6", features = ["subscriptions"] }
+log = "0.4"
+prost = "0.7"
+tokio = { version = "1", features = ["full"] }
+warp = "0.3"
