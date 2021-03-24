@@ -1,4 +1,4 @@
-use crate::interface::{Command, Event};
+use crate::interface::{Command, Event, EventKind};
 use anyhow::{Context, Result};
 use base64;
 use brane_cfg::infrastructure::{Location, LocationCredentials};
@@ -33,17 +33,17 @@ pub async fn handle(
 
     // Retreive location metadata and credentials.
     let location_id = command.location.clone().unwrap();
-    let location = infra
-        .get_location_metadata(&location_id)
-        .with_context(context)?;
+    let location = infra.get_location_metadata(&location_id).with_context(context)?;
 
     // Branch into specific handlers based on the location kind.
-    let job_id = match location {
+    let identifier = match location {
         Location::Kube {
-            namespace, credentials, ..
+            address,
+            namespace,
+            credentials,
         } => {
             let credentials = credentials.resolve_secrets(&secrets);
-            handle_k8s(command, namespace, credentials).await?
+            handle_k8s(command, address, namespace, credentials).await?
         }
         Location::Slurm {
             address,
@@ -63,15 +63,19 @@ pub async fn handle(
         }
     };
 
-    info!("Created job '{}' at location '{}'.", job_id, location_id);
+    info!("Created job '{}' at location '{}'.", identifier, location_id);
 
-    Ok(vec![])
+    let key = format!("{}#1", identifier);
+    let event = Event::new(EventKind::Created, identifier, location_id);
+
+    Ok(vec![(key, event)])
 }
 
 ///
 ///
 ///
 fn validate_command(command: &Command) -> Result<()> {
+    ensure!(command.identifier.is_some(), "Identifier is not specified");
     ensure!(command.location.is_some(), "Location is not specified");
     ensure!(command.image.is_some(), "Image is not specified");
 
@@ -83,10 +87,11 @@ fn validate_command(command: &Command) -> Result<()> {
 ///
 async fn handle_k8s(
     command: Command,
+    _address: String,
     namespace: String,
     credentials: LocationCredentials,
 ) -> Result<String> {
-    // Create Kubernetes client based on
+    // Create Kubernetes client based on config credentials
     let client = if let LocationCredentials::Config { file } = credentials {
         let config = construct_k8s_config(file).await?;
         KubeClient::try_from(config)?
@@ -94,8 +99,8 @@ async fn handle_k8s(
         bail!("Cannot create KubeClient from non-config credentials.");
     };
 
-    let identifier = get_random_identifier();
-    let job_description = create_k8s_job_description(&identifier, command)?;
+    let job_id = get_random_identifier();
+    let job_description = create_k8s_job_description(&job_id, &command)?;
 
     let jobs: Api<Job> = Api::namespaced(client.clone(), &namespace);
     let result = jobs.create(&PostParams::default(), &job_description).await;
@@ -126,7 +131,8 @@ async fn handle_k8s(
         }
     }
 
-    Ok(identifier)
+    let command_id = command.identifier.clone().unwrap();
+    Ok(format!("{}+{}", command_id, job_id))
 }
 
 ///
@@ -155,8 +161,10 @@ async fn construct_k8s_config(config_file: String) -> Result<KubeConfig> {
 ///
 fn create_k8s_job_description(
     identifier: &String,
-    command: Command,
+    command: &Command,
 ) -> Result<Job> {
+    let command = command.clone();
+
     let job_description = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
         "kind": "Job",
@@ -221,15 +229,16 @@ fn handle_xenon(
     let mut scheduler = create_xenon_scheduler(address, adaptor, credentials, xenon_channel)?;
 
     let job_description = match runtime.to_lowercase().as_str() {
-        "singularity" => create_singularity_job_description(command)?,
-        "docker" => create_docker_job_description(command)?,
+        "singularity" => create_singularity_job_description(&command)?,
+        "docker" => create_docker_job_description(&command)?,
         _ => unreachable!(),
     };
 
     let job = scheduler.submit_batch_job(job_description)?;
     scheduler.close()?;
 
-    Ok(job.id)
+    let command_id = command.identifier.clone().unwrap();
+    Ok(format!("{}+{}", command_id, job.id))
 }
 
 ///
@@ -263,7 +272,9 @@ fn create_xenon_scheduler<S1: Into<String>, S2: Into<String>>(
 ///
 ///
 ///
-fn create_docker_job_description(command: Command) -> Result<JobDescription> {
+fn create_docker_job_description(command: &Command) -> Result<JobDescription> {
+    let command = command.clone();
+
     // Format: docker run [-v /source:/target] {image} {arguments}
     let executable = String::from("docker");
     let mut arguments = vec![String::from("run")];
@@ -292,7 +303,9 @@ fn create_docker_job_description(command: Command) -> Result<JobDescription> {
 ///
 ///
 ///
-fn create_singularity_job_description(command: Command) -> Result<JobDescription> {
+fn create_singularity_job_description(command: &Command) -> Result<JobDescription> {
+    let command = command.clone();
+
     // Format: singularity run [-B /source:/target] {image} {arguments}
     let executable = String::from("singularity");
     let mut arguments = vec![String::from("run")];

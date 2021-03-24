@@ -6,7 +6,7 @@ pub struct Command {
     #[prost(tag = "1", enumeration = "CommandKind")]
     pub kind: i32,
     #[prost(tag = "2", optional, string)]
-    pub id: Option<String>,
+    pub identifier: Option<String>,
     #[prost(tag = "3", optional, string)]
     pub location: Option<String>,
     #[prost(tag = "4", optional, string)]
@@ -20,7 +20,7 @@ pub struct Command {
 impl Command {
     pub fn new<S: Into<String> + Clone>(
         kind: CommandKind,
-        id: Option<S>,
+        identifier: Option<S>,
         location: Option<S>,
         image: Option<S>,
         command: Vec<S>,
@@ -28,7 +28,7 @@ impl Command {
     ) -> Self {
         Command {
             kind: kind as i32,
-            id: id.map(S::into),
+            identifier: identifier.map(S::into),
             location: location.map(S::into),
             image: image.map(S::into),
             command: command.iter().map(S::clone).map(S::into).collect(),
@@ -41,8 +41,7 @@ impl Command {
 pub enum CommandKind {
     Unknown = 0,
     Create = 1,
-    Cancel = 2,
-    Check = 3,
+    Stop = 3,
 }
 
 impl fmt::Display for CommandKind {
@@ -55,7 +54,35 @@ impl fmt::Display for CommandKind {
 }
 
 #[derive(Clone, PartialEq, Message)]
-pub struct Event {}
+pub struct Event {
+    #[prost(tag = "1", enumeration = "EventKind")]
+    pub kind: i32,
+    #[prost(tag = "2", string)]
+    pub identifier: String,
+    #[prost(tag = "3", string)]
+    pub location: String,
+}
+
+impl Event {
+    pub fn new<S: Into<String> + Clone>(
+        kind: EventKind,
+        identifier: S,
+        location: S,
+    ) -> Self {
+        Event {
+            kind: kind as i32,
+            identifier: identifier.into(),
+            location: location.into(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Enumeration)]
+pub enum EventKind {
+    Unknown = 0,
+    Created = 1,
+    Stopped = 2,
+}
 
 #[derive(Clone, PartialEq, Message)]
 pub struct Mount {

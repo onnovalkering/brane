@@ -6,6 +6,5 @@ extern crate log;
 extern crate maplit;
 
 pub mod cmd_cancel;
-pub mod cmd_check;
 pub mod cmd_create;
 pub mod interface;

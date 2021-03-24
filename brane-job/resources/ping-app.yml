@@ -1,0 +1,8 @@
+- identifier: busybox-ping
+  location: cluster
+  image: busybox
+  command: ["ping", "-c", "30", "google.com"]
+
+- identifier: busybox-ping
+  state: created
+

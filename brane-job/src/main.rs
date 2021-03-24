@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use brane_cfg::{Infrastructure, Secrets};
-use brane_job::cmd_create;
 use brane_job::interface::{Command, CommandKind};
+use brane_job::cmd_create;
 use bytes::BytesMut;
 use clap::Clap;
 use dotenv::dotenv;
@@ -25,10 +25,8 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::task::JoinHandle;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 #[derive(Clap)]
-#[clap(version = VERSION)]
+#[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
     /// Topic to receive commands from
     #[clap(short, long = "cmd-topic", env = "COMMAND_TOPIC")]
@@ -75,7 +73,7 @@ async fn main() -> Result<()> {
     }
 
     // Ensure that the input (commands) topic exists.
-    ensure_input_topic(&opts.command_topic, &opts.brokers).await?;
+    ensure_topics(&opts.command_topic, &opts.event_topic, &opts.brokers).await?;
 
     let infra = Infrastructure::new(opts.infra.clone())?;
     let secrets = Secrets::new(opts.secrets.clone())?;
@@ -118,8 +116,9 @@ async fn main() -> Result<()> {
 ///
 ///
 ///
-async fn ensure_input_topic(
+async fn ensure_topics(
     input_topic: &str,
+    output_topic: &str,
     brokers: &str,
 ) -> Result<()> {
     let admin_client: AdminClient<_> = ClientConfig::new()
@@ -129,7 +128,10 @@ async fn ensure_input_topic(
 
     let results = admin_client
         .create_topics(
-            &[NewTopic::new(input_topic, 1, TopicReplication::Fixed(1))],
+            &[
+                NewTopic::new(input_topic, 1, TopicReplication::Fixed(1)),
+                NewTopic::new(output_topic, 1, TopicReplication::Fixed(1)),
+            ],
             &AdminOptions::new(),
         )
         .await?;
@@ -137,13 +139,13 @@ async fn ensure_input_topic(
     // Report on the results. Don't consider 'TopicAlreadyExists' an error.
     for result in results {
         match result {
-            Ok(topic) => info!("Input topic '{}' created.", topic),
+            Ok(topic) => info!("Kafka topic '{}' created.", topic),
             Err((topic, error)) => match error {
                 RDKafkaErrorCode::TopicAlreadyExists => {
-                    info!("Input topic '{}' already exists", topic);
+                    info!("Kafka topic '{}' already exists", topic);
                 }
                 _ => {
-                    bail!("Input topic '{}' not created: {:?}", topic, error);
+                    bail!("Kafka topic '{}' not created: {:?}", topic, error);
                 }
             },
         }
@@ -235,8 +237,7 @@ async fn start_worker(
                     CommandKind::Create => {
                         cmd_create::handle(&cmd_key, command, owned_infra, owned_secrets, owned_xenon_channel)
                     }
-                    CommandKind::Cancel => unimplemented!(),
-                    CommandKind::Check => unimplemented!(),
+                    CommandKind::Stop => unimplemented!(),
                     CommandKind::Unknown => unreachable!(),
                 };
 

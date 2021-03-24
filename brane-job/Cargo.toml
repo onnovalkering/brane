@@ -27,3 +27,6 @@ serde_json = "1"
 serde_yaml = "0.8"
 tokio = { version = "1", features = ["full"] }
 xenon-rs = { git = "https://github.com/onnovalkering/xenon-rs" }
+
+[dev-dependencies]
+dashmap = "4.0"
