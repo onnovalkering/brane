@@ -13,49 +13,80 @@ pub struct InfrastructureDocument {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct Location {
-    pub kind: String,
-    pub address: String,
-    pub runtime: String,
-    pub credentials: LocationCredentials,
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum Location {
+    Kube {
+        address: String,
+        namespace: String,
+        credentials: LocationCredentials,
+    },
+    Vm {
+        address: String,
+        runtime: String,
+        credentials: LocationCredentials,
+    },
+    Slurm {
+        address: String,
+        runtime: String,
+        credentials: LocationCredentials,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct LocationCredentials {
-    pub mechanism: String,
-    pub username: String,
-    pub identity_file: String,
+#[serde(tag = "mechanism", rename_all = "kebab-case")]
+pub enum LocationCredentials {
+    Config {
+        file: String,
+    },
+    SshCertificate {
+        username: String,
+        certificate: String,
+        passphrase: Option<String>
+    },
+    SshPassword {
+        username: String,
+        password: String
+    },
 }
 
 impl LocationCredentials {
-    pub fn new<S: Into<String>>(mechanism: S, username: S, identity_file: S) -> Self {
-        LocationCredentials {
-            mechanism: mechanism.into(),
-            username: username.into(),
-            identity_file: identity_file.into(),
+    ///
+    ///
+    ///
+    pub fn resolve_secrets(&self, secrets: &Secrets) -> Self {
+        use LocationCredentials::*;
+
+        let resolve = |value: &String| {
+            if value.starts_with("s$") {
+                // Try to resolve secret, but use the value as-is otherwise.
+                secrets.get(&value[2..]).unwrap_or_else(|_| value.clone())
+            } else {
+                value.clone()
+            }
+        };
+
+        match self {
+            Config { file } => {
+                let file = resolve(file);
+
+                Config { file }
+            }
+            SshCertificate { username, certificate, passphrase } => {
+                let username = resolve(username);
+                let certificate = resolve(certificate);
+                let passphrase = passphrase.clone().map(|p| resolve(&p));
+
+                SshCertificate { username, certificate, passphrase}
+            }
+            SshPassword { username, password } => {
+                let username = resolve(username);
+                let password = resolve(password);
+
+                SshPassword { username, password }
+            }
         }
     }
-
-    ///
-    ///
-    ///
-    pub fn resolve_secrets(&self, secrets: &Secrets) -> Result<Self> {
-        let username = if self.username.starts_with("s$") {
-            secrets.get(&self.username[2..])?
-        } else {
-            self.username.clone()
-        };
-
-        let identity_file = if self.identity_file.starts_with("s$") {
-            secrets.get(&self.identity_file[2..])?
-        } else {
-            self.identity_file.clone()
-        };
-
-        Ok(LocationCredentials::new(self.mechanism.clone(), username, identity_file))
-    }
 }
-
 
 #[derive(Clone, Debug)]
 pub struct Infrastructure {
