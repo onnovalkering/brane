@@ -1,9 +1,14 @@
 use anyhow::Result;
 use brane_log::ingestion;
+use brane_log::{schema::Query, Context, Schema};
 use cassandra_cpp::Cluster;
 use clap::Clap;
 use dotenv::dotenv;
+use juniper::{self, EmptyMutation, EmptySubscription};
 use log::LevelFilter;
+use std::sync::Arc;
+use tokio_compat_02::FutureExt;
+use warp::Filter;
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
@@ -47,6 +52,7 @@ async fn main() -> Result<()> {
     let cassandra_session = cassanda_cluster
         .connect_async()
         .await
+        .map(Arc::new)
         .map_err(|_| anyhow::anyhow!("Failed to create Cassandra session connection."))?;
 
     // Ensure Cassandra keyspace and table.
@@ -54,12 +60,31 @@ async fn main() -> Result<()> {
     ingestion::ensure_db_tables(&cassandra_session).await?;
 
     // Spawn a single event ingestion worker.
-    let handle = tokio::spawn(ingestion::start_worker(
+    tokio::spawn(ingestion::start_worker(
         opts.brokers.clone(),
         opts.group_id.clone(),
         opts.event_topic.clone(),
-        cassandra_session,
+        cassandra_session.clone(),
     ));
 
-    handle.await?
+    // Configure Wrap web server.
+    let log = warp::log("warp_server");
+    let schema = Schema::new(Query {}, EmptyMutation::new(), EmptySubscription::new());
+    let context = warp::any().map(move || Context {
+        cassandra: cassandra_session.clone(),
+    });
+    let graphql_filter = juniper_warp::make_graphql_filter(schema, context.boxed());
+
+    warp::serve(
+        warp::get()
+            .and(warp::path("graphiql"))
+            .and(juniper_warp::graphiql_filter("/graphql", None))
+            .or(warp::path("graphql").and(graphql_filter))
+            .with(log),
+    )
+    .run(([127, 0, 0, 1], 8080))
+    .compat()
+    .await;
+
+    Ok(())
 }

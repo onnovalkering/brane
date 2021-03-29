@@ -19,5 +19,7 @@ juniper_warp = { version = "0.6", features = ["subscriptions"] }
 log = "0.4"
 prost = "0.7"
 rdkafka = { version = "0.26", features = ["cmake-build"] }
+time = "0.2"
 tokio = { version = "1", features = ["full"] }
-warp = "0.3"
+tokio-compat-02 = "0.2"
+warp = "0.2"

@@ -11,12 +11,12 @@ use rdkafka::{
     util::Timeout,
     Message as KafkaMesage, Offset, TopicPartitionList,
 };
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
 
 ///
 ///
 ///
-pub async fn ensure_db_keyspace(cassandra: &Session) -> Result<()> {
+pub async fn ensure_db_keyspace(cassandra: &Arc<Session>) -> Result<()> {
     let query = stmt!(
         r#"
         CREATE KEYSPACE IF NOT EXISTS application_event
@@ -35,7 +35,7 @@ pub async fn ensure_db_keyspace(cassandra: &Session) -> Result<()> {
 ///
 ///
 ///
-pub async fn ensure_db_tables(cassandra: &Session) -> Result<()> {
+pub async fn ensure_db_tables(cassandra: &Arc<Session>) -> Result<()> {
     let query = stmt!(
         r#"
         CREATE TABLE IF NOT EXISTS application_event.events (
@@ -65,7 +65,7 @@ pub async fn start_worker(
     brokers: String,
     group_id: String,
     event_topic: String,
-    cassandra: Session,
+    cassandra: Arc<Session>,
 ) -> Result<()> {
     let consumer: StreamConsumer = ClientConfig::new()
         .set("bootstrap.servers", &brokers)
@@ -127,7 +127,6 @@ fn process_message(
     let event = Event::decode(payload).unwrap();
     let kind = EventKind::from_i32(event.kind).unwrap();
     let kind_txt = format!("{:?}", kind).to_lowercase();
-    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
 
     dbg!(&event);
 
@@ -144,7 +143,7 @@ fn process_message(
     insert.bind_string(2, event.location.as_str()).unwrap();
     insert.bind_int32(3, 1).unwrap();
     insert.bind_string(4, kind_txt.as_str()).unwrap();
-    insert.bind_int64(5, timestamp as i64).unwrap();
+    insert.bind_int64(5, event.timestamp).unwrap();
 
     cassandra
         .execute(&insert)
