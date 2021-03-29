@@ -1,4 +1,5 @@
 - identifier: busybox-ping
+  application: ping-app
   location: cluster
   image: busybox
   command: ["ping", "-c", "30", "google.com"]

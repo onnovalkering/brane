@@ -16,6 +16,8 @@ use std::convert::TryFrom;
 use std::iter;
 use xenon::compute::{JobDescription, Scheduler};
 use xenon::credentials::Credential;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 ///
 ///
@@ -26,10 +28,12 @@ pub async fn handle(
     infra: Infrastructure,
     secrets: Secrets,
     xenon_channel: Channel,
+    event_counter: Arc<AtomicU32>,
 ) -> Result<Vec<(String, Event)>> {
     let context = || format!("CREATE command failed or is invalid (key: {}).", key);
 
     validate_command(&command).with_context(context)?;
+    let application = command.application.clone().unwrap();
 
     // Retreive location metadata and credentials.
     let location_id = command.location.clone().unwrap();
@@ -66,7 +70,9 @@ pub async fn handle(
     info!("Created job '{}' at location '{}'.", identifier, location_id);
 
     let key = format!("{}#1", identifier);
-    let event = Event::new(EventKind::Created, identifier, location_id);
+    let count = event_counter.fetch_add(1, Ordering::Release);
+
+    let event = Event::new(EventKind::Created, identifier, application, location_id, count, None);
 
     Ok(vec![(key, event)])
 }
@@ -76,6 +82,7 @@ pub async fn handle(
 ///
 fn validate_command(command: &Command) -> Result<()> {
     ensure!(command.identifier.is_some(), "Identifier is not specified");
+    ensure!(command.application.is_some(), "Application is not specified");
     ensure!(command.location.is_some(), "Location is not specified");
     ensure!(command.image.is_some(), "Image is not specified");
 

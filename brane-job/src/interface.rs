@@ -1,5 +1,6 @@
 use prost::{Enumeration, Message};
 use std::fmt;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, PartialEq, Message)]
 pub struct Command {
@@ -8,12 +9,14 @@ pub struct Command {
     #[prost(tag = "2", optional, string)]
     pub identifier: Option<String>,
     #[prost(tag = "3", optional, string)]
-    pub location: Option<String>,
+    pub application: Option<String>,
     #[prost(tag = "4", optional, string)]
+    pub location: Option<String>,
+    #[prost(tag = "5", optional, string)]
     pub image: Option<String>,
-    #[prost(tag = "5", repeated, string)]
+    #[prost(tag = "6", repeated, string)]
     pub command: Vec<String>,
-    #[prost(tag = "6", repeated, message)]
+    #[prost(tag = "7", repeated, message)]
     pub mounts: Vec<Mount>,
 }
 
@@ -21,6 +24,7 @@ impl Command {
     pub fn new<S: Into<String> + Clone>(
         kind: CommandKind,
         identifier: Option<S>,
+        application: Option<S>,
         location: Option<S>,
         image: Option<S>,
         command: Vec<S>,
@@ -29,6 +33,7 @@ impl Command {
         Command {
             kind: kind as i32,
             identifier: identifier.map(S::into),
+            application: application.map(S::into),
             location: location.map(S::into),
             image: image.map(S::into),
             command: command.iter().map(S::clone).map(S::into).collect(),
@@ -60,19 +65,42 @@ pub struct Event {
     #[prost(tag = "2", string)]
     pub identifier: String,
     #[prost(tag = "3", string)]
+    pub application: String,
+    #[prost(tag = "4", string)]
     pub location: String,
+    #[prost(tag = "5", uint32)]
+    pub order: u32,
+    #[prost(tag = "6", uint64)]
+    pub timestamp: u64,
 }
 
 impl Event {
+    ///
+    ///
+    ///
     pub fn new<S: Into<String> + Clone>(
         kind: EventKind,
         identifier: S,
+        application: S,
         location: S,
+        order: u32,
+        timestamp: Option<u64>,
     ) -> Self {
+        let timestamp = timestamp
+            .unwrap_or_else(||
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64
+            );
+
         Event {
             kind: kind as i32,
             identifier: identifier.into(),
+            application: application.into(),
             location: location.into(),
+            order,
+            timestamp,
         }
     }
 }

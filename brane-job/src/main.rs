@@ -12,6 +12,7 @@ use log::LevelFilter;
 use log::{debug, error, info, warn};
 use prost::Message;
 use rdkafka::{
+    Offset,
     admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
     config::ClientConfig,
     consumer::{stream_consumer::StreamConsumer, CommitMode, Consumer},
@@ -24,6 +25,7 @@ use rdkafka::{
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::task::JoinHandle;
+use std::sync::atomic::AtomicU32;
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
@@ -82,6 +84,9 @@ async fn main() -> Result<()> {
     let xenon_env = Arc::new(EnvBuilder::new().build());
     let xenon_channel = ChannelBuilder::new(xenon_env).connect(&opts.xenon);
 
+    // Create an atomic integer (u32) for counting events.
+    let event_counter = Arc::new(AtomicU32::new(0));
+
     // Spawn workers, using Tokio tasks and thread pool.
     let workers = (0..opts.num_workers)
         .map(|i| {
@@ -93,6 +98,7 @@ async fn main() -> Result<()> {
                 infra.clone(),
                 secrets.clone(),
                 xenon_channel.clone(),
+                event_counter.clone(),
             ));
 
             info!("Spawned asynchronous worker #{}.", i + 1);
@@ -165,6 +171,7 @@ async fn start_worker(
     infra: Infrastructure,
     secrets: Secrets,
     xenon_channel: Channel,
+    event_counter: Arc<AtomicU32>,
 ) -> Result<()> {
     let output_topic = output_topic.as_ref();
 
@@ -189,10 +196,18 @@ async fn start_worker(
     let mut tpl = TopicPartitionList::new();
     tpl.add_partition(&input_topic, 0);
 
-    let committed_offsets = consumer.committed_offsets(tpl, Timeout::Never)?;
-    debug!("Restoring commited offsets: {:?}", &committed_offsets);
+    let committed_offsets = consumer.committed_offsets(tpl.clone(), Timeout::Never)?;
+    let committed_offsets = committed_offsets.to_topic_map();
+    if let Some(offset) = committed_offsets.get(&(input_topic.clone(), 0)) {
+        match offset {
+            Offset::Invalid => tpl.set_partition_offset(&input_topic, 0, Offset::Beginning)?,
+            offset => tpl.set_partition_offset(&input_topic, 0, offset.clone())?,
+        };
+    }
+
+    info!("Restoring commited offsets: {:?}", &tpl);
     consumer
-        .assign(&committed_offsets)
+        .assign(&tpl)
         .context("Failed to manually assign topic, partition, and/or offset to consumer.")?;
 
     // Create the outer pipeline on the message stream.
@@ -205,6 +220,7 @@ async fn start_worker(
         let owned_infra = infra.clone();
         let owned_secrets = secrets.clone();
         let owned_xenon_channel = xenon_channel.clone();
+        let owned_event_counter = event_counter.clone();
 
         async move {
             let cmd_key = owned_message
@@ -235,7 +251,7 @@ async fn start_worker(
                 // Dispatch command message to appropriate handlers.
                 let events = match kind {
                     CommandKind::Create => {
-                        cmd_create::handle(&cmd_key, command, owned_infra, owned_secrets, owned_xenon_channel)
+                        cmd_create::handle(&cmd_key, command, owned_infra, owned_secrets, owned_xenon_channel, owned_event_counter)
                     }
                     CommandKind::Stop => unimplemented!(),
                     CommandKind::Unknown => unreachable!(),

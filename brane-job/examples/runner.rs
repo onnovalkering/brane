@@ -37,6 +37,7 @@ enum Action {
 #[derive(Clone, Debug, Deserialize)]
 struct RunAction {
     pub identifier: String,
+    pub application: String,
     pub location: String,
     pub image: String,
     pub command: Vec<String>,
@@ -202,6 +203,7 @@ async fn execute_run_action(
     let command = Command::new(
         CommandKind::Create,
         Some(action.identifier.clone()),
+        Some(action.application.clone()),
         Some(action.location.clone()),
         Some(action.image.clone()),
         action.command.clone(),
@@ -214,7 +216,10 @@ async fn execute_run_action(
     let message = FutureRecord::to(&command_topic)
         .key(&action.identifier)
         .payload(payload.to_bytes());
-    if let Err(_) = producer.send(message, Timeout::Never).await {
+
+    dbg!(&message);
+
+    if let Err(_) = producer.send(message, Timeout::After(Duration::from_secs(5))).await {
         bail!("Failed to send command to '{}' topic.", command_topic);
     }
 
