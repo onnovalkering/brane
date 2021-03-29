@@ -8,6 +8,7 @@ edition = "2018"
 anyhow = "1"
 brane-job = { path = "../brane-job" }
 bytes = "1"
+cassandra-cpp = "0.16"
 clap = "3.0.0-beta.2"
 dotenv = "0.15"
 env_logger = "0.8"
@@ -17,5 +18,6 @@ juniper_graphql_ws = "0.2"
 juniper_warp = { version = "0.6", features = ["subscriptions"] }
 log = "0.4"
 prost = "0.7"
+rdkafka = { version = "0.26", features = ["cmake-build"] }
 tokio = { version = "1", features = ["full"] }
 warp = "0.3"

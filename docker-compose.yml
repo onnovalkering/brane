@@ -6,6 +6,11 @@ services:
     ports:
       - "8070:8080"
 
+  cassandra:
+    image: cassandra:4.0
+    ports:
+      - "9042:9042"
+
   kafka:
     image: confluentinc/cp-kafka:5.5.1
     depends_on:

@@ -1,8 +1,8 @@
 use anyhow::Result;
-use brane_log::{schema::Query, Context, Schema};
+use brane_log::ingestion;
+use cassandra_cpp::Cluster;
 use clap::Clap;
 use dotenv::dotenv;
-use juniper::{self, EmptyMutation, EmptySubscription, Variables};
 use log::LevelFilter;
 
 #[derive(Clap)]
@@ -10,16 +10,16 @@ use log::LevelFilter;
 struct Opts {
     /// Kafka brokers
     #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
-    _brokers: String,
+    brokers: String,
     /// Print debug info
     #[clap(short, long, env = "DEBUG", takes_value = false)]
     debug: bool,
     /// Topic to receive events from
     #[clap(short, long = "evt-topic", env = "EVENT_TOPIC")]
-    _event_topic: String,
+    event_topic: String,
     /// Consumer group id
     #[clap(short, long, default_value = "brane-log", env = "GROUP_ID")]
-    _group_id: String,
+    group_id: String,
 }
 
 #[tokio::main]
@@ -37,16 +37,29 @@ async fn main() -> Result<()> {
         logger.filter_level(LevelFilter::Info).init();
     }
 
-    let schema = Schema::new(Query {}, EmptyMutation::new(), EmptySubscription::new());
-    let variables = Variables::new();
-    let context = Context {
-        name: String::from("TEST!"),
-    };
+    // Configure Cassandra cluster connection.
+    let mut cassanda_cluster = Cluster::default();
+    cassanda_cluster.set_load_balance_round_robin();
+    cassanda_cluster
+        .set_contact_points("127.0.0.1")
+        .map_err(|_| anyhow::anyhow!("Failed to append Cassandra contact point."))?;
 
-    let (res, _) = juniper::execute("query { events { identifier } }", None, &schema, &variables, &context)
+    let cassandra_session = cassanda_cluster
+        .connect_async()
         .await
-        .unwrap();
-    println!("{:?}", res);
+        .map_err(|_| anyhow::anyhow!("Failed to create Cassandra session connection."))?;
 
-    Ok(())
+    // Ensure Cassandra keyspace and table.
+    ingestion::ensure_db_keyspace(&cassandra_session).await?;
+    ingestion::ensure_db_tables(&cassandra_session).await?;
+
+    // Spawn a single event ingestion worker.
+    let handle = tokio::spawn(ingestion::start_worker(
+        opts.brokers.clone(),
+        opts.group_id.clone(),
+        opts.event_topic.clone(),
+        cassandra_session,
+    ));
+
+    handle.await?
 }
