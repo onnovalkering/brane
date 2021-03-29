@@ -1,6 +1,6 @@
 use prost::{Enumeration, Message};
+use time::OffsetDateTime;
 use std::fmt;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, PartialEq, Message)]
 pub struct Command {
@@ -70,8 +70,8 @@ pub struct Event {
     pub location: String,
     #[prost(tag = "5", uint32)]
     pub order: u32,
-    #[prost(tag = "6", uint64)]
-    pub timestamp: u64,
+    #[prost(tag = "6", int64)]
+    pub timestamp: i64,
 }
 
 impl Event {
@@ -84,15 +84,9 @@ impl Event {
         application: S,
         location: S,
         order: u32,
-        timestamp: Option<u64>,
+        timestamp: Option<i64>,
     ) -> Self {
-        let timestamp = timestamp
-            .unwrap_or_else(||
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64
-            );
+        let timestamp = timestamp.unwrap_or_else(|| OffsetDateTime::now_utc().unix_timestamp());
 
         Event {
             kind: kind as i32,
