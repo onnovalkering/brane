@@ -1,0 +1,22 @@
+[package]
+name = "brane-clb"
+version = "0.4.0"
+authors = ["Onno Valkering"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1"
+bytes = "1"
+clap = "3.0.0-beta.2"
+dotenv = "0.15"
+env_logger = "0.8"
+futures = "0.3"
+log = "0.4"
+prost = "0.6"
+rdkafka = { version = "0.24", features = ["cmake-build"] }
+time = "0.2"
+tokio = { version = "0.2", features = ["full"] }
+tonic = "0.3"
+
+[build-dependencies]
+tonic-build = "0.3"

@@ -1,0 +1,14 @@
+syntax = "proto3";
+package callback;
+
+service CallbackService {
+    rpc Callback (CallbackRequest) returns (CallbackReply);
+}
+
+message CallbackRequest {
+   string job = 1;
+}
+
+message CallbackReply {
+    string status = 1;
+}

@@ -2,6 +2,7 @@
 members = [
     "brane-api",
     "brane-cfg",
+    "brane-clb",
     "brane-cli",
     "brane-dsl",
     "brane-exec",
