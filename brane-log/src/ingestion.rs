@@ -1,4 +1,6 @@
 use anyhow::{Context as AContext, Result};
+use time::{Format, OffsetDateTime};
+use crate::schema;
 use brane_job::interface::{Event, EventKind};
 use cassandra_cpp::Session;
 use futures::stream::StreamExt;
@@ -11,12 +13,13 @@ use rdkafka::{
     util::Timeout,
     Message as KafkaMesage, Offset, TopicPartitionList,
 };
-use std::sync::Arc;
+use tokio::sync::watch::Sender;
+use std::sync::{Arc, RwLock};
 
 ///
 ///
 ///
-pub async fn ensure_db_keyspace(cassandra: &Arc<Session>) -> Result<()> {
+pub async fn ensure_db_keyspace(cassandra: &Arc<RwLock<Session>>) -> Result<()> {
     let query = stmt!(
         r#"
         CREATE KEYSPACE IF NOT EXISTS application_event
@@ -25,6 +28,8 @@ pub async fn ensure_db_keyspace(cassandra: &Arc<Session>) -> Result<()> {
     );
 
     cassandra
+        .read()
+        .unwrap()
         .execute(&query)
         .await
         .map(|_| ())
@@ -35,7 +40,7 @@ pub async fn ensure_db_keyspace(cassandra: &Arc<Session>) -> Result<()> {
 ///
 ///
 ///
-pub async fn ensure_db_tables(cassandra: &Arc<Session>) -> Result<()> {
+pub async fn ensure_db_tables(cassandra: &Arc<RwLock<Session>>) -> Result<()> {
     let query = stmt!(
         r#"
         CREATE TABLE IF NOT EXISTS application_event.events (
@@ -51,6 +56,8 @@ pub async fn ensure_db_tables(cassandra: &Arc<Session>) -> Result<()> {
     );
 
     cassandra
+        .read()
+        .unwrap()
         .execute(&query)
         .await
         .map(|_| ())
@@ -65,7 +72,8 @@ pub async fn start_worker(
     brokers: String,
     group_id: String,
     event_topic: String,
-    cassandra: Arc<Session>,
+    events_tx: Sender<schema::Event>,
+    cassandra: Arc<RwLock<Session>>,
 ) -> Result<()> {
     let consumer: StreamConsumer = ClientConfig::new()
         .set("bootstrap.servers", &brokers)
@@ -94,13 +102,13 @@ pub async fn start_worker(
         .assign(&tpl)
         .context("Failed to manually assign topic, partition, and/or offset to consumer.")?;
 
-    let mut message_stream = consumer.stream();
+    let mut message_stream = consumer.start();
 
     // Process incoming event messages.
     while let Some(message) = message_stream.next().await {
         match message {
             Ok(borrowed_message) => {
-                if let Err(error) = process_message(borrowed_message.detach(), &cassandra) {
+                if let Err(error) = process_message(borrowed_message.detach(), &events_tx, &cassandra) {
                     error!("An error occured while processing a kafka message: {:?}", error);
                 }
             }
@@ -116,7 +124,8 @@ pub async fn start_worker(
 ///
 fn process_message(
     message: OwnedMessage,
-    cassandra: &Session,
+    events_tx: &Sender<schema::Event>,
+    cassandra: &Arc<RwLock<Session>>,
 ) -> Result<()> {
     let payload = match message.payload() {
         Some(payload) => payload,
@@ -126,7 +135,7 @@ fn process_message(
     // Decode payload into a Event message.
     let event = Event::decode(payload).unwrap();
     let kind = EventKind::from_i32(event.kind).unwrap();
-    let kind_txt = format!("{:?}", kind).to_lowercase();
+    let kind = format!("{:?}", kind).to_lowercase();
 
     dbg!(&event);
 
@@ -141,17 +150,30 @@ fn process_message(
     insert.bind_string(0, event.application.as_str()).unwrap();
     insert.bind_string(1, event.identifier.as_str()).unwrap();
     insert.bind_string(2, event.location.as_str()).unwrap();
-    insert.bind_int32(3, 1).unwrap();
-    insert.bind_string(4, kind_txt.as_str()).unwrap();
+    insert.bind_int32(3, event.order as i32).unwrap();
+    insert.bind_string(4, kind.as_str()).unwrap();
     insert.bind_int64(5, event.timestamp).unwrap();
 
     cassandra
+        .read()
+        .unwrap()
         .execute(&insert)
         .wait() // TODO: use .await, however this won't compile in the current configuration.
         .map(|_| ())
         .map_err(|e| anyhow!("{:?}", e))
         .with_context(|| format!("Failed to insert event: {:?}", event))
         .unwrap();
+
+    let event = schema::Event {
+        application: event.application.clone(),
+        job: event.identifier.clone(),
+        location: event.location.clone(),
+        order: event.order as i32,
+        kind,
+        timestamp: OffsetDateTime::from_unix_timestamp(event.timestamp.clone()).format(Format::Rfc3339),
+    };
+
+    events_tx.broadcast(event)?;
 
     Ok(())
 }

@@ -1,19 +1,23 @@
 use crate::Context;
 use cassandra_cpp::{AsRustType, BindRustType, Row};
-use juniper::{EmptyMutation, EmptySubscription, GraphQLObject, RootNode};
+use juniper::{EmptyMutation, GraphQLObject, RootNode, FieldError};
 use time::{Format, OffsetDateTime};
+use std::pin::Pin;
+use futures::Stream;
+use async_stream::stream;
 
-pub type Schema = RootNode<'static, Query, EmptyMutation<Context>, EmptySubscription<Context>>;
+pub type Schema = RootNode<'static, Query, EmptyMutation<Context>, Subscription>;
 
 impl juniper::Context for Context {}
 
-#[derive(Clone, GraphQLObject)]
+#[derive(Clone, Debug, GraphQLObject, Default)]
 pub struct Event {
-    job: String,
-    location: String,
-    order: i32,
-    kind: String,
-    timestamp: String,
+    pub application: String,
+    pub job: String,
+    pub location: String,
+    pub order: i32,
+    pub kind: String,
+    pub timestamp: String,
 }
 
 pub struct Query;
@@ -24,7 +28,7 @@ impl Query {
     ///
     ///
     async fn applications(context: &Context) -> Vec<String> {
-        let cassandra = context.cassandra.clone();
+        let cassandra = context.cassandra.read().unwrap();
 
         let query = stmt!("SELECT DISTINCT application_id FROM application_event.events;");
         let result = cassandra.execute(&query).wait().unwrap();
@@ -43,12 +47,13 @@ impl Query {
         kind: Option<String>,
         context: &Context,
     ) -> Vec<Event> {
-        let cassandra = context.cassandra.clone();
+        let cassandra = context.cassandra.read().unwrap();
 
         let mut query = stmt!("SELECT * FROM application_event.events WHERE application_id = ?;");
         query.bind(0, application.as_str()).unwrap();
 
         let as_event = |r: Row| {
+            let application = r.get_by_name("application_id").unwrap();
             let job = r.get_by_name("job_id").unwrap();
             let location = r.get_by_name("location_id").unwrap();
             let order = r.get_by_name("event_id").unwrap();
@@ -58,6 +63,7 @@ impl Query {
             let timestamp = OffsetDateTime::from_unix_timestamp(timestamp).format(Format::Rfc3339);
 
             Event {
+                application,
                 job,
                 location,
                 order,
@@ -77,5 +83,43 @@ impl Query {
         }
 
         events
+    }
+}
+
+pub struct Subscription;
+
+type EventStream = Pin<Box<dyn Stream<Item = Result<Event, FieldError>> + Send>>;
+
+#[graphql_subscription(context = Context)]
+impl Subscription {
+    async fn events(
+        application: String,
+        job: Option<String>,
+        kind: Option<String>,
+        context: &Context
+    ) -> EventStream {
+        let mut events_rx = context.events_rx.clone();
+
+        let stream = stream! {
+            while let Some(event) = events_rx.recv().await {
+                if event.application != application {
+                    continue;
+                }
+                if let Some(ref job) = job {
+                    if &event.job != job {
+                        continue;
+                    }
+                }
+                if let Some(ref kind) = kind {
+                    if &event.kind != kind {
+                        continue;
+                    }
+                }
+
+                yield Ok(event)
+            }
+        };
+
+        Box::pin(stream)
     }
 }

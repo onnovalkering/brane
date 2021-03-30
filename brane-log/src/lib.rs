@@ -8,13 +8,15 @@ extern crate log;
 extern crate juniper;
 
 use cassandra_cpp::Session;
-use std::sync::Arc;
+use tokio::sync::watch::Receiver;
+use std::sync::{Arc, RwLock};
 
 pub mod ingestion;
 pub mod schema;
 
 pub struct Context {
-    pub cassandra: Arc<Session>,
+    pub cassandra: Arc<RwLock<Session>>,
+    pub events_rx: Receiver<schema::Event>,
 }
 
 pub use schema::Schema;
