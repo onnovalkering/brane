@@ -18,7 +18,7 @@ use rdkafka::{
     consumer::{stream_consumer::StreamConsumer, CommitMode, Consumer},
     message::ToBytes,
     producer::{FutureProducer, FutureRecord},
-    types::RDKafkaErrorCode,
+    types::RDKafkaError,
     util::Timeout,
     Message as KafkaMesage, TopicPartitionList,
 };
@@ -147,7 +147,7 @@ async fn ensure_topics(
         match result {
             Ok(topic) => info!("Kafka topic '{}' created.", topic),
             Err((topic, error)) => match error {
-                RDKafkaErrorCode::TopicAlreadyExists => {
+                RDKafkaError::TopicAlreadyExists => {
                     info!("Kafka topic '{}' already exists", topic);
                 }
                 _ => {
@@ -211,7 +211,7 @@ async fn start_worker(
         .context("Failed to manually assign topic, partition, and/or offset to consumer.")?;
 
     // Create the outer pipeline on the message stream.
-    let stream_processor = consumer.stream().try_for_each(|borrowed_message| {
+    let stream_processor = consumer.start().try_for_each(|borrowed_message| {
         let start = Instant::now();
         &consumer.commit_message(&borrowed_message, CommitMode::Sync).unwrap();
 

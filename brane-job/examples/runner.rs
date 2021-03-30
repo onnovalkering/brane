@@ -155,7 +155,7 @@ async fn start_event_monitor(
         .context("Failed to manually assign topic, partition, and/or offset to consumer.")?;
 
     consumer
-        .stream()
+        .start()
         .try_for_each(|borrowed_message| {
             let owned_message = borrowed_message.detach();
             let owned_states = states.clone();

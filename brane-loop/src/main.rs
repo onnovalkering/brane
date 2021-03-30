@@ -79,7 +79,7 @@ async fn main() -> Result<()> {
 
     // Start consuming messages
     consumer.subscribe(&[TOPIC_CONTROL]).expect("Failed to subscribe");
-    let mut message_stream = consumer.stream();
+    let mut message_stream = consumer.start();
 
     while let Some(message) = message_stream.next().await {
         match message {
