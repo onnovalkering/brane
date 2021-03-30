@@ -1,4 +1,4 @@
-version: '3'
+version: '3.5'
 
 services:
   adminer:
@@ -68,3 +68,8 @@ services:
     image: confluentinc/cp-zookeeper:5.5.1
     environment:
       ZOOKEEPER_CLIENT_PORT: "2181"
+
+networks:
+  default:
+    external:
+      name: kind

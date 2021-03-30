@@ -50,7 +50,7 @@ start-ide:
 start-loop:
 	cd brane-loop && cargo run
 
-start-services:
+start-services: create-kind-network
 	docker-compose up -d
 
 stop-services:
@@ -64,6 +64,11 @@ install-kind:
 	./contrib/kind/install-kubectl.sh		&& \
 	./contrib/kind/install-kind.sh
 
+create-kind-network:
+	@if [ ! -n "$(shell docker network ls -f name=kind | grep kind)" ]; then \
+		docker network create kind; \
+	fi;
+
 create-kind-cluster:
 	kind create cluster --config=contrib/kind/config.yml --wait 5m
 
@@ -71,4 +76,4 @@ delete-kind-cluster:
 	kind delete cluster --name brane
 
 kind-cluster-config:
-	kind get kubeconfig --name brane | base64
+	@kind get kubeconfig --name brane | base64
