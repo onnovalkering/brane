@@ -5,10 +5,27 @@ service CallbackService {
     rpc Callback (CallbackRequest) returns (CallbackReply);
 }
 
+enum CallbackKind {
+    UNKOWN = 0;
+    READY = 1;
+    INITIALIZED = 2;
+    STARTED = 3;
+    HEARTBEAT = 4;
+    FINISHED = 5;
+    STOPPED = 6;
+    FAILED = 7;
+}
+
 message CallbackRequest {
-   string job = 1;
+   CallbackKind kind = 1;
+   string job = 2;
+   string application = 3;
+   string location = 4;
+   int32 order = 5;
+   bytes payload = 6;
 }
 
 message CallbackReply {
     string status = 1;
+    string message = 2;
 }

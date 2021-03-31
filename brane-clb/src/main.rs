@@ -1,41 +1,22 @@
 use anyhow::{Context, Result};
+use brane_clb::{callback::CallbackHandler, grpc::CallbackServiceServer};
 use clap::Clap;
 use dotenv::dotenv;
 use log::LevelFilter;
-use rdkafka::{producer::FutureProducer, ClientConfig};
-use tonic::{transport::Server, Request, Response, Status};
-
-use callback::callback_service_server::{CallbackService, CallbackServiceServer};
-use callback::{CallbackReply, CallbackRequest};
-
-pub mod callback {
-    tonic::include_proto!("callback");
-}
-
-pub struct MyCallback {
-    callback_topic: String,
-    producer: FutureProducer,
-}
-
-#[tonic::async_trait]
-impl CallbackService for MyCallback {
-    async fn callback(
-        &self,
-        request: Request<CallbackRequest>,
-    ) -> Result<Response<CallbackReply>, Status> {
-        println!("Got a request: {:?}", request);
-
-        let reply = CallbackReply {
-            status: format!("Hello {}!", request.into_inner().job).into(),
-        };
-
-        Ok(Response::new(reply))
-    }
-}
+use rdkafka::{
+    admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
+    producer::FutureProducer,
+    types::RDKafkaError,
+    ClientConfig,
+};
+use tonic::transport::Server;
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
+    #[clap(short, long, default_value = "[::1]:50052", env = "ADDR")]
+    /// Service address to use
+    address: String,
     /// Kafka brokers
     #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
     brokers: String,
@@ -62,22 +43,63 @@ async fn main() -> Result<()> {
         logger.filter_level(LevelFilter::Info).init();
     }
 
+    // Ensure that the callback topic (output) exists.
+    let callback_topic = opts.callback_topic.clone();
+    ensure_callback_topic(&callback_topic, &opts.brokers).await?;
+
     let producer: FutureProducer = ClientConfig::new()
         .set("bootstrap.servers", &opts.brokers)
         .set("message.timeout.ms", "5000")
         .create()
         .context("Failed to create Kafka producer.")?;
 
-    let addr = "[::1]:50052".parse()?;
-    let my_callback = MyCallback {
-        callback_topic: opts.callback_topic.clone(),
+    let handler = CallbackHandler {
+        callback_topic,
         producer,
     };
 
+    // Start gRPC server with callback service.
     Server::builder()
-        .add_service(CallbackServiceServer::new(my_callback))
-        .serve(addr)
+        .add_service(CallbackServiceServer::new(handler))
+        .serve(opts.address.parse()?)
+        .await
+        .context("Failed to start callback gRPC server.")
+}
+
+///
+///
+///
+pub async fn ensure_callback_topic(
+    callback_topic: &str,
+    brokers: &str,
+) -> Result<()> {
+    let admin_client: AdminClient<_> = ClientConfig::new()
+        .set("bootstrap.servers", brokers)
+        .set("message.timeout.ms", "5000")
+        .create()
+        .context("Failed to create Kafka admin client.")?;
+
+    let results = admin_client
+        .create_topics(
+            &[NewTopic::new(callback_topic, 1, TopicReplication::Fixed(1))],
+            &AdminOptions::new(),
+        )
         .await?;
+
+    // Report on the results. Don't consider 'TopicAlreadyExists' an error.
+    for result in results {
+        match result {
+            Ok(topic) => log::info!("Kafka topic '{}' created.", topic),
+            Err((topic, error)) => match error {
+                RDKafkaError::TopicAlreadyExists => {
+                    log::info!("Kafka topic '{}' already exists", topic);
+                }
+                _ => {
+                    anyhow::bail!("Kafka topic '{}' not created: {:?}", topic, error);
+                }
+            },
+        }
+    }
 
     Ok(())
 }
