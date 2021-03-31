@@ -10,6 +10,7 @@ services:
     image: cassandra:4.0
     ports:
       - "9042:9042"
+    restart: always
 
   kafka:
     image: confluentinc/cp-kafka:5.5.1
@@ -17,6 +18,7 @@ services:
       - zookeeper
     ports:
       - "9092:9092"
+    restart: always
     environment:
       KAFKA_BROKER_ID: 0
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -29,6 +31,7 @@ services:
     image: postgres:12
     ports:
       - "5432:5432"
+    restart: always
     environment:
       POSTGRES_PASSWORD: postgres
 
@@ -36,11 +39,13 @@ services:
     image: redis:6-alpine
     ports:
       - "6379:6379"
+    restart: always
 
   registry:
     image: registry:2
     ports:
       - "5000:5000"
+    restart: always
 
   slurm:
     build:
@@ -49,6 +54,7 @@ services:
     privileged: true
     ports:
       - "10022:22"
+    restart: always
 
   vault:
     image: vault:1.5.3
@@ -56,6 +62,7 @@ services:
       - IPC_LOCK
     ports:
       - "8200:8200"
+    restart: always
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: mytoken
 
@@ -63,11 +70,13 @@ services:
     image: onnovalkering/xenon-grpc
     ports:
       - "50051:50051"
+    restart: always
 
   zookeeper:
     image: confluentinc/cp-zookeeper:5.5.1
     environment:
       ZOOKEEPER_CLIENT_PORT: "2181"
+    restart: always
 
 networks:
   default:
