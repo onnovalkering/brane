@@ -17,16 +17,19 @@ pub struct InfrastructureDocument {
 pub enum Location {
     Kube {
         address: String,
+        callback_to: String,
         namespace: String,
         credentials: LocationCredentials,
     },
     Vm {
         address: String,
+        callback_to: String,
         runtime: String,
         credentials: LocationCredentials,
     },
     Slurm {
         address: String,
+        callback_to: String,
         runtime: String,
         credentials: LocationCredentials,
     },
