@@ -14,6 +14,7 @@ pub mod grpc {
 
     pub use callback_service_server::CallbackService;
     pub use callback_service_server::CallbackServiceServer;
+    pub use callback_service_client::CallbackServiceClient;
 }
 
 pub struct CallbackHandler {
