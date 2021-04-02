@@ -244,6 +244,12 @@ fn create_k8s_job_description(
                         "image": command.image.expect("unreachable!"),
                         "args": command.command,
                         "env": environment,
+                        "securityContext": {
+                            "capabilities": {
+                                "drop": ["all"],
+                                "add": ["NET_BIND_SERVICE", "NET_ADMIN"]
+                            },
+                        }
                     }],
                     "restartPolicy": "Never",
                 }
@@ -344,7 +350,15 @@ fn create_docker_job_description(
 
     // Format: docker run [-v /source:/target] {image} {arguments}
     let executable = String::from("docker");
-    let mut arguments = vec![String::from("run")];
+    let mut arguments = vec![
+        String::from("run"),
+        String::from("--cap-drop"),
+        String::from("ALL"),
+        String::from("--cap-add"),
+        String::from("NET_BIND_SERVICE"),
+        String::from("--cap-add"),
+        String::from("NET_ADMIN"),
+    ];
 
     // Add mount bindings
     for mount in command.mounts {
@@ -379,7 +393,13 @@ fn create_singularity_job_description(
 
     // Format: singularity run [-B /source:/target] {image} {arguments}
     let executable = String::from("singularity");
-    let mut arguments = vec![String::from("run")];
+    let mut arguments = vec![
+        String::from("run"),
+        String::from("--drop-caps"),
+        String::from("ALL"),
+        String::from("--add-caps"),
+        String::from("CAP_NET_BIND_SERVICE,CAP_NET_ADMIN"),
+    ];
 
     // Add mount bindings
     for mount in command.mounts {
