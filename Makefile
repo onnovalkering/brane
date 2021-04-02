@@ -1,3 +1,6 @@
+build: binaries docker
+
+
 # Build release binaries
 binaries: cli init
 
@@ -7,17 +10,25 @@ cli:
 init:
 	cargo build --release --package brane-init --target x86_64-unknown-linux-musl
 
+
 # Build Docker images
 docker: api ide loop
 
 api:
 	docker build -t onnovalkering/brane-api -f Dockerfile.api .
 
+clb:
+	docker build -t onnovalkering/brane-clb -f Dockerfile.clb .
+
 ide:
 	docker build -t onnovalkering/brane-ide -f Dockerfile.ide .
 
 loop:
 	docker build -t onnovalkering/brane-loop -f Dockerfile.loop .
+
+noop:
+	docker build -t onnovalkering/brane-noop -f Dockerfile.noop .
+
 
 # Development setup
 start: start-services
@@ -61,7 +72,7 @@ restart-services: stop-services start-services
 # Kubernetes in Docker (kind)
 
 install-kind:
-	./contrib/kind/install-kubectl.sh		&& \
+	./contrib/kind/install-kubectl.sh && \
 	./contrib/kind/install-kind.sh
 
 create-kind-network:

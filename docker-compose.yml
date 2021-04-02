@@ -1,10 +1,18 @@
 version: '3.5'
 
 services:
-  adminer:
-    image: adminer
+  brane-clb:
+    build:
+      context: .
+      dockerfile: Dockerfile.clb
     ports:
-      - "8070:8080"
+      - "50052:50052"
+    restart: always
+    environment:
+        ADDRESS: "0.0.0.0:50052"
+        BROKERS: "kafka:29092"
+        CALLBACK_TOPIC: "clb"
+        DEBUG: "true"
 
   cassandra:
     image: cassandra:4.0
@@ -22,9 +30,12 @@ services:
     environment:
       KAFKA_BROKER_ID: 0
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENERS: DOCKER://kafka:29092,HOST://kafka:9092
+      KAFKA_ADVERTISED_LISTENERS: DOCKER://kafka:29092,HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: DOCKER:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: DOCKER
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_NUM_PARTITIONS: 1
       CONFLUENT_SUPPORT_METRICS_ENABLE: 0
 
   postgres:

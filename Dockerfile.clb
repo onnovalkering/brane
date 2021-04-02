@@ -1,0 +1,34 @@
+FROM rust:1.50 as build
+
+RUN rustup component add rustfmt
+
+RUN apt-get update && apt-get install -y \
+    cmake \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN USER=root cargo new --bin brane-clb
+WORKDIR /brane-clb
+
+# Copy over project manifests
+COPY ./brane-clb/Cargo.toml ./Cargo.toml
+
+# This will prepare dependencies
+RUN cargo build --release
+RUN rm src/*.rs
+
+# Copy over project source code
+COPY ./brane-clb/proto ./proto
+COPY ./brane-clb/src ./src
+COPY ./brane-clb/build.rs ./build.rs
+
+# This will build a release binary
+RUN rm ./target/release/deps/brane_clb*
+RUN cargo build --release
+
+# Define final image
+FROM ubuntu:20.04
+
+# Copy the release binary from the build stage
+COPY --from=build /brane-clb/target/release/brane-clb .
+
+ENTRYPOINT [ "./brane-clb" ]
