@@ -52,7 +52,7 @@ struct WaitUntilAction {
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
-    #[clap(short, long, default_value = "./resources/ping-app.yml")]
+    #[clap(short, long, default_value = "./resources/noop-app.yml")]
     application: PathBuf,
     /// Topic to send commands to
     #[clap(short, long = "cmd-topic", env = "COMMAND_TOPIC")]
@@ -168,12 +168,15 @@ async fn start_event_monitor(
 
                     dbg!(&event);
 
-                    let event_id: Vec<_> = event.identifier.split('+').collect();
+                    let event_id: Vec<_> = event.identifier.split('-').collect();
                     let command_id = event_id.first().unwrap().to_string();
 
                     match kind {
                         EventKind::Created => {
                             owned_states.insert(command_id, String::from("created"));
+                        }
+                        EventKind::Started => {
+                            owned_states.insert(command_id, String::from("started"));
                         }
                         EventKind::Stopped => {
                             owned_states.insert(command_id, String::from("stopped"));

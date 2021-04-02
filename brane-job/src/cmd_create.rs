@@ -12,11 +12,11 @@ use kube::{Client as KubeClient, Config as KubeConfig};
 use rand::distributions::Alphanumeric;
 use rand::{self, Rng};
 use serde_json::{json, Value as JValue};
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::iter;
 use xenon::compute::{JobDescription, Scheduler};
 use xenon::credentials::Credential;
-use std::collections::HashMap;
 
 // Names of environment variables.
 const BRANE_APPLICATION_ID: &str = "BRANE_APPLICATION_ID";
@@ -45,7 +45,7 @@ pub async fn handle(
     let location = infra.get_location_metadata(&location_id).with_context(context)?;
 
     // Generate job identifier.
-    let job_id = format!("{}+{}", correlation_id, get_random_identifier());
+    let job_id = format!("{}-{}", correlation_id, get_random_identifier());
 
     // Branch into specific handlers based on the location kind.
     match location {
@@ -69,7 +69,15 @@ pub async fn handle(
             let environment = construct_environment(&application, &location_id, &job_id, &callback_to)?;
             let credentials = credentials.resolve_secrets(&secrets);
 
-            handle_xenon(command, environment, address, "slurm", runtime, credentials, xenon_channel)?
+            handle_xenon(
+                command,
+                environment,
+                address,
+                "slurm",
+                runtime,
+                credentials,
+                xenon_channel,
+            )?
         }
         Location::Vm {
             address,
@@ -80,11 +88,22 @@ pub async fn handle(
             let environment = construct_environment(&application, &location_id, &job_id, &callback_to)?;
             let credentials = credentials.resolve_secrets(&secrets);
 
-            handle_xenon(command, environment, address, "ssh", runtime, credentials, xenon_channel)?
+            handle_xenon(
+                command,
+                environment,
+                address,
+                "ssh",
+                runtime,
+                credentials,
+                xenon_channel,
+            )?
         }
     };
 
-    info!("Created job '{}' at location '{}' as part of application '{}'.", job_id, location_id, application);
+    info!(
+        "Created job '{}' at location '{}' as part of application '{}'.",
+        job_id, location_id, application
+    );
 
     let order = 0; // A CREATE event is always the first, thus order=0.
     let key = format!("{}#{}", job_id, order);
@@ -112,7 +131,7 @@ fn construct_environment<S: Into<String>>(
     application_id: S,
     location_id: S,
     job_id: S,
-    callback_to: S
+    callback_to: S,
 ) -> Result<HashMap<String, String>> {
     let environment = hashmap! {
         BRANE_APPLICATION_ID.to_string() => application_id.into(),
@@ -207,10 +226,7 @@ fn create_k8s_job_description(
     environment: HashMap<String, String>,
 ) -> Result<Job> {
     let command = command.clone();
-    let environment: Vec<JValue> = environment
-        .iter()
-        .map(|(k, v)| json!({k: v}))
-        .collect();
+    let environment: Vec<JValue> = environment.iter().map(|(k, v)| json!({ "name": k, "value": v })).collect();
 
     let job_description = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
@@ -226,7 +242,7 @@ fn create_k8s_job_description(
                     "containers": [{
                         "name": job_id,
                         "image": command.image.expect("unreachable!"),
-                        "command": command.command,
+                        "args": command.command,
                         "env": environment,
                     }],
                     "restartPolicy": "Never",
@@ -322,7 +338,7 @@ fn create_xenon_scheduler<S1: Into<String>, S2: Into<String>>(
 ///
 fn create_docker_job_description(
     command: &Command,
-    environment: HashMap<String, String>
+    environment: HashMap<String, String>,
 ) -> Result<JobDescription> {
     let command = command.clone();
 
@@ -357,7 +373,7 @@ fn create_docker_job_description(
 ///
 fn create_singularity_job_description(
     command: &Command,
-    environment: HashMap<String, String>
+    environment: HashMap<String, String>,
 ) -> Result<JobDescription> {
     let command = command.clone();
 

@@ -1,7 +1,10 @@
 use anyhow::{bail, Context, Result};
 use brane_cfg::{Infrastructure, Secrets};
-use brane_job::interface::{Command, CommandKind};
-use brane_job::cmd_create;
+use brane_job::{
+    clb_heartbeat, clb_lifecycle,
+    interface::{Callback, CallbackKind, Command, CommandKind},
+};
+use brane_job::{cmd_create, interface::Event};
 use bytes::BytesMut;
 use clap::Clap;
 use dotenv::dotenv;
@@ -12,7 +15,6 @@ use log::LevelFilter;
 use log::{debug, error, info, warn};
 use prost::Message;
 use rdkafka::{
-    Offset,
     admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
     config::ClientConfig,
     consumer::{stream_consumer::StreamConsumer, CommitMode, Consumer},
@@ -20,17 +22,19 @@ use rdkafka::{
     producer::{FutureProducer, FutureRecord},
     types::RDKafkaError,
     util::Timeout,
-    Message as KafkaMesage, TopicPartitionList,
+    Message as KafkaMesage, Offset, TopicPartitionList,
 };
 use std::sync::Arc;
-use std::time::Instant;
 use tokio::task::JoinHandle;
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
+    /// Topic to receive callbacks from
+    #[clap(short, long = "clb-topic", env = "CALLBACK_TOPIC")]
+    callback_topic: String,
     /// Topic to receive commands from
-    #[clap(short, long = "cmd-topic", env = "COMMAND_TOPIC")]
+    #[clap(short = 'o', long = "cmd-topic", env = "COMMAND_TOPIC")]
     command_topic: String,
     /// Kafka brokers
     #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
@@ -73,8 +77,12 @@ async fn main() -> Result<()> {
         logger.filter_level(LevelFilter::Info).init();
     }
 
-    // Ensure that the input (commands) topic exists.
-    ensure_topics(&opts.command_topic, &opts.event_topic, &opts.brokers).await?;
+    // Ensure that the input/output topics exists.
+    ensure_topics(
+        vec![&opts.callback_topic, &opts.command_topic, &opts.event_topic],
+        &opts.brokers,
+    )
+    .await?;
 
     let infra = Infrastructure::new(opts.infra.clone())?;
     let secrets = Secrets::new(opts.secrets.clone())?;
@@ -89,6 +97,7 @@ async fn main() -> Result<()> {
             let handle = tokio::spawn(start_worker(
                 opts.brokers.clone(),
                 opts.group_id.clone(),
+                opts.callback_topic.clone(),
                 opts.command_topic.clone(),
                 opts.event_topic.clone(),
                 infra.clone(),
@@ -118,8 +127,7 @@ async fn main() -> Result<()> {
 ///
 ///
 async fn ensure_topics(
-    input_topic: &str,
-    output_topic: &str,
+    topics: Vec<&str>,
     brokers: &str,
 ) -> Result<()> {
     let admin_client: AdminClient<_> = ClientConfig::new()
@@ -127,15 +135,12 @@ async fn ensure_topics(
         .create()
         .context("Failed to create Kafka admin client.")?;
 
-    let results = admin_client
-        .create_topics(
-            &[
-                NewTopic::new(input_topic, 1, TopicReplication::Fixed(1)),
-                NewTopic::new(output_topic, 1, TopicReplication::Fixed(1)),
-            ],
-            &AdminOptions::new(),
-        )
-        .await?;
+    let topics: Vec<NewTopic> = topics
+        .iter()
+        .map(|t| NewTopic::new(t, 1, TopicReplication::Fixed(1)))
+        .collect();
+
+    let results = admin_client.create_topics(topics.iter(), &AdminOptions::new()).await?;
 
     // Report on the results. Don't consider 'TopicAlreadyExists' an error.
     for result in results {
@@ -161,13 +166,14 @@ async fn ensure_topics(
 async fn start_worker(
     brokers: String,
     group_id: String,
-    input_topic: String,
-    output_topic: String,
+    clb_topic: String,
+    cmd_topic: String,
+    evt_topic: String,
     infra: Infrastructure,
     secrets: Secrets,
     xenon_channel: Channel,
 ) -> Result<()> {
-    let output_topic = output_topic.as_ref();
+    let output_topic = evt_topic.as_ref();
 
     let producer: FutureProducer = ClientConfig::new()
         .set("bootstrap.servers", &brokers)
@@ -188,14 +194,21 @@ async fn start_worker(
 
     // Restore previous topic/partition offset.
     let mut tpl = TopicPartitionList::new();
-    tpl.add_partition(&input_topic, 0);
+    tpl.add_partition(&clb_topic, 0);
+    tpl.add_partition(&cmd_topic, 0);
 
     let committed_offsets = consumer.committed_offsets(tpl.clone(), Timeout::Never)?;
     let committed_offsets = committed_offsets.to_topic_map();
-    if let Some(offset) = committed_offsets.get(&(input_topic.clone(), 0)) {
+    if let Some(offset) = committed_offsets.get(&(clb_topic.clone(), 0)) {
         match offset {
-            Offset::Invalid => tpl.set_partition_offset(&input_topic, 0, Offset::Beginning)?,
-            offset => tpl.set_partition_offset(&input_topic, 0, offset.clone())?,
+            Offset::Invalid => tpl.set_partition_offset(&clb_topic, 0, Offset::Beginning)?,
+            offset => tpl.set_partition_offset(&clb_topic, 0, offset.clone())?,
+        };
+    }
+    if let Some(offset) = committed_offsets.get(&(cmd_topic.clone(), 0)) {
+        match offset {
+            Offset::Invalid => tpl.set_partition_offset(&cmd_topic, 0, Offset::Beginning)?,
+            offset => tpl.set_partition_offset(&cmd_topic, 0, offset.clone())?,
         };
     }
 
@@ -206,7 +219,6 @@ async fn start_worker(
 
     // Create the outer pipeline on the message stream.
     let stream_processor = consumer.start().try_for_each(|borrowed_message| {
-        let start = Instant::now();
         &consumer.commit_message(&borrowed_message, CommitMode::Sync).unwrap();
 
         let owned_message = borrowed_message.detach();
@@ -216,64 +228,50 @@ async fn start_worker(
         let owned_xenon_channel = xenon_channel.clone();
 
         async move {
-            let cmd_key = owned_message
+            let msg_key = owned_message
                 .key()
                 .map(String::from_utf8_lossy)
                 .map(String::from)
                 .unwrap_or_default();
 
-            if cmd_key.is_empty() {
+            if msg_key.is_empty() {
                 warn!("Received message without a key. Ignoring it.");
                 return Ok(());
             }
 
-            if let Some(payload) = owned_message.payload() {
-                // Decode payload into a command message.
-                let command = Command::decode(payload).unwrap();
-                let kind = CommandKind::from_i32(command.kind).unwrap();
+            let msg_payload = owned_message.payload().unwrap_or_default();
+            if msg_payload.is_empty() {
+                warn!("Received message without a payload (key: {}). Ignoring it.", msg_key);
+                return Ok(());
+            }
 
-                // Ignore unkown commands, as we can't dispatch it.
-                if kind == CommandKind::Unknown {
-                    warn!("Received UNKOWN command (key: {}). Ignoring it.", cmd_key);
-                    return Ok(());
+            let events = match owned_message.topic() {
+                "clb" => handle_clb_message(msg_key, msg_payload),
+                "cmd" => {
+                    handle_cmd_message(msg_key, msg_payload, owned_infra, owned_secrets, owned_xenon_channel).await
                 }
+                _ => unreachable!(),
+            };
 
-                info!("Received {} command (key: {}).", kind, cmd_key);
-                debug!("{:?}", command);
+            match events {
+                Ok(events) => {
+                    for (evt_key, event) in events {
+                        // Encode event message into a payload (bytes)
+                        let mut payload = BytesMut::with_capacity(64);
+                        event.encode(&mut payload).unwrap();
 
-                // Dispatch command message to appropriate handlers.
-                let events = match kind {
-                    CommandKind::Create => {
-                        cmd_create::handle(&cmd_key, command, owned_infra, owned_secrets, owned_xenon_channel)
-                    }
-                    CommandKind::Stop => unimplemented!(),
-                    CommandKind::Unknown => unreachable!(),
-                };
+                        // Send event on output topic
+                        let message = FutureRecord::to(&output_topic)
+                            .key(&evt_key)
+                            .payload(payload.to_bytes());
 
-                match events.await {
-                    Ok(events) => {
-                        for (evt_key, event) in events {
-                            // Encode event message into a payload (bytes)
-                            let mut payload = BytesMut::with_capacity(64);
-                            event.encode(&mut payload).unwrap();
-
-                            // Send event on output topic
-                            let message = FutureRecord::to(&output_topic)
-                                .key(&evt_key)
-                                .payload(payload.to_bytes());
-
-                            if let Err(error) = owned_producer.send(message, Timeout::Never).await {
-                                error!("Failed to send event (key: {}): {:?}", evt_key, error);
-                            }
+                        if let Err(error) = owned_producer.send(message, Timeout::Never).await {
+                            error!("Failed to send event (key: {}): {:?}", evt_key, error);
                         }
                     }
-                    Err(error) => error!("{:?}", error),
-                };
-
-                debug!("Command executed in {:?} (key: {}).", start.elapsed(), cmd_key);
-            } else {
-                info!("Received message without payload (key: {}).", cmd_key);
-            }
+                }
+                Err(error) => error!("{:?}", error),
+            };
 
             Ok(())
         }
@@ -282,4 +280,61 @@ async fn start_worker(
     stream_processor
         .await
         .context("Stream processor did not run until completion.")
+}
+
+///
+///
+///
+fn handle_clb_message(
+    key: String,
+    payload: &[u8],
+) -> Result<Vec<(String, Event)>> {
+    // Decode payload into a callback message.
+    let callback = Callback::decode(payload).unwrap();
+    let kind = CallbackKind::from_i32(callback.kind).unwrap();
+
+    // Ignore unkown callbacks, as we can't dispatch it.
+    if kind == CallbackKind::Unknown {
+        warn!("Received UNKOWN command (key: {}). Ignoring it.", key);
+        return Ok(vec![]);
+    }
+
+    info!("Received {} callback (key: {}).", kind, key);
+    debug!("{:?}", callback);
+
+    match kind {
+        CallbackKind::Heartbeat => clb_heartbeat::handle(callback),
+        _ => clb_lifecycle::handle(callback),
+    }
+}
+
+///
+///
+///
+async fn handle_cmd_message(
+    key: String,
+    payload: &[u8],
+    infra: Infrastructure,
+    secrets: Secrets,
+    xenon_channel: Channel,
+) -> Result<Vec<(String, Event)>> {
+    // Decode payload into a command message.
+    let command = Command::decode(payload).unwrap();
+    let kind = CommandKind::from_i32(command.kind).unwrap();
+
+    // Ignore unkown commands, as we can't dispatch it.
+    if kind == CommandKind::Unknown {
+        warn!("Received UNKOWN command (key: {}). Ignoring it.", key);
+        return Ok(vec![]);
+    }
+
+    info!("Received {} command (key: {}).", kind, key);
+    debug!("{:?}", command);
+
+    // Dispatch command message to appropriate handlers.
+    match kind {
+        CommandKind::Create => cmd_create::handle(&key, command, infra, secrets, xenon_channel).await,
+        CommandKind::Stop => unimplemented!(),
+        CommandKind::Unknown => unreachable!(),
+    }
 }

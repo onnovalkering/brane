@@ -1,0 +1,9 @@
+- identifier: noop
+  application: noop-app
+  location: cluster
+  image: onnovalkering/brane-noop
+  command: ["no-op"]
+
+- identifier: noop
+  state: created
+
