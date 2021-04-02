@@ -1,21 +1,14 @@
 use crate::interface::{Callback, CallbackKind};
+use crate::grpc;
 use anyhow::Result;
 use bytes::BytesMut;
 use prost::Message;
-use rdkafka::message::ToBytes;
 use rdkafka::{
+    message::ToBytes,
     producer::{FutureProducer, FutureRecord},
     util::Timeout,
 };
 use tonic::{Request, Response, Status};
-
-pub mod grpc {
-    tonic::include_proto!("callback");
-
-    pub use callback_service_server::CallbackService;
-    pub use callback_service_server::CallbackServiceServer;
-    pub use callback_service_client::CallbackServiceClient;
-}
 
 pub struct CallbackHandler {
     pub callback_topic: String,
