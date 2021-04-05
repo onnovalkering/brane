@@ -1,0 +1,129 @@
+openapi: 3.0.3
+info:
+  title: httpbin
+  version: 0.9.2
+
+servers:
+  - url: https://httpbin.org
+
+paths:
+  '/anything/{anything}':
+    delete:
+      operationId: deleteAnything
+      parameters:
+        - name: anything
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Anything passed in the request.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - method
+                properties:
+                  data:
+                    type: string
+                  method:
+                    type: string
+
+    get:
+      operationId: getAnything
+      parameters:
+        - name: anything
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Anything passed in the request.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - method
+                properties:
+                  data:
+                    type: string
+                  method:
+                    type: string
+
+    patch:
+      operationId: patchAnything
+      parameters:
+        - name: anything
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Anything passed in the request.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - method
+                properties:
+                  data:
+                    type: string
+                  method:
+                    type: string
+
+    post:
+      operationId: postAnything
+      parameters:
+        - name: anything
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Anything passed in the request.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - method
+                properties:
+                  data:
+                    type: string
+                  method:
+                    type: string
+
+    put:
+      operationId: putAnything
+      parameters:
+        - name: anything
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Anything passed in the request.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - method
+                properties:
+                  data:
+                    type: string
+                  method:
+                    type: string
