@@ -1,0 +1,106 @@
+openapi: 3.1.0
+info:
+  title: schema
+  version: 1.0.0
+
+servers:
+  - url: https://example.org
+
+paths:
+  '/schema-empty-object':
+    get:
+      operationId: emptyObject
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
+
+  '/schema-string-property':
+    get:
+      operationId: stringProperty
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  "1":
+                    type: string
+
+  '/schema-number-property':
+    get:
+      operationId: numberProperty
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  "1":
+                    type: number
+
+  '/schema-integer-property':
+    get:
+      operationId: stringProperty
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  "1":
+                    type: integer
+
+  '/schema-boolean-property':
+    get:
+      operationId: stringProperty
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  "1":
+                    type: boolean
+
+  '/schema-two-properties':
+    get:
+      operationId: twoProperties
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  "1":
+                    type: string
+                  "2":
+                    type: string
+
+  '/schema-nested-objects':
+    get:
+      operationId: nestedObjects
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  "1":
+                    type: object
+

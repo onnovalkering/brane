@@ -11,6 +11,7 @@ members = [
     "brane-log",
     "brane-let",
     "brane-loop",
+    "brane-oas",
     "brane-std",
     "brane-sys",
     "brane-vm",

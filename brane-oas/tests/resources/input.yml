@@ -1,0 +1,192 @@
+openapi: 3.1.0
+info:
+  title: parameters
+  version: 1.0.0
+
+servers:
+  - url: https://example.org
+
+paths:
+  '/param-count/{1}':
+    get:
+      operationId: onlyPathParameters
+      parameters:
+        - name: "1"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Anything passed in the request.
+          content:
+            application/json:
+              schema:
+                type: object
+
+  '/param-count/{1}/{2}':
+    get:
+      operationId: onlyPathParameters
+      parameters:
+        - name: "1"
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: "2"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Anything passed in the request.
+          content:
+            application/json:
+              schema:
+                type: object
+
+  '/param-count/{1}/{2}/{3}':
+    get:
+      operationId: onlyPathParameters
+      parameters:
+        - name: "1"
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: "2"
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: "3"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Anything passed in the request.
+          content:
+            application/json:
+              schema:
+                type: object
+
+  '/param-count/{1}/{2}/{3}/{4}':
+    get:
+      operationId: onlyPathParameters
+      parameters:
+        - name: "1"
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: "2"
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: "3"
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: "4"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Anything passed in the request.
+          content:
+            application/json:
+              schema:
+                type: object
+
+  '/param-locations/{1}':
+    get:
+      operationId: onlyPathParameters
+      parameters:
+        - name: "1"
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: "2"
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: "3"
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: "4"
+          in: cookie
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Anything passed in the request.
+          content:
+            application/json:
+              schema:
+                type: object
+
+  '/param-required':
+    get:
+      operationId: onlyPathParameters
+      parameters:
+        - name: "1"
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: "2"
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Anything passed in the request.
+          content:
+            application/json:
+              schema:
+                type: object
+
+  '/param-required-count-4':
+    get:
+      operationId: onlyPathParameters
+      parameters:
+        - name: "1"
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: "2"
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: "3"
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: "4"
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Anything passed in the request.
+          content:
+            application/json:
+              schema:
+                type: object
