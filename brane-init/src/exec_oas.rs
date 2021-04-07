@@ -99,7 +99,7 @@ pub async fn execute(
         .expect("OAS document requires a server.")
         .url;
 
-    let (path, operation) = get_operation(operation_id, &oas_document)?;
+    let (path, method, operation) = get_operation(operation_id, &oas_document)?;
     let mut operation_url = format!("{}{}", base_url, path);
 
     for parameter in &operation.parameters {
@@ -125,7 +125,16 @@ pub async fn execute(
     let client = reqwest::Client::builder().user_agent("HTTPie/1.0.3").build()?;
 
     // Perform the requirest
-    let response = client.get(&operation_url).send().await?.text().await?;
+    let client = match method.as_str() {
+        "delete" => client.delete(&operation_url),
+        "get" => client.get(&operation_url),
+        "patch" => client.patch(&operation_url),
+        "post" => client.post(&operation_url),
+        "put" => client.put(&operation_url),
+        _ => unreachable!()
+    };
+
+    let response = client.send().await?.text().await?;
     Ok(response)
 }
 
@@ -135,36 +144,47 @@ pub async fn execute(
 pub fn get_operation(
     operation_id: &String,
     oas_document: &OpenAPI,
-) -> Result<(String, Operation)> {
-    let (path, path_item) = oas_document
+) -> Result<(String, String, Operation)> {
+    let (path, method, operation) = oas_document
         .paths
         .iter()
-        .find(|(_, path)| {
-            if let ReferenceOr::Item(path) = path {
-                if let Some(get_operation) = &path.get {
-                    if let Some(id) = &get_operation.operation_id {
-                        return operation_id == id.to_lowercase().as_str();
+        .find_map(|(path, path_item)| {
+            if let ReferenceOr::Item(path_item) = path_item {
+                // Check each method-operation to see if the operation ID matches.
+                let check = |op: &Option<Operation>| {
+                    if let Some(op) = op {
+                        if let Some(id) = &op.operation_id {
+                            if operation_id == id.to_lowercase().as_str() {
+                                return true;
+                            }
+                        }
                     }
-                } else {
-                    unimplemented!();
+
+                    false
+                };
+
+                if check(&path_item.delete) {
+                    return Some((path, "delete", path_item.delete.clone()));
+                }
+                if check(&path_item.get) {
+                    return Some((path, "get", path_item.get.clone()));
+                }
+                if check(&path_item.patch) {
+                    return Some((path, "patch", path_item.patch.clone()));
+                }
+                if check(&path_item.post) {
+                    return Some((path, "post", path_item.post.clone()));
+                }
+                if check(&path_item.put) {
+                    return Some((path, "put", path_item.put.clone()));
                 }
             }
 
-            unreachable!();
+            None
         })
         .expect("Mismatch in operation id");
 
-    let operation = if let ReferenceOr::Item(path_item) = path_item {
-        if let Some(operation) = &path_item.get {
-            operation
-        } else {
-            unreachable!();
-        }
-    } else {
-        unreachable!();
-    };
-
-    Ok((path.clone(), operation.clone()))
+    Ok((path.clone(), method.to_string(), operation.unwrap()))
 }
 
 ///

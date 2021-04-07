@@ -1,0 +1,93 @@
+---
+created: "2021-04-05T14:38:00.807072664Z"
+functions:
+  getanything:
+    parameters:
+      - type: string
+        name: anything
+        optional: false
+    pattern:
+      prefix: getanything
+    returnType: GetAnythingOutput
+  deleteanything:
+    parameters:
+      - type: string
+        name: anything
+        optional: false
+    pattern:
+      prefix: deleteanything
+    returnType: DeleteAnythingOutput
+  putanything:
+    parameters:
+      - type: string
+        name: anything
+        optional: false
+    pattern:
+      prefix: putanything
+    returnType: PutAnythingOutput
+  postanything:
+    parameters:
+      - type: string
+        name: anything
+        optional: false
+    pattern:
+      prefix: postanything
+    returnType: PostAnythingOutput
+  patchanything:
+    parameters:
+      - type: string
+        name: anything
+        optional: false
+    pattern:
+      prefix: patchanything
+    returnType: PatchAnythingOutput
+id: 7a4b99e5-fae0-4dc0-b0be-6edbc166604f
+kind: oas
+name: httpbin
+types:
+  PatchAnythingOutput:
+    name: PatchAnythingOutput
+    properties:
+      - type: string
+        name: data
+        optional: true
+      - type: string
+        name: method
+        optional: true
+  PostAnythingOutput:
+    name: PostAnythingOutput
+    properties:
+      - type: string
+        name: data
+        optional: true
+      - type: string
+        name: method
+        optional: true
+  DeleteAnythingOutput:
+    name: DeleteAnythingOutput
+    properties:
+      - type: string
+        name: data
+        optional: true
+      - type: string
+        name: method
+        optional: true
+  PutAnythingOutput:
+    name: PutAnythingOutput
+    properties:
+      - type: string
+        name: data
+        optional: true
+      - type: string
+        name: method
+        optional: true
+  GetAnythingOutput:
+    name: GetAnythingOutput
+    properties:
+      - type: string
+        name: data
+        optional: true
+      - type: string
+        name: method
+        optional: true
+version: 0.9.2
