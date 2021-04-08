@@ -103,12 +103,30 @@ fn build_oas_function_input(
     let mut input_properties = Vec::<Property>::new();
     let mut input_types = Map::<Type>::new();
 
-    // Construct input properties.
+    // Determine input from paramaters.
     for parameter in &operation.parameters {
         let parameter = resolve_reference(parameter)?;
         let mut properties = parameter_to_properties(&parameter)?;
 
         input_properties.append(&mut properties);
+    }
+
+    // Determine input from request body.
+    if let Some(request_body) = &operation.request_body {
+        let request_body = resolve_reference(request_body)?;
+
+        // Only 'application/json' request bodies are supported
+        if let Some(content) = request_body.content.get("application/json") {
+            if let Some(schema) = &content.schema {
+                let schema = resolve_reference(schema)?;
+                let optional = false; // check if is in required list
+                let properties = schema_to_properties(None, &schema, optional)?;
+
+                input_properties.extend(properties);
+            }
+        } else {
+            return Err(anyhow!(OAS_JSON_MEDIA_NOT_FOUND));
+        }
     }
 
     // Convert input properties to parameters.

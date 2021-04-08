@@ -81,3 +81,38 @@ fn param_required_is_preserved() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn body_none_ignored() -> Result<()> {
+    let (function, _) = common::build_oas_function_body("/body-none")?;
+    assert_eq!(function.parameters.len(), 0);
+
+    Ok(())
+}
+
+#[test]
+fn body_empty_ignored() -> Result<()> {
+    let (function, _) = common::build_oas_function_body("/body-empty")?;
+    assert_eq!(function.parameters.len(), 0);
+
+    Ok(())
+}
+
+#[test]
+fn body_object2props_2params() -> Result<()> {
+    let (function, _) = common::build_oas_function_body("/body-object-2")?;
+    assert_eq!(function.parameters.len(), 2);
+
+    Ok(())
+}
+
+#[test]
+fn body_object4props_1param() -> Result<()> {
+    let (function, types) = common::build_oas_function_body("/body-object-4")?;
+    assert_eq!(function.parameters.len(), 1);
+    assert_eq!(types.len(), 1);
+    let input_type = types.values().next().unwrap();
+    assert_eq!(input_type.properties.len(), 4);
+
+    Ok(())
+}

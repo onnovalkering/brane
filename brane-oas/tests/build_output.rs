@@ -1,9 +1,8 @@
 mod common;
-
 use anyhow::Result;
 
 #[test]
-fn resp_none_unit() -> Result<()> {
+fn resp_empty_unit() -> Result<()> {
     let (function, _) = common::build_oas_function_resp("/schema-empty-object")?;
     assert_eq!(function.return_type, String::from("unit"));
 

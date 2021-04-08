@@ -1,0 +1,81 @@
+openapi: 3.1.0
+info:
+  title: body
+  version: 1.0.0
+
+servers:
+  - url: https://example.org
+
+paths:
+  '/body-none':
+    get:
+      operationId: none
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
+
+  '/body-empty':
+    get:
+      operationId: empty
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
+
+  '/body-object-2':
+    get:
+      operationId: object_2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                "1":
+                  type: string
+                "2":
+                  type: string
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
+
+  '/body-object-4':
+    get:
+      operationId: object_4
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                "1":
+                  type: string
+                "2":
+                  type: string
+                "3":
+                  type: string
+                "4":
+                  type: string
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
