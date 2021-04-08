@@ -13,8 +13,8 @@ const OAS_CONTENT_NOT_SUPPORTED: &str = "OpenAPI parameter content mapping is no
 const OAS_JSON_MEDIA_NOT_FOUND: &str = "JSON media type not found (application/json).";
 const OAS_MULTIPLE_NOT_SUPPORTED: &str = "Multiple responses per operation is not supported.";
 const OAS_SCHEMA_NOT_SUPPORTED: &str = "Only type schemas are supported.";
-const OAS_SCHEMA_MUST_BE_OBJECT: &str = "Response schema must be of type object if no name is provided.";
 const OAS_NESTED_OBJECTS_NOT_SUPPORTED: &str = "Nested objects are not supported.";
+const OAS_ONLY_VALUE_ARRAYS_SUPPORTED: &str = "Only value arrays (string[], integer[], ..) are supported.";
 
 /// Traverses a valid OpenAPI document and builds a function
 /// for every operation it finds. Corresponding input/output
@@ -234,7 +234,19 @@ fn schema_to_properties(
     };
 
     let properties = match data_type {
-        OType::Array(_) => unimplemented!(),
+        OType::Array(array) => {
+            let items_schema = *resolve_reference(&array.items)?;
+
+            let data_type = match &items_schema.schema_kind  {
+                SchemaKind::Type(OType::String(_)) => String::from("string[]"),
+                SchemaKind::Type(OType::Number(_)) => String::from("real[]"),
+                SchemaKind::Type(OType::Integer(_)) => String::from("integer[]"),
+                SchemaKind::Type(OType::Boolean{}) => String::from("boolean[]"),
+                _ => return Err(anyhow!(OAS_ONLY_VALUE_ARRAYS_SUPPORTED)),
+            };
+
+            vec![Property::new(name.unwrap_or_default(), data_type, None, None, Some(!required), None)]
+        },
         OType::Object(object) => {
             ensure!(name.is_none(), OAS_NESTED_OBJECTS_NOT_SUPPORTED);
 
@@ -249,19 +261,15 @@ fn schema_to_properties(
             properties
         }
         _ => {
-            if let Some(name) = name {
-                let data_type = match data_type {
-                    OType::String(_) => String::from("string"),
-                    OType::Number(_) => String::from("real"),
-                    OType::Integer(_) => String::from("integer"),
-                    OType::Boolean {} => String::from("boolean"),
-                    _ => unreachable!(),
-                };
+            let data_type = match data_type {
+                OType::String(_) => String::from("string"),
+                OType::Number(_) => String::from("real"),
+                OType::Integer(_) => String::from("integer"),
+                OType::Boolean {} => String::from("boolean"),
+                _ => unreachable!(),
+            };
 
-                vec![Property::new(name, data_type, None, None, Some(!required), None)]
-            } else {
-                bail!(OAS_SCHEMA_MUST_BE_OBJECT);
-            }
+            vec![Property::new(name.unwrap_or_default(), data_type, None, None, Some(!required), None)]
         }
     };
 

@@ -6,13 +6,13 @@ type Map<T> = std::collections::HashMap<String, T>;
 type FunctionAndTypes = (Function, Map<Type>);
 
 #[allow(dead_code)]
-pub fn build_oas_function_input(path: &str) -> Result<FunctionAndTypes> {
-    build_oas_function(path, "input.yml")
+pub fn build_oas_function_param(path: &str) -> Result<FunctionAndTypes> {
+    build_oas_function(path, "param.yml")
 }
 
 #[allow(dead_code)]
-pub fn build_oas_function_output(path: &str) -> Result<FunctionAndTypes> {
-    build_oas_function(path, "output.yml")
+pub fn build_oas_function_resp(path: &str) -> Result<FunctionAndTypes> {
+    build_oas_function(path, "resp.yml")
 }
 
 ///

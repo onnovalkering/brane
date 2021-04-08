@@ -1,0 +1,148 @@
+openapi: 3.1.0
+info:
+  title: resp
+  version: 1.0.0
+
+servers:
+  - url: https://example.org
+
+paths:
+  '/schema-empty-object':
+    get:
+      operationId: emptyObject
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
+
+  '/schema-string':
+    get:
+      operationId: string
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: string
+
+  '/schema-number':
+    get:
+      operationId: number
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: number
+
+  '/schema-integer':
+    get:
+      operationId: integer
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: integer
+
+  '/schema-boolean':
+    get:
+      operationId: boolean
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: boolean
+
+  '/schema-object':
+    get:
+      operationId: object
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  "1":
+                    type: string
+                  "2":
+                    type: string
+
+  '/schema-nested-objects':
+    get:
+      operationId: nestedObjects
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  "1":
+                    type: object
+
+  '/schema-string-array':
+    get:
+      operationId: stringArray
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                    type: string
+
+
+  '/schema-number-array':
+    get:
+      operationId: numberArray
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                    type: number
+
+
+  '/schema-integer-array':
+    get:
+      operationId: integerArray
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                    type: integer
+
+
+  '/schema-boolean-array':
+    get:
+      operationId: booleanArray
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                    type: boolean
