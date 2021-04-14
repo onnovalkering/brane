@@ -10,6 +10,9 @@ cli:
 init:
 	cargo build --release --package brane-init --target x86_64-unknown-linux-musl
 
+branelet:
+	cargo build --release --package brane-let --target x86_64-unknown-linux-musl
+
 
 # Build Docker images
 docker: api ide loop
