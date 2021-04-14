@@ -131,20 +131,25 @@ async fn run(
     };
 
     // Perform final FINISHED callback.
-    if let Ok(value) = output {
-        dbg!(&value);
+    match output {
+        Ok(value) => {
+            dbg!(&value);
 
-        if let Some(callback) = &mut callback.as_mut() {
-            let payload: Vec<u8> = serde_json::to_string(&value)?.into_bytes();
-            callback.finished(Some(payload)).await?;
-        }
-    } else {
-        if let Some(callback) = &mut callback.as_mut() {
-            callback.failed(None).await?;
+            if let Some(callback) = &mut callback.as_mut() {
+                let payload: Vec<u8> = serde_json::to_string(&value)?.into_bytes();
+                callback.finished(Some(payload)).await?;
+            }
+
+            Ok(())
+        },
+        Err(error) => {
+            if let Some(callback) = &mut callback.as_mut() {
+                callback.failed(None).await?;
+            }
+
+            Err(error)
         }
     }
-
-    Ok(())
 }
 
 ///

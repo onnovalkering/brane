@@ -40,6 +40,10 @@ pub async fn handle(
         capture: None,
     });
 
+    if let Some(callback) = callback {
+        callback.started(None).await?;
+    }
+
     // Output variables are captured from the stdout
     let stdout = execute(entrypoint, &command.args, &arguments, &working_dir)?;
     let output = capture_output(stdout, &function.output, &command.capture, &container_info.types)?;
