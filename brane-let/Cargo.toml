@@ -22,5 +22,6 @@ serde_yaml = "0.8"
 socksx = "0.1"
 specifications = { path = "../specifications" }
 tokio = { version = "1", features = ["full"] }
+tokio-compat-02 = "0.2"
 tonic = "0.3"
 yaml-rust = "0.4"

@@ -1,12 +1,15 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use brane_let::callback::Callback;
+use brane_let::exec_code;
 use brane_let::redirector;
 use clap::Clap;
 use dotenv::dotenv;
 use log::LevelFilter;
-use socksx::{self, Socks6Client};
+use serde::de::DeserializeOwned;
+use specifications::common::Value;
+use std::path::PathBuf;
 use std::{future::Future, process, time::Duration};
-use tokio::net::{TcpListener, TcpStream};
+use tokio_compat_02::FutureExt;
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
@@ -21,6 +24,9 @@ struct Opts {
     callback_to: String,
     #[clap(short, long, env = "BRANE_PROXY_ADDRESS")]
     proxy_address: Option<String>,
+    /// Disables callbacks
+    #[clap(long, env = "DISABLE_CALLBACK", takes_value = false)]
+    disable_callback: bool,
     /// Prints debug info
     #[clap(short, long, env = "DEBUG", takes_value = false)]
     debug: bool,
@@ -30,7 +36,17 @@ struct Opts {
 
 #[derive(Clap, Clone)]
 enum SubCommand {
-    /// Don't perform any operation and return nothing.
+    /// Execute arbitrary source code and return output
+    #[clap(name = "code")]
+    Code {
+        /// Function to execute
+        function: String,
+        /// Input arguments
+        arguments: String,
+        #[clap(short, long, env = "BRANE_WORKDIR", default_value = "/opt/wd")]
+        working_dir: PathBuf,
+    },
+    /// Don't perform any operation and return nothing
     #[clap(name = "no-op")]
     NoOp,
 }
@@ -45,6 +61,7 @@ async fn main() -> Result<()> {
     let job_id = opts.job_id.clone();
     let callback_to = opts.callback_to.clone();
     let proxy_address = opts.proxy_address.clone();
+    let disable_callback = opts.disable_callback.clone();
 
     // Configure logger.
     let mut logger = env_logger::builder();
@@ -63,10 +80,14 @@ async fn main() -> Result<()> {
     }
 
     // Callbacks may be called at any time of the execution.
-    let callback = Callback::new(&application_id, &location_id, &job_id, &callback_to);
+    let callback = if !disable_callback {
+        Some(Callback::new(&application_id, &location_id, &job_id, &callback_to))
+    } else {
+        None
+    };
 
     // Wrap actual execution, so we can always log errors.
-    match run(opts.sub_command, callback).await {
+    match run(opts.sub_command, callback).compat().await {
         Ok(_) => process::exit(0),
         Err(error) => {
             eprintln!("{:?}", error);
@@ -80,28 +101,65 @@ async fn main() -> Result<()> {
 ///
 async fn run(
     sub_command: SubCommand,
-    callback: impl Future<Output = Result<Callback>>,
+    callback: Option<impl Future<Output = Result<Callback>>>,
 ) -> Result<()> {
-    let mut callback = callback.await?;
+    let mut callback: Option<Callback> = if let Some(callback) = callback {
+        let mut callback = callback.await?;
 
-    // Perform READY callback as soon as possible.
-    callback.ready(None).await?;
+        callback.ready(None).await?;
+        callback.heartbeat(None).await?;
 
-    // TODO: start hearthbeat background worker.
-    callback.heartbeat(None).await?;
+        Some(callback)
+    } else {
+        None
+    };
 
-    // TODO: perform initialization.
-    callback.initialized(None).await?;
-
-    match sub_command {
+    let output = match sub_command {
+        SubCommand::Code {
+            function,
+            arguments,
+            working_dir,
+        } => exec_code::handle(function, decode_b64(arguments)?, working_dir, &mut callback.as_mut()).await,
         SubCommand::NoOp => {
-            // TODO: start execution.
-            callback.started(None).await?;
+            if let Some(callback) = &mut callback.as_mut() {
+                callback.initialized(None).await?;
+                callback.started(None).await?;
+            }
+
+            Ok(Value::Unit)
         }
     };
 
     // Perform final FINISHED callback.
-    callback.finished(None).await?;
+    if let Ok(value) = output {
+        dbg!(&value);
+
+        if let Some(callback) = &mut callback.as_mut() {
+            let payload: Vec<u8> = serde_json::to_string(&value)?.into_bytes();
+            callback.finished(Some(payload)).await?;
+        }
+    } else {
+        if let Some(callback) = &mut callback.as_mut() {
+            callback.failed(None).await?;
+        }
+    }
 
     Ok(())
+}
+
+///
+///
+///
+fn decode_b64<T>(input: String) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    let input =
+        base64::decode(input).with_context(|| "Decoding failed, encoded input doesn't seem to be Base64 encoded.")?;
+
+    let input = String::from_utf8(input[..].to_vec())
+        .with_context(|| "Conversion failed, decoded input doesn't seem to be UTF-8 encoded.")?;
+
+    serde_json::from_str(&input)
+        .with_context(|| "Deserialization failed, decoded input doesn't seem to be as expected.")
 }
