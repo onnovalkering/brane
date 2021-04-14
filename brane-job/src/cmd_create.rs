@@ -17,6 +17,7 @@ use std::convert::TryFrom;
 use std::iter;
 use xenon::compute::{JobDescription, Scheduler};
 use xenon::credentials::Credential;
+use std::process::Command as OsCommand;
 
 // Names of environment variables.
 const BRANE_APPLICATION_ID: &str = "BRANE_APPLICATION_ID";
@@ -60,6 +61,13 @@ pub async fn handle(
 
             handle_k8s(command, &job_id, environment, address, namespace, credentials).await?
         }
+        Location::Local {
+            callback_to,
+            network,
+        } => {
+            let environment = construct_environment(&application, &location_id, &job_id, &callback_to)?;
+            handle_local(command, &job_id, environment, network)?
+        }
         Location::Slurm {
             address,
             callback_to,
@@ -71,6 +79,7 @@ pub async fn handle(
 
             handle_xenon(
                 command,
+                &job_id,
                 environment,
                 address,
                 "slurm",
@@ -90,6 +99,7 @@ pub async fn handle(
 
             handle_xenon(
                 command,
+                &job_id,
                 environment,
                 address,
                 "ssh",
@@ -107,7 +117,7 @@ pub async fn handle(
 
     let order = 0; // A CREATE event is always the first, thus order=0.
     let key = format!("{}#{}", job_id, order);
-    let event = Event::new(EventKind::Created, job_id, application, location_id, order, None);
+    let event = Event::new(EventKind::Created, job_id, application, location_id, order, None, None);
 
     Ok(vec![(key, event)])
 }
@@ -278,8 +288,30 @@ fn create_k8s_namespace(namespace: &String) -> Result<Namespace> {
 ///
 ///
 ///
+fn handle_local(
+    command: Command,
+    job_id: &String,
+    environment: HashMap<String, String>,
+    network: String
+) -> Result<()> {
+    let job_description = create_docker_job_description(&command, &job_id, environment, Some(network))?;
+
+    let process = OsCommand::new("docker")
+        .args(job_description.arguments.unwrap_or_default())
+        .spawn();
+
+    dbg!(&process);
+
+    Ok(())
+}
+
+
+///
+///
+///
 fn handle_xenon(
     command: Command,
+    job_id: &String,
     environment: HashMap<String, String>,
     address: String,
     adaptor: &str,
@@ -300,8 +332,8 @@ fn handle_xenon(
     let mut scheduler = create_xenon_scheduler(address, adaptor, credentials, xenon_channel)?;
 
     let job_description = match runtime.to_lowercase().as_str() {
-        "singularity" => create_singularity_job_description(&command, environment)?,
-        "docker" => create_docker_job_description(&command, environment)?,
+        "singularity" => create_singularity_job_description(&command, &job_id, environment)?,
+        "docker" => create_docker_job_description(&command, &job_id, environment, None)?,
         _ => unreachable!(),
     };
 
@@ -344,7 +376,9 @@ fn create_xenon_scheduler<S1: Into<String>, S2: Into<String>>(
 ///
 fn create_docker_job_description(
     command: &Command,
+    job_id: &String,
     environment: HashMap<String, String>,
+    network: Option<String>,
 ) -> Result<JobDescription> {
     let command = command.clone();
 
@@ -352,6 +386,8 @@ fn create_docker_job_description(
     let executable = String::from("docker");
     let mut arguments = vec![
         String::from("run"),
+        String::from("--name"),
+        String::from(job_id.clone()),
         String::from("--cap-drop"),
         String::from("ALL"),
         String::from("--cap-add"),
@@ -359,6 +395,17 @@ fn create_docker_job_description(
         String::from("--cap-add"),
         String::from("NET_ADMIN"),
     ];
+
+    if let Some(network) = network {
+        arguments.push(String::from("--network"));
+        arguments.push(network);
+    }
+
+    // Add environment variables
+    for (name, value) in environment {
+        arguments.push(String::from("--env"));
+        arguments.push(format!("{}={}", name, value));
+    }
 
     // Add mount bindings
     for mount in command.mounts {
@@ -375,7 +422,6 @@ fn create_docker_job_description(
     let job_description = JobDescription {
         arguments: Some(arguments),
         executable: Some(executable),
-        environment: Some(environment),
         ..Default::default()
     };
 
@@ -387,6 +433,7 @@ fn create_docker_job_description(
 ///
 fn create_singularity_job_description(
     command: &Command,
+    _job_id: &String,
     environment: HashMap<String, String>,
 ) -> Result<JobDescription> {
     let command = command.clone();
@@ -400,6 +447,12 @@ fn create_singularity_job_description(
         String::from("--add-caps"),
         String::from("CAP_NET_BIND_SERVICE,CAP_NET_ADMIN"),
     ];
+
+    // Add environment variables
+    for (name, value) in environment {
+        arguments.push(String::from("--env"));
+        arguments.push(format!("{}={}", name, value));
+    }
 
     // Add mount bindings
     for mount in command.mounts {
@@ -416,7 +469,6 @@ fn create_singularity_job_description(
     let job_description = JobDescription {
         arguments: Some(arguments),
         executable: Some(executable),
-        environment: Some(environment),
         ..Default::default()
     };
 

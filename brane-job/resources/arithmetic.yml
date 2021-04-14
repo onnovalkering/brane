@@ -1,0 +1,9 @@
+- identifier: addition
+  application: arithmetic-app
+  location: local
+  image: "arithmetic:1.0.0"
+  command: ["code", "add", "ewogICJhIjogewogICAgInYiOiAiaW50ZWdlciIsCiAgICAiYyI6IDEKICB9LAogICJiIjogewogICAgInYiOiAiaW50ZWdlciIsCiAgICAiYyI6IDEKICB9Cn0K"]
+
+- identifier: addition
+  state: finished
+

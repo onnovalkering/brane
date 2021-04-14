@@ -172,17 +172,32 @@ async fn start_event_monitor(
                     let command_id = event_id.first().unwrap().to_string();
 
                     match kind {
+                        EventKind::Unknown => {
+                            owned_states.insert(command_id, String::from("unkown"));
+                        }
                         EventKind::Created => {
                             owned_states.insert(command_id, String::from("created"));
+                        }
+                        EventKind::Ready => {
+                            owned_states.insert(command_id, String::from("created"));
+                        }
+                        EventKind::Initialized => {
+                            owned_states.insert(command_id, String::from("initialized"));
                         }
                         EventKind::Started => {
                             owned_states.insert(command_id, String::from("started"));
                         }
+                        EventKind::Finished => {
+                            owned_states.insert(command_id, String::from("finished"));
+                        }
                         EventKind::Stopped => {
                             owned_states.insert(command_id, String::from("stopped"));
                         }
-                        EventKind::Unknown => {
-                            owned_states.insert(command_id, String::from("unkown"));
+                        EventKind::Failed => {
+                            owned_states.insert(command_id, String::from("failed"));
+                        }
+                        _ => {
+                            unreachable!();
                         }
                     }
                 }

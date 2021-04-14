@@ -134,7 +134,9 @@ pub struct Event {
     pub location: String,
     #[prost(tag = "5", uint32)]
     pub order: u32,
-    #[prost(tag = "6", int64)]
+    #[prost(tag = "6", bytes)]
+    pub payload: Vec<u8>,
+    #[prost(tag = "7", int64)]
     pub timestamp: i64,
 }
 
@@ -148,6 +150,7 @@ impl Event {
         application: S,
         location: S,
         order: u32,
+        payload: Option<Vec<u8>>,
         timestamp: Option<i64>,
     ) -> Self {
         let timestamp = timestamp.unwrap_or_else(|| OffsetDateTime::now_utc().unix_timestamp());
@@ -158,6 +161,7 @@ impl Event {
             application: application.into(),
             location: location.into(),
             order,
+            payload: payload.unwrap_or_default(),
             timestamp,
         }
     }
@@ -165,10 +169,24 @@ impl Event {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Enumeration)]
 pub enum EventKind {
-    Unknown = 0,
-    Created = 1,
-    Started = 2,
-    Stopped = 3,
+    Unknown = -1,
+    Created = 0,
+    Ready = 1,
+    Initialized = 2,
+    Started = 3,
+    Heartbeat = 4,
+    Finished = 5,
+    Stopped = 6,
+    Failed = 7,
+}
+
+impl fmt::Display for EventKind {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        write!(f, "{}", format!("{:?}", self).to_uppercase())
+    }
 }
 
 #[derive(Clone, PartialEq, Message)]

@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1"
 base64 = "0.13"
+bincode = "1.3"
 brane-cfg = { path = "../brane-cfg" }
 bytes = "1"
 clap = "3.0.0-beta.2"
