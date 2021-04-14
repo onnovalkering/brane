@@ -21,6 +21,10 @@ pub enum Location {
         namespace: String,
         credentials: LocationCredentials,
     },
+    Local {
+        callback_to: String,
+        network: String,
+    },
     Vm {
         address: String,
         callback_to: String,
