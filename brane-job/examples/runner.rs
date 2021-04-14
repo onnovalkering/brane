@@ -200,6 +200,8 @@ async fn start_event_monitor(
                             unreachable!();
                         }
                     }
+
+                    dbg!(&owned_states);
                 }
 
                 Ok(())

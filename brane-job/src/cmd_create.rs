@@ -66,7 +66,7 @@ pub async fn handle(
             network,
         } => {
             let environment = construct_environment(&application, &location_id, &job_id, &callback_to)?;
-            handle_local(command, &job_id, environment, network)?
+            handle_local(command, &correlation_id, environment, network)?
         }
         Location::Slurm {
             address,
@@ -386,6 +386,7 @@ fn create_docker_job_description(
     let executable = String::from("docker");
     let mut arguments = vec![
         String::from("run"),
+        String::from("--rm"),
         String::from("--name"),
         String::from(job_id.clone()),
         String::from("--cap-drop"),

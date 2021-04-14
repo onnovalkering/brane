@@ -1,0 +1,26 @@
+- identifier: ppsdg_master
+  application: ppsdg-app
+  location: local
+  image: "ppsdg:1.0.0"
+  command:
+    - "-d"
+    - "code"
+    - "launch"
+    - "ewogICAgIndvcmxkX3NpemUiOiB7CiAgICAgICAgInYiOiAiaW50ZWdlciIsCiAgICAgICAgImMiOiAyCiAgICB9LAogICAgInJhbmsiOiB7CiAgICAgICAgInYiOiAiaW50ZWdlciIsCiAgICAgICAgImMiOiAwCiAgICB9LAogICAgIm1hc3Rlcl9hZGRyIjogewogICAgICAgICJ2IjogInVuaWNvZGUiLAogICAgICAgICJjIjogIjAuMC4wLjAiCiAgICB9LAogICAgIm1hc3Rlcl9wb3J0IjogewogICAgICAgICJ2IjogImludGVnZXIiLAogICAgICAgICJjIjogNTAwMAogICAgfSAgICAgICAKfQ=="
+
+- identifier: ppsdg_master
+  state: started
+
+- identifier: ppsdg_worker
+  application: ppsdg-app
+  location: local
+  image: "ppsdg:1.0.0"
+  command:
+    - "-d"
+    - "code"
+    - "launch"
+    - "ewogICAgIndvcmxkX3NpemUiOiB7CiAgICAgICAgInYiOiAiaW50ZWdlciIsCiAgICAgICAgImMiOiAyCiAgICB9LAogICAgInJhbmsiOiB7CiAgICAgICAgInYiOiAiaW50ZWdlciIsCiAgICAgICAgImMiOiAxCiAgICB9LAogICAgIm1hc3Rlcl9hZGRyIjogewogICAgICAgICJ2IjogInVuaWNvZGUiLAogICAgICAgICJjIjogInBwc2RnX21hc3RlciIKICAgIH0sCiAgICAibWFzdGVyX3BvcnQiOiB7CiAgICAgICAgInYiOiAiaW50ZWdlciIsCiAgICAgICAgImMiOiA1MDAwCiAgICB9ICAgICAgIAp9"
+
+- identifier: ppsdg_master
+  state: finished
+
