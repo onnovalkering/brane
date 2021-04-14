@@ -9,6 +9,7 @@ use std::fs::{self, File};
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
 use std::process::Command;
+use fs_extra::dir::CopyOptions;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -195,17 +196,25 @@ fn prepare_directory(
     fs::copy(package_dir.join("package.yml"), wd.join("package.yml"))?;
 
     if let Some(files) = &ecu_document.files {
-        for file in files {
-            let wd_path = wd.join(file);
+        for file_path in files {
+            let wd_path = wd.join(file_path);
             if let Some(parent) = wd_path.parent() {
                 if !parent.exists() {
                     fs::create_dir_all(&parent)?;
                 }
             }
 
-            let file_path = context.join(file);
-            fs::copy(&file_path, &wd_path)
-                .with_context(|| format!("Couldn't find {:?} within the build context.", file_path))?;
+            let file_path = fs::canonicalize(context.join(file_path))?;
+            if file_path.is_dir() {
+                let mut copy_options = CopyOptions::new();
+                copy_options.copy_inside = true;
+
+                fs_extra::dir::copy(&file_path, &wd_path, &copy_options)
+                    .with_context(|| format!("Couldn't find/copy {:?} within the build context.", file_path))?;
+            } else {
+                fs::copy(&file_path, &wd_path)
+                    .with_context(|| format!("Couldn't find/copy {:?} within the build context.", file_path))?;
+            }
 
             debug!("Copied {:?} to working directory", file_path);
         }
