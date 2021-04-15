@@ -24,6 +24,7 @@ const BRANE_APPLICATION_ID: &str = "BRANE_APPLICATION_ID";
 const BRANE_LOCATION_ID: &str = "BRANE_LOCATION_ID";
 const BRANE_JOB_ID: &str = "BRANE_JOB_ID";
 const BRANE_CALLBACK_TO: &str = "BRANE_CALLBACK_TO";
+const BRANE_PROXY_ADDRESS: &str = "BRANE_PROXY_ADDRESS";
 
 ///
 ///
@@ -55,8 +56,9 @@ pub async fn handle(
             callback_to,
             namespace,
             credentials,
+            proxy_address,
         } => {
-            let environment = construct_environment(&application, &location_id, &job_id, &callback_to)?;
+            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address)?;
             let credentials = credentials.resolve_secrets(&secrets);
 
             handle_k8s(command, &job_id, environment, address, namespace, credentials).await?
@@ -64,8 +66,9 @@ pub async fn handle(
         Location::Local {
             callback_to,
             network,
+            proxy_address,
         } => {
-            let environment = construct_environment(&application, &location_id, &job_id, &callback_to)?;
+            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address)?;
             handle_local(command, &correlation_id, environment, network)?
         }
         Location::Slurm {
@@ -73,8 +76,9 @@ pub async fn handle(
             callback_to,
             runtime,
             credentials,
+            proxy_address,
         } => {
-            let environment = construct_environment(&application, &location_id, &job_id, &callback_to)?;
+            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address)?;
             let credentials = credentials.resolve_secrets(&secrets);
 
             handle_xenon(
@@ -93,8 +97,9 @@ pub async fn handle(
             callback_to,
             runtime,
             credentials,
+            proxy_address,
         } => {
-            let environment = construct_environment(&application, &location_id, &job_id, &callback_to)?;
+            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address)?;
             let credentials = credentials.resolve_secrets(&secrets);
 
             handle_xenon(
@@ -142,13 +147,18 @@ fn construct_environment<S: Into<String>>(
     location_id: S,
     job_id: S,
     callback_to: S,
+    proxy_address: &Option<String>,
 ) -> Result<HashMap<String, String>> {
-    let environment = hashmap! {
+    let mut environment = hashmap! {
         BRANE_APPLICATION_ID.to_string() => application_id.into(),
         BRANE_LOCATION_ID.to_string() => location_id.into(),
         BRANE_JOB_ID.to_string() => job_id.into(),
         BRANE_CALLBACK_TO.to_string() => callback_to.into(),
     };
+
+    if let Some(proxy_address) = proxy_address {
+        environment.insert(BRANE_PROXY_ADDRESS.to_string(), proxy_address.clone());
+    }
 
     Ok(environment)
 }
@@ -392,14 +402,18 @@ fn create_docker_job_description(
         String::from("--cap-drop"),
         String::from("ALL"),
         String::from("--cap-add"),
+        String::from("NET_ADMIN"),
+        String::from("--cap-add"),
         String::from("NET_BIND_SERVICE"),
         String::from("--cap-add"),
-        String::from("NET_ADMIN"),
+        String::from("NET_RAW")
     ];
 
     if let Some(network) = network {
         arguments.push(String::from("--network"));
         arguments.push(network);
+        arguments.push(String::from("--hostname"));
+        arguments.push(job_id.clone());
     }
 
     // Add environment variables
@@ -446,7 +460,7 @@ fn create_singularity_job_description(
         String::from("--drop-caps"),
         String::from("ALL"),
         String::from("--add-caps"),
-        String::from("CAP_NET_BIND_SERVICE,CAP_NET_ADMIN"),
+        String::from("CAP_NET_ADMIN,CAP_NET_BIND_SERVICE,CAP_NET_RAW"),
     ];
 
     // Add environment variables
