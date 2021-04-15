@@ -121,6 +121,10 @@ fn generate_dockerfile(
     } else {
         write!(contents, "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-change-held-packages --allow-downgrades ")?;
     }
+
+    // Default dependencies
+    write!(contents, "iptables ")?;
+
     if let Some(dependencies) = &ecu_document.dependencies {
         for dependency in dependencies {
             write!(contents, "{} ", dependency)?;
