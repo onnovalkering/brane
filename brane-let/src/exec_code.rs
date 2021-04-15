@@ -2,8 +2,10 @@ use crate::callback::Callback;
 use anyhow::{Context, Result};
 use specifications::common::{Parameter, Type, Value};
 use specifications::container::{ActionCommand, ContainerInfo};
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::Command;
+use subprocess::{Exec, Redirection};
 use yaml_rust::{Yaml, YamlLoader};
 
 type Map<T> = std::collections::HashMap<String, T>;
@@ -119,38 +121,43 @@ fn execute(
     command_args: &[String],
     arguments: &Map<Value>,
     working_dir: &PathBuf,
-) -> Result<String> {
+) -> Result<Vec<String>> {
     let entrypoint_path = working_dir.join(entrypoint).canonicalize()?;
-    let mut command = if entrypoint_path.is_file() {
-        Command::new(entrypoint_path)
+    let command = if entrypoint_path.is_file() {
+        Exec::cmd(entrypoint_path)
     } else {
         let segments = entrypoint.split_whitespace().collect::<Vec<&str>>();
         let entrypoint_path = working_dir.join(&segments[0]).canonicalize()?;
 
-        let mut command = Command::new(entrypoint_path);
-        command.args(segments.iter().skip(1));
-
-        command
+        Exec::cmd(entrypoint_path).args(&segments[1..])
     };
 
     let envs = construct_envs(arguments)?;
     debug!("Using environment variables:\n{:#?}", envs);
+    let envs: Vec<_> = envs.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
 
-    let result = command
+    let process = command
         .args(command_args)
-        .envs(envs)
-        .output()
-        .expect("Couldn't execute action");
+        .env_extend(&envs)
+        .stderr(Redirection::Merge)
+        .stdout(Redirection::Pipe)
+        .stream_stdout()
+        .expect("Couldn't start subprocess.");
 
-    let stdout = String::from(String::from_utf8_lossy(&result.stdout));
-    let stderr = String::from(String::from_utf8_lossy(&result.stderr));
+    let br = BufReader::new(process);
+    let mut lines = Vec::new();
 
-    debug!("stdout:\n{}", &stdout);
-    debug!("stderr:\n{}", &stderr);
+    for line in br.lines() {
+        if let Ok(line) = line {
+            println!("{}", &line);
+            lines.push(line);
+        }
+    }
 
-    ensure!(result.status.success(), "Non-zero exit status for action");
+    // TODO: is this possible with subprocess crate?
+    // ensure!(result.exit_status == ExitStatus::Exited(0), "Non-zero exit status for action");
 
-    Ok(stdout)
+    Ok(lines)
 }
 
 ///
@@ -247,7 +254,7 @@ fn construct_struct_envs(
 ///
 ///
 fn capture_output(
-    stdout: String,
+    stdout: Vec<String>,
     parameters: &[Parameter],
     mode: &Option<String>,
     c_types: &Option<Map<Type>>,
@@ -390,40 +397,39 @@ const PREFIX: &str = "~~>";
 ///
 ///
 fn preprocess_stdout(
-    stdout: String,
+    stdout: Vec<String>,
     mode: &Option<String>,
 ) -> Result<String> {
     let mode = mode.clone().unwrap_or_else(|| String::from("complete"));
 
-    if mode == "complete" {
-        return Ok(stdout);
-    }
-
     let mut captured = Vec::new();
+    match mode.as_str() {
+        "complete" => return Ok(stdout.join("\n")),
+        "marked" => {
+            let mut capture = false;
 
-    if mode == "marked" {
-        let mut capture = false;
+            for line in stdout {
+                if !capture && line.trim_start().starts_with(MARK_START) {
+                    capture = true;
+                    continue;
+                }
 
-        for line in stdout.split('\n') {
-            if !capture && line.trim_start().starts_with(MARK_START) {
-                capture = true;
-                continue;
-            }
+                if capture && line.trim_start().starts_with(MARK_END) {
+                    break;
+                }
 
-            if capture && line.trim_start().starts_with(MARK_END) {
-                break;
-            }
-
-            captured.push(line);
-        }
-    }
-
-    if mode == "prefixed" {
-        for line in stdout.split('\n') {
-            if line.starts_with(PREFIX) {
-                captured.push(line.trim_start_matches(PREFIX));
+                captured.push(line);
             }
         }
+        "prefixed" => {
+            for line in stdout {
+                if line.starts_with(PREFIX) {
+                    let trimmed = line.trim_start_matches(PREFIX);
+                    captured.push(trimmed.to_string());
+                }
+            }
+        }
+        _ => unreachable!(),
     }
 
     Ok(captured.join("\n"))

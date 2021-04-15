@@ -8,7 +8,7 @@ use log::LevelFilter;
 use serde::de::DeserializeOwned;
 use specifications::common::Value;
 use std::path::PathBuf;
-use std::{future::Future, process, time::Duration};
+use std::{future::Future, process};
 use tokio_compat_02::FutureExt;
 
 #[derive(Clap)]
@@ -74,9 +74,8 @@ async fn main() -> Result<()> {
     }
 
     // Start redirector in the background, if proxy address is set.
-    if proxy_address.is_some() {
-        tokio::spawn(redirector::start(proxy_address.unwrap()));
-        tokio::time::sleep(Duration::from_millis(500)).await;
+    if let Some(proxy_address) = proxy_address {
+        redirector::start(proxy_address).await?;
     }
 
     // Callbacks may be called at any time of the execution.
@@ -141,7 +140,7 @@ async fn run(
             }
 
             Ok(())
-        },
+        }
         Err(error) => {
             if let Some(callback) = &mut callback.as_mut() {
                 callback.failed(None).await?;
