@@ -20,22 +20,26 @@ pub enum Location {
         callback_to: String,
         namespace: String,
         credentials: LocationCredentials,
+        proxy_address: Option<String>,
     },
     Local {
         callback_to: String,
         network: String,
+        proxy_address: Option<String>,
     },
     Vm {
         address: String,
         callback_to: String,
         runtime: String,
         credentials: LocationCredentials,
+        proxy_address: Option<String>,
     },
     Slurm {
         address: String,
         callback_to: String,
         runtime: String,
         credentials: LocationCredentials,
+        proxy_address: Option<String>,
     },
 }
 
