@@ -1,0 +1,33 @@
+FROM rust:1.50 as build
+
+RUN rustup component add rustfmt
+
+RUN apt-get update && apt-get install -y \
+    cmake \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN USER=root cargo new --bin brane-net
+WORKDIR /brane-net
+
+# Copy over project manifests
+COPY ./brane-net/Cargo.toml ./Cargo.toml
+
+# This will prepare dependencies
+RUN cargo build --release
+RUN rm src/*.rs
+
+# Copy over project source code
+COPY ./brane-net/src ./src
+
+# This will build a release binary
+RUN rm ./target/release/deps/brane_net*
+RUN cargo build --release
+
+# Define final image
+FROM ubuntu:20.04
+
+# Copy the release binary from the build stage
+COPY --from=build /brane-net/target/release/brane-net .
+
+EXPOSE 5080
+ENTRYPOINT [ "./brane-net" ]

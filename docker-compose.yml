@@ -14,6 +14,19 @@ services:
         CALLBACK_TOPIC: "clb"
         DEBUG: "true"
 
+  brane-net:
+    build:
+      context: .
+      dockerfile: Dockerfile.net
+    ports:
+      - "5080:5080"
+    restart: always
+    environment:
+        ADDRESS: "0.0.0.0:5080"
+        BROKERS: "kafka:29092"
+        EVENT_TOPIC: "net-evt"
+        DEBUG: "true"
+
   cassandra:
     image: cassandra:4.0
     ports:

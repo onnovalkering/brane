@@ -17,3 +17,8 @@ members = [
     "brane-vm",
     "specifications",
 ]
+
+# Keep it seperate: conflicting dependencies.
+exclude = [
+    "brane-net"
+]
