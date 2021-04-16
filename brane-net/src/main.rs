@@ -1,22 +1,24 @@
-use std::sync::Arc;
-
 use anyhow::{Context, Result};
+use brane_net::interface::{NetEvent, NetEventKind};
 use clap::Clap;
 use dotenv::dotenv;
-use log::LevelFilter;
-use socksx::Socks6Handler;
-use tokio::net::TcpListener;
+use log::{LevelFilter, debug, warn};
+use prost::{bytes::BytesMut, Message};
 use rdkafka::{
     admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
-    producer::FutureProducer,
     error::RDKafkaErrorCode,
+    producer::{FutureProducer, FutureRecord},
+    util::Timeout,
     ClientConfig,
+    message::ToBytes,
 };
+use socksx::socks6::{self, SocksReply};
+use tokio::net::{TcpListener, TcpStream};
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
-    #[clap(short, long, default_value = "127.0.0.1:5080", env = "ADDRESS")]
+    #[clap(short, long, default_value = "0.0.0.0:5081", env = "ADDRESS")]
     /// Service address
     address: String,
     /// Kafka brokers
@@ -46,28 +48,105 @@ async fn main() -> Result<()> {
     }
 
     // Ensure that the callback topic (output) exists.
-    let callback_topic = opts.event_topic.clone();
-    ensure_event_topic(&callback_topic, &opts.brokers).await?;
+    let event_topic = opts.event_topic.clone();
+    ensure_event_topic(&event_topic, &opts.brokers).await?;
 
-    let _producer: FutureProducer = ClientConfig::new()
+    let producer: FutureProducer = ClientConfig::new()
         .set("bootstrap.servers", &opts.brokers)
         .set("message.timeout.ms", "5000")
         .create()
         .context("Failed to create Kafka producer.")?;
 
+    // Start listening for SOCKS connections.
     let listener = TcpListener::bind(opts.address).await?;
-    let handler = Arc::new(Socks6Handler::new());
-
     loop {
-        let (mut incoming, _) = listener.accept().await?;
-        let handler = Arc::clone(&handler);
+        let (socket, _) = listener.accept().await?;
 
-        dbg!(&incoming);
+        let producer = producer.clone();
+        let event_topic = event_topic.clone();
 
-        tokio::spawn(async move { handler.handle_request(&mut incoming).await });
+        tokio::spawn(async move { handle_connection(socket, producer, event_topic).await });
     }
 }
 
+///
+///
+///
+pub async fn handle_connection(
+    mut source: TcpStream,
+    producer: FutureProducer,
+    event_topic: String,
+) -> Result<()> {
+    match socks6::read_request(&mut source).await {
+        Ok(request) => {
+            socks6::no_authentication(&mut source).await?;
+
+            if let Ok(mut destination) = TcpStream::connect(request.destination.to_string()).await {
+                // EVENT: connection has been established between source and destination.
+                emit_event(NetEventKind::Connected, &producer, &event_topic, None).await?;
+
+                socks6::write_reply(&mut source, socks6::SocksReply::Success).await?;
+                socks6::write_initial_data(&mut destination, &request).await?;
+
+                // Patch together the source and destination sockets, collect number of bytes transfered.
+                let (_bytes_sd, _bytes_ds) = socksx::copy_bidirectional(&mut source, &mut destination).await?;
+
+                // EVENT: connection has been closed between source and destination.
+                emit_event(NetEventKind::Disconnected, &producer, &event_topic, None).await?;
+            } else {
+                warn!("host unreachable");
+                socks6::write_reply(&mut source, SocksReply::HostUnreachable).await?;
+            }
+        }
+        Err(_) => {
+            warn!("general failure");
+            socks6::write_reply(&mut source, SocksReply::GeneralFailure).await?;
+        }
+    }
+
+    Ok(())
+}
+
+///
+///
+///
+pub async fn emit_event(
+    kind: NetEventKind,
+    producer: &FutureProducer,
+    event_topic: &str,
+    payload: Option<Vec<u8>>,
+) -> Result<()> {
+    // Get metadata from SOCKS options.
+    let application = "app".to_string();
+    let location = "loc".to_string();
+    let job_id = "job".to_string();
+    let order = 1;
+
+    // Create new event.
+    let event_key = format!("{}#{}", job_id, order);
+    let event = NetEvent::new(
+        kind,
+        application,
+        location,
+        job_id,
+        order,
+        payload,
+        None,
+    );
+
+    // Encode event as bytes.
+    let mut payload = BytesMut::with_capacity(64);
+    event.encode(&mut payload).unwrap();
+
+    // Send event on output topic
+    let message = FutureRecord::to(&event_topic).key(&event_key).payload(payload.to_bytes());
+
+    if let Err(error) = producer.send(message, Timeout::Never).await {
+        log::error!("Failed to send event (key: {}): {:?}", event_key, error);
+    }
+
+    Ok(())
+}
 
 ///
 ///
