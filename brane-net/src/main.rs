@@ -2,17 +2,17 @@ use anyhow::{Context, Result};
 use brane_net::interface::{NetEvent, NetEventKind};
 use clap::Clap;
 use dotenv::dotenv;
-use log::{LevelFilter, debug, warn};
+use log::{warn, LevelFilter};
 use prost::{bytes::BytesMut, Message};
 use rdkafka::{
     admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
     error::RDKafkaErrorCode,
+    message::ToBytes,
     producer::{FutureProducer, FutureRecord},
     util::Timeout,
     ClientConfig,
-    message::ToBytes,
 };
-use socksx::socks6::{self, SocksReply};
+use socksx::socks6::{self, Socks6Request, SocksReply};
 use tokio::net::{TcpListener, TcpStream};
 
 #[derive(Clap)]
@@ -79,20 +79,29 @@ pub async fn handle_connection(
 ) -> Result<()> {
     match socks6::read_request(&mut source).await {
         Ok(request) => {
+            dbg!(&request);
             socks6::no_authentication(&mut source).await?;
 
             if let Ok(mut destination) = TcpStream::connect(request.destination.to_string()).await {
                 // EVENT: connection has been established between source and destination.
-                emit_event(NetEventKind::Connected, &producer, &event_topic, None).await?;
+                emit_event(NetEventKind::Connected, &producer, &event_topic, &request, None).await?;
 
                 socks6::write_reply(&mut source, socks6::SocksReply::Success).await?;
                 socks6::write_initial_data(&mut destination, &request).await?;
 
                 // Patch together the source and destination sockets, collect number of bytes transfered.
-                let (_bytes_sd, _bytes_ds) = socksx::copy_bidirectional(&mut source, &mut destination).await?;
+                let bytes_written = socksx::copy_bidirectional(&mut source, &mut destination).await?;
 
                 // EVENT: connection has been closed between source and destination.
-                emit_event(NetEventKind::Disconnected, &producer, &event_topic, None).await?;
+                let payload = bincode::serialize(&bytes_written)?;
+                emit_event(
+                    NetEventKind::Disconnected,
+                    &producer,
+                    &event_topic,
+                    &request,
+                    Some(payload),
+                )
+                .await?;
             } else {
                 warn!("host unreachable");
                 socks6::write_reply(&mut source, SocksReply::HostUnreachable).await?;
@@ -114,32 +123,31 @@ pub async fn emit_event(
     kind: NetEventKind,
     producer: &FutureProducer,
     event_topic: &str,
+    request: &Socks6Request,
     payload: Option<Vec<u8>>,
 ) -> Result<()> {
     // Get metadata from SOCKS options.
-    let application = "app".to_string();
-    let location = "loc".to_string();
-    let job_id = "job".to_string();
-    let order = 1;
+    let application = request.metadata.get(&1u16).map(String::clone).unwrap_or_default();
+    let location = request.metadata.get(&2u16).map(String::clone).unwrap_or_default();
+    let job_id = request.metadata.get(&3u16).map(String::clone).unwrap_or_default();
+    let order = request
+        .metadata
+        .get(&4u16)
+        .map(|x| x.parse().unwrap_or_default())
+        .unwrap_or_default();
 
     // Create new event.
     let event_key = format!("{}#{}", job_id, order);
-    let event = NetEvent::new(
-        kind,
-        application,
-        location,
-        job_id,
-        order,
-        payload,
-        None,
-    );
+    let event = NetEvent::new(kind, application, location, job_id, order, payload, None);
 
     // Encode event as bytes.
     let mut payload = BytesMut::with_capacity(64);
     event.encode(&mut payload).unwrap();
 
     // Send event on output topic
-    let message = FutureRecord::to(&event_topic).key(&event_key).payload(payload.to_bytes());
+    let message = FutureRecord::to(&event_topic)
+        .key(&event_key)
+        .payload(payload.to_bytes());
 
     if let Err(error) = producer.send(message, Timeout::Never).await {
         log::error!("Failed to send event (key: {}): {:?}", event_key, error);
