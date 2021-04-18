@@ -10,6 +10,7 @@ use specifications::common::Value;
 use std::path::PathBuf;
 use std::{future::Future, process};
 use tokio_compat_02::FutureExt;
+use socksx::options::MetadataOption;
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
@@ -75,7 +76,17 @@ async fn main() -> Result<()> {
 
     // Start redirector in the background, if proxy address is set.
     if let Some(proxy_address) = proxy_address {
-        redirector::start(proxy_address).await?;
+        let options = vec![
+            MetadataOption::new(1, application_id.clone()),
+            MetadataOption::new(2, location_id.clone()),
+            MetadataOption::new(3, job_id.clone()),
+        ];
+
+        redirector::start(
+            proxy_address,
+            options,
+        )
+        .await?;
     }
 
     // Callbacks may be called at any time of the execution.

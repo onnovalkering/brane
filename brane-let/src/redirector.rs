@@ -1,5 +1,6 @@
 use anyhow::Result;
 use socksx::{self, Socks6Client};
+use socksx::options::{SocksOption, MetadataOption};
 use std::net::IpAddr;
 use std::process::Command;
 use std::time::Duration;
@@ -10,7 +11,10 @@ const REDIRECTOR_ADDRESS: &str = "127.0.0.1:42000";
 ///
 ///
 ///
-pub async fn start(proxy_address: String) -> Result<()> {
+pub async fn start(
+    proxy_address: String,
+    options: Vec<SocksOption>,
+) -> Result<()> {
     let proxy_ip = socksx::resolve_addr(&proxy_address).await?.ip();
 
     // Turn interception on as quickly as possible.
@@ -22,11 +26,17 @@ pub async fn start(proxy_address: String) -> Result<()> {
 
     tokio::spawn(async move {
         debug!("Started redirector service on: {}", REDIRECTOR_ADDRESS);
+        let mut order = 0;
 
         loop {
             match listener.accept().await {
                 Ok((stream, _)) => {
-                    tokio::spawn(redirect(stream, client.clone()));
+                    // Append (dynamic) order metadata property.
+                    let mut options = options.clone();
+                    options.push(MetadataOption::new(5, order.to_string()));
+                    order = order + 1;
+
+                    tokio::spawn(redirect(stream, client.clone(), options));
                 }
                 Err(err) => {
                     error!("An error occured while trying to redirect a connection: {:?}", err);
@@ -37,7 +47,7 @@ pub async fn start(proxy_address: String) -> Result<()> {
     });
 
     // Everything *should* be instantaneous, but give it some time to be sure.
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(256)).await;
 
     Ok(())
 }
@@ -75,11 +85,12 @@ fn configure_iptables(proxy_ip: &IpAddr) -> Result<()> {
 async fn redirect(
     incoming: TcpStream,
     client: Socks6Client,
+    options: Vec<SocksOption>,
 ) -> Result<()> {
     let mut incoming = incoming;
     let dst_addr = socksx::get_original_dst(&incoming)?;
 
-    let (mut outgoing, _) = client.connect(dst_addr, None, None).await?;
+    let (mut outgoing, _) = client.connect(dst_addr, None, Some(options)).await?;
     tokio::io::copy_bidirectional(&mut incoming, &mut outgoing).await?;
 
     Ok(())
