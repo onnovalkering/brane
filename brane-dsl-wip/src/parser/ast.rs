@@ -12,13 +12,14 @@ pub enum Stmt {
         ident: Ident,
         params: Vec<Ident>,
         body: Block,
-    },    
+    },
     Expr(Expr),
     If {
         condition: Expr,
         consequent: Block,
         alternative: Option<Block>,
     },
+    Import(Ident),
     For {
         initializer: Box<Stmt>,
         condition: Expr,

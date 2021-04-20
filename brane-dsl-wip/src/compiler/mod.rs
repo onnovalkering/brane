@@ -34,6 +34,7 @@ pub enum OpCode {
     OpSetGlobal,
     OpCall,
     OpClass,
+    OpImport,
 }
 
 impl Into<u8> for OpCode {
@@ -72,6 +73,7 @@ impl From<u8> for OpCode {
             0x19 => OpCode::OpSetGlobal,
             0x1A => OpCode::OpCall,
             0x1B => OpCode::OpClass,
+            0x1C => OpCode::OpImport,
             _ => {
                 panic!("ERROR: not a OpCode: {}", byte);
             }
@@ -81,37 +83,31 @@ impl From<u8> for OpCode {
 
 #[derive(Clone)]
 pub enum Function {
-    External {
-        name: String,
-    },
-    Native {
-        name: String,
-        arity: i32,
-    },
-    UserDefined {
-        name: String,
-        arity: i32,
-        chunk: Chunk,
-    },
+    External { name: String },
+    Native { name: String, arity: i32 },
+    UserDefined { name: String, arity: i32, chunk: Chunk },
 }
 
 impl fmt::Debug for Function {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut Formatter<'_>,
+    ) -> fmt::Result {
         match self {
-            Function::External { name, .. }
-            | Function::Native { name, .. }
-            | Function::UserDefined { name, .. } => write!(f, "{}", name),
+            Function::External { name, .. } | Function::Native { name, .. } | Function::UserDefined { name, .. } => {
+                write!(f, "{}", name)
+            }
         }
     }
 }
 
 impl Function {
-    pub fn new(name: String, arity: i32, chunk: Chunk) -> Self {
-        Function::UserDefined {
-            arity,
-            name,
-            chunk,
-        }
+    pub fn new(
+        name: String,
+        arity: i32,
+        chunk: Chunk,
+    ) -> Self {
+        Function::UserDefined { arity, name, chunk }
     }
 }
 
@@ -130,7 +126,7 @@ pub enum Value {
     Real(f64),
     Unit,
     Function(Function),
-    Class(Class)
+    Class(Class),
 }
 
 #[derive(Debug, Clone)]
@@ -194,11 +190,17 @@ impl Chunk {
         }
     }
 
-    pub fn write<B: Into<u8>>(&mut self, byte: B) {
+    pub fn write<B: Into<u8>>(
+        &mut self,
+        byte: B,
+    ) {
         self.code.put_u8(byte.into());
     }
 
-    pub fn add_constant(&mut self, value: Value) -> u8 {
+    pub fn add_constant(
+        &mut self,
+        value: Value,
+    ) -> u8 {
         self.constants.push(value);
 
         (self.constants.len() as u8) - 1
@@ -216,11 +218,16 @@ pub fn compile(program: Program) -> Result<Function> {
         stmt_to_opcodes(stmt, &mut chunk, &mut locals, 0);
     }
 
-    // disassemble_chunk(&chunk, "main");
+    disassemble_chunk(&chunk, "main");
     Ok(Function::new(String::from("main"), 0, chunk))
 }
 
-pub fn compile_function(block: Block, scope: i32, params: &Vec<Ident>, name: String) -> Result<Function> {
+pub fn compile_function(
+    block: Block,
+    scope: i32,
+    params: &Vec<Ident>,
+    name: String,
+) -> Result<Function> {
     let mut locals = Vec::new();
     let mut chunk = Chunk::new();
 
@@ -242,7 +249,7 @@ pub fn compile_function(block: Block, scope: i32, params: &Vec<Ident>, name: Str
         stmt_to_opcodes(stmt, &mut chunk, &mut locals, scope);
     }
 
-    // disassemble_chunk(&chunk, &name);
+    disassemble_chunk(&chunk, &name);
     let function = Function::new(name, params.len() as i32, chunk);
 
     Ok(function)
@@ -251,8 +258,18 @@ pub fn compile_function(block: Block, scope: i32, params: &Vec<Ident>, name: Str
 ///
 ///
 ///
-pub fn stmt_to_opcodes(stmt: Stmt, chunk: &mut Chunk, locals: &mut Vec<Local>, scope: i32) {
+pub fn stmt_to_opcodes(
+    stmt: Stmt,
+    chunk: &mut Chunk,
+    locals: &mut Vec<Local>,
+    scope: i32,
+) {
     match stmt {
+        Stmt::Import(Ident(ident)) => {
+            let import = chunk.add_constant(ident.clone().into());
+            chunk.write(OpCode::OpImport);
+            chunk.write(import);
+        }
         Stmt::DeclareClass { ident: Ident(ident) } => {
             let class = chunk.add_constant(ident.clone().into());
             chunk.write(OpCode::OpClass);
@@ -261,7 +278,7 @@ pub fn stmt_to_opcodes(stmt: Stmt, chunk: &mut Chunk, locals: &mut Vec<Local>, s
             let ident = chunk.add_constant(ident.into());
             chunk.write(OpCode::OpDefineGlobal);
             chunk.write(ident);
-        },
+        }
         Stmt::Assign(Ident(ident), expr) => {
             // ident must be an existing local or global.
             expr_to_opcodes(expr, chunk, locals, scope);
@@ -356,10 +373,7 @@ pub fn stmt_to_opcodes(stmt: Stmt, chunk: &mut Chunk, locals: &mut Vec<Local>, s
 
             chunk.write(OpCode::OpPop);
         }
-        Stmt::While {
-            condition,
-            consequent,
-        } => {
+        Stmt::While { condition, consequent } => {
             let loop_start = chunk.code.len();
 
             expr_to_opcodes(condition, chunk, locals, scope);
@@ -462,7 +476,12 @@ pub fn stmt_to_opcodes(stmt: Stmt, chunk: &mut Chunk, locals: &mut Vec<Local>, s
 ///
 ///
 ///
-pub fn expr_to_opcodes(expr: Expr, chunk: &mut Chunk, locals: &mut Vec<Local>, scope: i32) {
+pub fn expr_to_opcodes(
+    expr: Expr,
+    chunk: &mut Chunk,
+    locals: &mut Vec<Local>,
+    scope: i32,
+) {
     match expr {
         Expr::Binary {
             operator,
@@ -545,10 +564,7 @@ pub fn expr_to_opcodes(expr: Expr, chunk: &mut Chunk, locals: &mut Vec<Local>, s
                 chunk.write(ident);
             }
         }
-        Expr::Call {
-            function,
-            arguments,
-        } => {
+        Expr::Call { function, arguments } => {
             expr_to_opcodes(Expr::Ident(function), chunk, locals, scope);
 
             let arguments_n = arguments.len() as u8;
@@ -563,7 +579,10 @@ pub fn expr_to_opcodes(expr: Expr, chunk: &mut Chunk, locals: &mut Vec<Local>, s
     }
 }
 
-pub fn disassemble_chunk(chunk: &Chunk, name: &str) {
+pub fn disassemble_chunk(
+    chunk: &Chunk,
+    name: &str,
+) {
     println!("== {} ==", name);
 
     let mut skip = 0;
@@ -631,16 +650,25 @@ pub fn disassemble_chunk(chunk: &Chunk, name: &str) {
             OpCode::OpSetLocal => {
                 byte_instruction("OP_SET_LOCAL", &chunk, offset);
                 skip = 1;
-            },
+            }
             OpCode::OpClass => {
                 constant_instruction("OP_CLASS", &chunk, offset);
+                skip = 1;
+            }
+            OpCode::OpImport => {
+                constant_instruction("OP_IMPORT", &chunk, offset);
                 skip = 1;
             }
         }
     }
 }
 
-pub fn jump_instruction(name: &str, sign: i16, chunk: &Chunk, offset: usize) {
+pub fn jump_instruction(
+    name: &str,
+    sign: i16,
+    chunk: &Chunk,
+    offset: usize,
+) {
     let jump1 = chunk.code[offset + 1] as u16;
     let jump2 = chunk.code[offset + 2] as u16;
 
@@ -653,7 +681,11 @@ pub fn jump_instruction(name: &str, sign: i16, chunk: &Chunk, offset: usize) {
     );
 }
 
-pub fn constant_instruction(name: &str, chunk: &Chunk, offset: usize) {
+pub fn constant_instruction(
+    name: &str,
+    chunk: &Chunk,
+    offset: usize,
+) {
     let constant = chunk.code[offset + 1];
     print!("{:<16} {:4} '", name, constant);
 
@@ -662,7 +694,11 @@ pub fn constant_instruction(name: &str, chunk: &Chunk, offset: usize) {
     }
 }
 
-pub fn byte_instruction(name: &str, chunk: &Chunk, offset: usize) {
+pub fn byte_instruction(
+    name: &str,
+    chunk: &Chunk,
+    offset: usize,
+) {
     let slot = chunk.code[offset + 1];
     println!("{:<16} {:4} '", name, slot);
 }

@@ -9,9 +9,7 @@ type Span<'a> = nom_locate::LocatedSpan<&'a str>;
 ///
 ///
 ///
-pub fn parse<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(
-    input: Span<'a>,
-) -> IResult<Span<'a>, Token, E> {
+pub fn parse<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>) -> IResult<Span<'a>, Token, E> {
     branch::alt((
         comb::map(real, |s| Token::Real(s)),
         comb::map(integer, |s| Token::Integer(s)),
@@ -24,18 +22,14 @@ pub fn parse<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(
 ///
 ///
 ///
-fn boolean<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(
-    input: Span<'a>,
-) -> IResult<Span<'a>, Span<'a>, E> {
+fn boolean<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>) -> IResult<Span<'a>, Span<'a>, E> {
     branch::alt((bc::tag("true"), bc::tag("false"))).parse(input)
 }
 
 ///
 ///
 ///
-fn integer<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(
-    input: Span<'a>,
-) -> IResult<Span<'a>, Span<'a>, E> {
+fn integer<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>) -> IResult<Span<'a>, Span<'a>, E> {
     comb::recognize(multi::many1(seq::terminated(
         cc::one_of("0123456789"),
         multi::many0(cc::char('_')),
@@ -46,9 +40,7 @@ fn integer<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(
 ///
 ///
 ///
-fn string<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(
-    input: Span<'a>,
-) -> IResult<Span<'a>, Span<'a>, E> {
+fn string<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>) -> IResult<Span<'a>, Span<'a>, E> {
     nom::error::context(
         "string",
         seq::preceded(
@@ -64,18 +56,12 @@ fn string<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(
 ///
 ///
 ///
-fn real<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(
-    input: Span<'a>,
-) -> IResult<Span<'a>, Span<'a>, E> {
+fn real<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>) -> IResult<Span<'a>, Span<'a>, E> {
     branch::alt((
         comb::recognize(seq::tuple((
             cc::char('.'),
             integer,
-            comb::opt(seq::tuple((
-                cc::one_of("eE"),
-                comb::opt(cc::one_of("+-")),
-                integer,
-            ))),
+            comb::opt(seq::tuple((cc::one_of("eE"), comb::opt(cc::one_of("+-")), integer))),
         ))),
         comb::recognize(seq::tuple((
             integer,

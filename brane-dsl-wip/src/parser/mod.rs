@@ -41,7 +41,7 @@ macro_rules! tag_token (
 ///
 ///
 pub fn parse_program<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Vec<Stmt>, E> {
     comb::all_consuming(multi::many0(parse_stmt))(input)
 }
@@ -50,7 +50,7 @@ pub fn parse_program<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 pub fn parse_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Stmt, E> {
     if input.tok.is_empty() {
         return Err(nom::Err::Error(nom::error_position!(input, ErrorKind::Tag)));
@@ -63,6 +63,7 @@ pub fn parse_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
         declare_func_stmt,
         expr_stmt,
         if_stmt,
+        import_stmt,
         for_stmt,
         let_assign_stmt,
         return_stmt,
@@ -75,7 +76,7 @@ pub fn parse_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 pub fn let_assign_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Stmt, E> {
     comb::map(
         seq::delimited(
@@ -92,7 +93,7 @@ pub fn let_assign_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>
 ///
 ///
 pub fn assign_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Stmt, E> {
     comb::map(
         seq::terminated(
@@ -108,7 +109,7 @@ pub fn assign_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 pub fn block_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Stmt, E> {
     comb::map(
         seq::delimited(
@@ -125,25 +126,18 @@ pub fn block_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 pub fn declare_class_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Stmt, E> {
     comb::map(
         seq::tuple((
-            seq::preceded(
-                tag_token!(Token::Class),
-                ident
-            ),
+            seq::preceded(tag_token!(Token::Class), ident),
             seq::delimited(
                 tag_token!(Token::LeftBrace),
                 multi::many0(parse_stmt),
                 tag_token!(Token::RightBrace),
             ),
         )),
-        |(ident, _)| {
-            Stmt::DeclareClass {
-                ident,
-            }
-        },
+        |(ident, _)| Stmt::DeclareClass { ident },
     )
     .parse(input)
 }
@@ -152,7 +146,7 @@ pub fn declare_class_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a
 ///
 ///
 pub fn declare_func_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Stmt, E> {
     comb::map(
         seq::tuple((
@@ -184,11 +178,7 @@ pub fn declare_func_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>
                 })
                 .unwrap_or_default();
 
-            Stmt::DeclareFunc {
-                ident,
-                params,
-                body,
-            }
+            Stmt::DeclareFunc { ident, params, body }
         },
     )
     .parse(input)
@@ -198,17 +188,13 @@ pub fn declare_func_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>
 ///
 ///
 pub fn if_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Stmt, E> {
     comb::map(
         seq::tuple((
             seq::preceded(
                 tag_token!(Token::If),
-                seq::delimited(
-                    tag_token!(Token::LeftParen),
-                    expr,
-                    tag_token!(Token::RightParen),
-                ),
+                seq::delimited(tag_token!(Token::LeftParen), expr, tag_token!(Token::RightParen)),
             ),
             seq::delimited(
                 tag_token!(Token::LeftBrace),
@@ -236,8 +222,21 @@ pub fn if_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 ///
+pub fn import_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
+    input: Tokens<'a>
+) -> IResult<Tokens, Stmt, E> {
+    comb::map(
+        seq::delimited(tag_token!(Token::Import), ident, tag_token!(Token::Semicolon)),
+        |ident| Stmt::Import(ident),
+    )
+    .parse(input)
+}
+
+///
+///
+///
 pub fn for_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Stmt, E> {
     comb::map(
         seq::pair(
@@ -273,17 +272,13 @@ pub fn for_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 pub fn while_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Stmt, E> {
     comb::map(
         seq::pair(
             seq::preceded(
                 tag_token!(Token::While),
-                seq::delimited(
-                    tag_token!(Token::LeftParen),
-                    expr,
-                    tag_token!(Token::RightParen),
-                ),
+                seq::delimited(tag_token!(Token::LeftParen), expr, tag_token!(Token::RightParen)),
             ),
             seq::delimited(
                 tag_token!(Token::LeftBrace),
@@ -291,10 +286,7 @@ pub fn while_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
                 tag_token!(Token::RightBrace),
             ),
         ),
-        |(condition, consequent)| Stmt::While {
-            condition,
-            consequent,
-        },
+        |(condition, consequent)| Stmt::While { condition, consequent },
     )
     .parse(input)
 }
@@ -303,14 +295,10 @@ pub fn while_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 pub fn return_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Stmt, E> {
     comb::map(
-        seq::delimited(
-            tag_token!(Token::Return),
-            comb::opt(expr),
-            tag_token!(Token::Semicolon),
-        ),
+        seq::delimited(tag_token!(Token::Return), comb::opt(expr), tag_token!(Token::Semicolon)),
         |expr| Stmt::Return(expr),
     )
     .parse(input)
@@ -320,20 +308,15 @@ pub fn return_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 pub fn expr_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Stmt, E> {
-    comb::map(seq::terminated(expr, tag_token!(Token::Semicolon)), |e| {
-        Stmt::Expr(e)
-    })
-    .parse(input)
+    comb::map(seq::terminated(expr, tag_token!(Token::Semicolon)), |e| Stmt::Expr(e)).parse(input)
 }
 
 ///
 ///
 ///
-pub fn expr<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
-) -> IResult<Tokens, Expr, E> {
+pub fn expr<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(input: Tokens<'a>) -> IResult<Tokens, Expr, E> {
     expr_pratt(input, 0)
 }
 
@@ -348,10 +331,7 @@ fn expr_pratt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
         Ok((r, UnOp::Idx)) => {
             let (r2, entries) = seq::terminated(
                 comb::opt(seq::terminated(
-                    seq::pair(
-                        expr,
-                        multi::many0(seq::preceded(tag_token!(Token::Comma), expr)),
-                    ),
+                    seq::pair(expr, multi::many0(seq::preceded(tag_token!(Token::Comma), expr))),
                     comb::opt(tag_token!(Token::Comma)),
                 )),
                 tag_token!(Token::RightBracket),
@@ -409,8 +389,7 @@ fn expr_pratt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
                 }
 
                 lhs = if let UnOp::Idx = operator {
-                    let (r2, rhs) =
-                        seq::terminated(expr, tag_token!(Token::RightBracket)).parse(r)?;
+                    let (r2, rhs) = seq::terminated(expr, tag_token!(Token::RightBracket)).parse(r)?;
                     remainder = r2;
 
                     Expr::Index {
@@ -435,7 +414,7 @@ fn expr_pratt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 pub fn expr_atom<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Expr, E> {
     branch::alt((call_expr, literal_expr, unit_expr, ident_expr)).parse(input)
 }
@@ -444,7 +423,7 @@ pub fn expr_atom<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 pub fn call_expr<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Expr, E> {
     comb::map(
         seq::pair(
@@ -463,10 +442,7 @@ pub fn call_expr<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
                 .map(|(h, e)| [&[h], &e[..]].concat().to_vec())
                 .unwrap_or_default();
 
-            Expr::Call {
-                function,
-                arguments,
-            }
+            Expr::Call { function, arguments }
         },
     )
     .parse(input)
@@ -476,7 +452,7 @@ pub fn call_expr<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 pub fn literal_expr<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Expr, E> {
     comb::map(literal, |l| Expr::Literal(l)).parse(input)
 }
@@ -484,20 +460,12 @@ pub fn literal_expr<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 ///
-pub fn literal<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
-) -> IResult<Tokens, Lit, E> {
+pub fn literal<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(input: Tokens<'a>) -> IResult<Tokens, Lit, E> {
     branch::alt((
-        comb::map(tag_token!(Token::Boolean), |t| {
-            Lit::Boolean(t.tok[0].as_bool())
-        }),
-        comb::map(tag_token!(Token::Integer), |t| {
-            Lit::Integer(t.tok[0].as_i64())
-        }),
+        comb::map(tag_token!(Token::Boolean), |t| Lit::Boolean(t.tok[0].as_bool())),
+        comb::map(tag_token!(Token::Integer), |t| Lit::Integer(t.tok[0].as_i64())),
         comb::map(tag_token!(Token::Real), |t| Lit::Real(t.tok[0].as_f64())),
-        comb::map(tag_token!(Token::String), |t| {
-            Lit::String(t.tok[0].as_string())
-        }),
+        comb::map(tag_token!(Token::String), |t| Lit::String(t.tok[0].as_string())),
     ))
     .parse(input)
 }
@@ -506,7 +474,7 @@ pub fn literal<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 pub fn unit_expr<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Expr, E> {
     comb::map(tag_token!(Token::Unit), |_| Expr::Unit).parse(input)
 }
@@ -515,7 +483,7 @@ pub fn unit_expr<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 pub fn ident_expr<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Expr, E> {
     comb::map(ident, |x| Expr::Ident(x)).parse(input)
 }
@@ -523,9 +491,7 @@ pub fn ident_expr<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 ///
-pub fn ident<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
-) -> IResult<Tokens, Ident, E> {
+pub fn ident<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(input: Tokens<'a>) -> IResult<Tokens, Ident, E> {
     comb::map(tag_token!(Token::Ident), |x| Ident(x.tok[0].as_string())).parse(input)
 }
 
@@ -533,7 +499,7 @@ pub fn ident<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 pub fn operator<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, Operator, E> {
     branch::alt((
         comb::map(binary_operator, |x| Operator::Binary(x)),
@@ -546,7 +512,7 @@ pub fn operator<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 fn binary_operator<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, BinOp, E> {
     branch::alt((
         comb::map(tag_token!(Token::And), |_| BinOp::And),
@@ -569,7 +535,7 @@ fn binary_operator<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ///
 ///
 fn unary_operator<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>,
+    input: Tokens<'a>
 ) -> IResult<Tokens, UnOp, E> {
     branch::alt((
         comb::map(tag_token!(Token::Not), |_| UnOp::Not),

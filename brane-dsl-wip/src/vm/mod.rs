@@ -1,4 +1,4 @@
-use crate::compiler::{Function, OpCode, Value, Class};
+use crate::compiler::{Class, Function, OpCode, Value};
 use std::{collections::HashMap, fmt::Write, usize};
 
 static FRAMES_MAX: usize = 64;
@@ -27,10 +27,13 @@ pub enum InterpretResult {
 impl VM {
     pub fn new() -> VM {
         let mut globals = HashMap::new();
-        globals.insert(String::from("print"), Value::Function(Function::Native {
-            name: String::from("print"),
-            arity: 1,
-        }));
+        globals.insert(
+            String::from("print"),
+            Value::Function(Function::Native {
+                name: String::from("print"),
+                arity: 1,
+            }),
+        );
 
         VM {
             call_frames: Vec::with_capacity(FRAMES_MAX),
@@ -39,7 +42,11 @@ impl VM {
         }
     }
 
-    fn call(&self, function: Function, arg_count: usize) -> CallFrame {
+    fn call(
+        &self,
+        function: Function,
+        arg_count: usize,
+    ) -> CallFrame {
         CallFrame {
             function,
             ip: 0,
@@ -47,14 +54,17 @@ impl VM {
         }
     }
 
-    pub fn run(&mut self, function: Option<Function>) -> InterpretResult {
+    pub fn run(
+        &mut self,
+        function: Option<Function>,
+    ) -> InterpretResult {
         use InterpretResult::*;
 
         if let Some(function) = function {
             self.call_frames.push(CallFrame {
                 slot_offset: 0,
                 ip: 0,
-                function
+                function,
             })
         }
 
@@ -68,9 +78,7 @@ impl VM {
         // Decodes and dispatches the instruction
         loop {
             let mut debug = String::from("          ");
-            self.stack
-                .iter()
-                .for_each(|v| write!(debug, "[ {:?} ]", v).unwrap());
+            self.stack.iter().for_each(|v| write!(debug, "[ {:?} ]", v).unwrap());
 
             debug!("{}", debug);
 
@@ -138,11 +146,7 @@ impl VM {
                     let index = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
-                    let local = self
-                        .stack
-                        .get_mut(frame.slot_offset + index as usize)
-                        .unwrap()
-                        .clone();
+                    let local = self.stack.get_mut(frame.slot_offset + index as usize).unwrap().clone();
                     self.stack.push(local)
                 }
                 OpConstant => {
@@ -177,9 +181,7 @@ impl VM {
                             (Value::Real(lhs), Value::Real(rhs)) => (lhs + rhs).into(),
                             (Value::Real(lhs), Value::Integer(rhs)) => (lhs + rhs as f64).into(),
                             (Value::Integer(lhs), Value::Real(rhs)) => (lhs as f64 + rhs).into(),
-                            (Value::String(lhs), Value::String(rhs)) => {
-                                (format!("{}{}", lhs, rhs)).into()
-                            }
+                            (Value::String(lhs), Value::String(rhs)) => (format!("{}{}", lhs, rhs)).into(),
                             (lhs, rhs) => {
                                 println!("{:?} + {:?}", lhs, rhs);
                                 unreachable!()
@@ -402,19 +404,28 @@ impl VM {
                                 self.stack.push(result);
                             }
                         }
-                        Function::Native { name, .. } => {
-                            match name.as_str() {
-                                "print" => {
-                                    let value = self.stack.pop().unwrap();
-                                    println!("{:?}", value);
-                                    self.stack.pop();
-                                }
-                                _ => unreachable!(),
+                        Function::Native { name, .. } => match name.as_str() {
+                            "print" => {
+                                let value = self.stack.pop().unwrap();
+                                println!("{:?}", value);
+                                self.stack.pop();
                             }
-                        }
+                            _ => unreachable!(),
+                        },
                         Function::External { .. } => {
                             todo!();
                         }
+                    }
+                },
+                OpImport => {
+                    let constant = chunk.code[frame.ip];
+                    frame.ip = frame.ip + 1;
+
+                    if let Some(value) = chunk.constants.get(constant as usize) {
+                        println!("TODO: bring functions into global scope: {:?}.", value);
+
+                    } else {
+                        unreachable!()
                     }
                 }
             }

@@ -1,76 +1,149 @@
-use std::{
-    iter::Enumerate,
-    ops::{Range, RangeFrom, RangeFull, RangeTo},
-    str::FromStr,
-};
-
 use nom::{InputIter, InputLength, InputTake, Needed, Slice};
+use std::iter::Enumerate;
+use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
+use std::str::FromStr;
 
 type Span<'a> = nom_locate::LocatedSpan<&'a str>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token<'a> {
-    // Keywords
-    And(Span<'a>),      // &
-    Break(Span<'a>),    // break
-    Catch(Span<'a>),    // catch
-    Class(Span<'a>),     // class
-    Continue(Span<'a>), // continue
-    Else(Span<'a>),     // else
-    Extends(Span<'a>),  // <:
-    For(Span<'a>),      // for
-    Function(Span<'a>), // func
-    If(Span<'a>),       // if
-    In(Span<'a>),       // in
-    Let(Span<'a>),      // let
-    Or(Span<'a>),       // |
-    Raise(Span<'a>),    // raise
-    Return(Span<'a>),   // return
-    Super(Span<'a>),    // super
-    This(Span<'a>),     // this
-    Try(Span<'a>),      // try
-    Unit(Span<'a>),     // unit
-    While(Span<'a>),    // while
+    /// `&`
+    And(Span<'a>),
 
-    // Punctuation
-    Dot(Span<'a>),   // .
-    Colon(Span<'a>), // :
-    Comma(Span<'a>), // ,
+    /// `break`
+    Break(Span<'a>),
+
+    /// `catch`
+    Catch(Span<'a>),
+
+    /// `class`
+    Class(Span<'a>),
+
+    /// `continue`
+    Continue(Span<'a>),
+
+    /// `else`
+    Else(Span<'a>),
+
+    /// `extends`
+    Extends(Span<'a>),
+
+    /// `for`
+    For(Span<'a>),
+
+    /// `func`
+    Function(Span<'a>),
+
+    /// `if`
+    If(Span<'a>),
+
+    /// `import`
+    Import(Span<'a>),
+
+    /// `let`
+    Let(Span<'a>),
+
+    /// `|`
+    Or(Span<'a>),
+
+    /// `return`
+    Return(Span<'a>),
+
+    /// `super`
+    Super(Span<'a>),
+
+    /// `this`
+    This(Span<'a>),
+
+    /// `try`
+    Try(Span<'a>),
+
+    /// `unit`
+    Unit(Span<'a>),
+
+    /// `while`
+    While(Span<'a>),
+
+    /// .
+    Dot(Span<'a>),
+
+    /// :
+    Colon(Span<'a>),
+
+    /// ,
+    Comma(Span<'a>),
+
     /// {
     LeftBrace(Span<'a>),
-    LeftBracket(Span<'a>),  // [
-    LeftParen(Span<'a>),    // (
-    RightBrace(Span<'a>),   // }
-    RightBracket(Span<'a>), // ]
-    RightParen(Span<'a>),   // )
-    Semicolon(Span<'a>),    // ;
 
-    // Operators
-    Assign(Span<'a>),         // :=
-    Equal(Span<'a>),          // =
-    Greater(Span<'a>),        // >
-    GreaterOrEqual(Span<'a>), // >=
-    Less(Span<'a>),           // <
-    LessOrEqual(Span<'a>),    // <=
-    Minus(Span<'a>),          // -
-    Not(Span<'a>),            // !
-    NotEqual(Span<'a>),       // !=
-    Plus(Span<'a>),           // +
-    Slash(Span<'a>),          // /
-    Star(Span<'a>),           // *
+    /// [
+    LeftBracket(Span<'a>),
 
-    // Literals
+    /// (
+    LeftParen(Span<'a>),
+
+    /// }
+    RightBrace(Span<'a>),
+
+    /// ]
+    RightBracket(Span<'a>),
+
+    /// )
+    RightParen(Span<'a>),
+
+    /// ;
+    Semicolon(Span<'a>),
+
+    /// :=
+    Assign(Span<'a>),
+
+    /// =
+    Equal(Span<'a>),
+
+    /// >
+    Greater(Span<'a>),
+
+    /// >=
+    GreaterOrEqual(Span<'a>),
+
+    /// <
+    Less(Span<'a>),
+
+    /// <=
+    LessOrEqual(Span<'a>),
+
+    /// -
+    Minus(Span<'a>),
+
+    /// !
+    Not(Span<'a>),
+
+    /// !=
+    NotEqual(Span<'a>),
+
+    /// +
+    Plus(Span<'a>),
+
+    /// /
+    Slash(Span<'a>),
+
+    /// *
+    Star(Span<'a>),
+
+    /// Boolean literal
     Boolean(Span<'a>),
+
+    /// Integer literal
     Integer(Span<'a>),
+
+    /// Real literal
     Real(Span<'a>),
+
+    /// String literal
     String(Span<'a>),
 
-    // Identifiers
+    /// Identifier
     Ident(Span<'a>),
-
-    // Miscellaneous
-    Eof(Span<'a>),
-    Illegal(Span<'a>),
 }
 
 impl<'a> Token<'a> {
@@ -132,7 +205,10 @@ impl<'a> InputLength for Tokens<'a> {
 
 impl<'a> InputTake for Tokens<'a> {
     #[inline]
-    fn take(&self, count: usize) -> Self {
+    fn take(
+        &self,
+        count: usize,
+    ) -> Self {
         Tokens {
             tok: &self.tok[0..count],
             start: 0,
@@ -141,7 +217,10 @@ impl<'a> InputTake for Tokens<'a> {
     }
 
     #[inline]
-    fn take_split(&self, count: usize) -> (Self, Self) {
+    fn take_split(
+        &self,
+        count: usize,
+    ) -> (Self, Self) {
         let (prefix, suffix) = self.tok.split_at(count);
         let first = Tokens {
             tok: prefix,
@@ -166,7 +245,10 @@ impl<'a> InputLength for Token<'a> {
 
 impl<'a> Slice<Range<usize>> for Tokens<'a> {
     #[inline]
-    fn slice(&self, range: Range<usize>) -> Self {
+    fn slice(
+        &self,
+        range: Range<usize>,
+    ) -> Self {
         Tokens {
             tok: self.tok.slice(range.clone()),
             start: self.start + range.start,
@@ -177,21 +259,30 @@ impl<'a> Slice<Range<usize>> for Tokens<'a> {
 
 impl<'a> Slice<RangeTo<usize>> for Tokens<'a> {
     #[inline]
-    fn slice(&self, range: RangeTo<usize>) -> Self {
+    fn slice(
+        &self,
+        range: RangeTo<usize>,
+    ) -> Self {
         self.slice(0..range.end)
     }
 }
 
 impl<'a> Slice<RangeFrom<usize>> for Tokens<'a> {
     #[inline]
-    fn slice(&self, range: RangeFrom<usize>) -> Self {
+    fn slice(
+        &self,
+        range: RangeFrom<usize>,
+    ) -> Self {
         self.slice(range.start..self.end - self.start)
     }
 }
 
 impl<'a> Slice<RangeFull> for Tokens<'a> {
     #[inline]
-    fn slice(&self, _: RangeFull) -> Self {
+    fn slice(
+        &self,
+        _: RangeFull,
+    ) -> Self {
         Tokens {
             tok: self.tok,
             start: self.start,
@@ -216,7 +307,10 @@ impl<'a> InputIter for Tokens<'a> {
     }
 
     #[inline]
-    fn position<P>(&self, predicate: P) -> Option<usize>
+    fn position<P>(
+        &self,
+        predicate: P,
+    ) -> Option<usize>
     where
         P: Fn(Self::Item) -> bool,
     {
@@ -224,7 +318,10 @@ impl<'a> InputIter for Tokens<'a> {
     }
 
     #[inline]
-    fn slice_index(&self, count: usize) -> Result<usize, Needed> {
+    fn slice_index(
+        &self,
+        count: usize,
+    ) -> Result<usize, Needed> {
         if self.tok.len() >= count {
             Ok(count)
         } else {
