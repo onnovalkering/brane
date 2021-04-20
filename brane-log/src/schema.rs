@@ -5,10 +5,17 @@ use time::{Format, OffsetDateTime};
 use std::pin::Pin;
 use futures::Stream;
 use async_stream::stream;
+use serde::{Deserialize, Serialize};
 
 pub type Schema = RootNode<'static, Query, EmptyMutation<Context>, Subscription>;
 
 impl juniper::Context for Context {}
+
+#[derive(Clone, Debug, Deserialize, GraphQLObject, Default, Serialize)]
+pub struct KeyValuePair {
+    pub key: String,
+    pub value: String,
+}
 
 #[derive(Clone, Debug, GraphQLObject, Default)]
 pub struct Event {
@@ -19,6 +26,7 @@ pub struct Event {
     pub order: i32,
     pub kind: String,
     pub timestamp: String,
+    pub information: Vec<KeyValuePair>,
 }
 
 pub struct Query;
@@ -60,7 +68,8 @@ impl Query {
             let category = r.get_by_name("category").unwrap();
             let order = r.get_by_name("event_id").unwrap();
             let kind = r.get_by_name("kind").unwrap();
-
+            let information: String = r.get_by_name("information").unwrap();
+            let information: Vec<KeyValuePair> = serde_json::from_str(&information).unwrap();
             let timestamp = r.get_by_name("timestamp").unwrap();
             let timestamp = OffsetDateTime::from_unix_timestamp(timestamp).format(Format::Rfc3339);
 
@@ -72,6 +81,7 @@ impl Query {
                 order,
                 kind,
                 timestamp,
+                information,
             }
         };
 
@@ -84,6 +94,9 @@ impl Query {
         if let Some(kind) = kind {
             events = events.iter().filter(|e| e.kind == kind).map(Event::clone).collect();
         }
+
+        // Lastly, sort by timestamp.
+        events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
         events
     }

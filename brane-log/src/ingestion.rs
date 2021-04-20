@@ -1,4 +1,5 @@
 use anyhow::{Context as AContext, Result};
+use schema::KeyValuePair;
 use time::{Format, OffsetDateTime};
 use crate::schema;
 use brane_job::interface::{Event, EventKind};
@@ -50,6 +51,7 @@ pub async fn ensure_db_tables(cassandra: &Arc<RwLock<Session>>) -> Result<()> {
             category text,
             event_id int,
             kind text,
+            information text,
             timestamp timestamp,
             PRIMARY KEY ((application_id), job_id, location_id, category, event_id)
         )
@@ -140,15 +142,49 @@ fn process_message(
     // Decode payload into a Event message.
     let event = Event::decode(payload).unwrap();
     let kind = EventKind::from_i32(event.kind).unwrap();
-    let kind = format!("{:?}", kind).to_lowercase();
+    let payload = event.payload.clone();
 
     dbg!(&event);
+
+    // Additional information, based on kind of event.
+    let mut information = vec![];
+    match kind {
+        EventKind::Created => {
+            information.push(KeyValuePair {
+                key: String::from("image"),
+                value: String::from_utf8(payload)?,
+            });
+        }
+        EventKind::Connected => {
+            information.push(KeyValuePair {
+                key: String::from("destination"),
+                value: String::from_utf8(payload)?,
+            });
+        }
+        EventKind::Disconnected => {
+            let (bytes_ab, bytes_ba): (u64, u64) = bincode::deserialize(&payload)?;
+
+            information.push(KeyValuePair {
+                key: String::from("bytes_ab"),
+                value: bytes_ab.to_string(),
+            });
+            information.push(KeyValuePair {
+                key: String::from("bytes_ba"),
+                value: bytes_ba.to_string(),
+            });
+        }
+        _ => {},
+    }
+
+    // Prepare for insertion.
+    let kind = format!("{:?}", kind).to_lowercase();
+    let information_str = serde_json::to_string(&information)?;
 
     // Insert event
     let mut insert = stmt!(
         r#"
-        INSERT INTO application_event.events (application_id, job_id, location_id, category, event_id, kind, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO application_event.events (application_id, job_id, location_id, category, event_id, kind, information, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     "#
     );
 
@@ -158,7 +194,8 @@ fn process_message(
     insert.bind_string(3, event.category.as_str()).unwrap();
     insert.bind_int32(4, event.order as i32).unwrap();
     insert.bind_string(5, kind.as_str()).unwrap();
-    insert.bind_int64(6, event.timestamp).unwrap();
+    insert.bind_string(6, information_str.as_str()).unwrap();
+    insert.bind_int64(7, event.timestamp).unwrap();
 
     cassandra
         .read()
@@ -177,6 +214,7 @@ fn process_message(
         category: event.category.clone(),
         order: event.order as i32,
         kind,
+        information,
         timestamp: OffsetDateTime::from_unix_timestamp(event.timestamp.clone()).format(Format::Rfc3339),
     };
 
