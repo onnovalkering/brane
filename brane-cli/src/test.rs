@@ -1,5 +1,5 @@
 use crate::packages;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use brane_exec::{docker, ExecuteInfo};
 use brane_sys::local::LocalSystem;
 use brane_vm::environment::InMemoryEnvironment;
@@ -10,6 +10,7 @@ use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Confirm, Password};
 use dialoguer::{Input as Prompt, Select};
 use serde_yaml;
+use serde::de::DeserializeOwned;
 use specifications::common::{Function, Parameter, Type, Value};
 use specifications::instructions::Instruction;
 use specifications::package::PackageInfo;
@@ -190,22 +191,31 @@ async fn test_ecu(
     let image_file = Some(package_dir.join("image.tar"));
 
     let command = vec![
-        String::from("ecu"),
+        String::from("--application-id"),
+        String::from("test"),
+        String::from("--location-id"),
+        String::from("localhost"),
+        String::from("--job-id"),
+        String::from("1"),
+        String::from("code"),
         function,
         base64::encode(serde_json::to_string(&arguments)?),
     ];
 
-    debug!("{:?}", command);
-
     let exec = ExecuteInfo::new(image, image_file, None, Some(command));
 
     let (stdout, stderr) = docker::run_and_wait(exec).await?;
-    if stderr.len() > 0 {
-        warn!("{}", stderr);
-    }
-
+    debug!("stderr: {}", stderr);
     debug!("stdout: {}", stdout);
-    Ok(serde_json::from_str(&stdout)?)
+
+    let output = stdout.lines().last().unwrap_or_default().to_string();
+    match decode_b64(output) {
+        Ok(value) => Ok(value),
+        Err(err) => {
+            println!("{:?}", err);
+            Ok(Value::Unit)
+        }
+    }
 }
 
 ///
@@ -248,7 +258,8 @@ fn prompt_for_input(
     functions: &Map<Function>,
     types: &Map<Type>,
 ) -> Result<(String, Map<Value>)> {
-    let function_list: Vec<String> = functions.keys().map(|k| k.to_string()).collect();
+    let mut function_list: Vec<String> = functions.keys().map(|k| k.to_string()).collect();
+    function_list.sort();
     let index = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("The function the execute")
         .default(0)
@@ -436,4 +447,21 @@ fn print_output(value: &Value) -> () {
             }
         }
     }
+}
+
+///
+///
+///
+fn decode_b64<T>(input: String) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    let input =
+        base64::decode(input).with_context(|| "Decoding failed, encoded input doesn't seem to be Base64 encoded.")?;
+
+    let input = String::from_utf8(input[..].to_vec())
+        .with_context(|| "Conversion failed, decoded input doesn't seem to be UTF-8 encoded.")?;
+
+    serde_json::from_str(&input)
+        .with_context(|| "Deserialization failed, decoded input doesn't seem to be as expected.")
 }
