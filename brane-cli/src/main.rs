@@ -61,6 +61,14 @@ enum SubCommand {
     #[structopt(name = "list", about = "List packages")]
     List {},
 
+    #[structopt(name = "load", about = "Load a package locally")]
+    Load {
+        #[structopt(name = "NAME", help = "Name of the package")]
+        name: String,
+        #[structopt(short, long, help = "Version of the package")]
+        version: Option<String>,
+    },
+
     #[structopt(name = "login", about = "Log in to a registry")]
     Login {
         #[structopt(name = "HOST", help = "Hostname of the registry")]
@@ -250,6 +258,9 @@ async fn run(options: CLI) -> Result<()> {
         }
         List {} => {
             packages::list()?;
+        }
+        Load { name, version } => {
+            packages::load(name, version).await?;
         }
         Login { host, username } => {
             registry::login(host, username)?;

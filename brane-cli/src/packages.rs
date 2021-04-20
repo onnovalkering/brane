@@ -10,7 +10,17 @@ use semver::Version;
 use specifications::package::PackageInfo;
 use std::fs;
 use std::path::PathBuf;
+use futures_util::stream::TryStreamExt;
+use bollard::errors::Error;
+use bollard::image::ImportImageOptions;
+use bollard::Docker;
+use hyper::Body;
+use tokio::fs::File as TFile;
+use tokio::stream::StreamExt;
+use tokio_util::codec::{BytesCodec, FramedRead};
 use std::time::Duration;
+
+const PACKAGE_NOT_FOUND: &str = "Package not found.";
 
 ///
 ///
@@ -135,6 +145,46 @@ pub fn list() -> Result<()> {
     }
 
     table.printstd();
+
+    Ok(())
+}
+
+///
+///
+///
+pub async fn load(
+    name: String,
+    version: Option<String>,
+) -> Result<()> {
+    let version_or_latest = version.unwrap_or_else(|| String::from("latest"));
+    let package_dir = get_package_dir(&name, Some(&version_or_latest))?;
+    if !package_dir.exists() {
+        return Err(anyhow!(PACKAGE_NOT_FOUND));
+    }
+
+    let package_info = PackageInfo::from_path(package_dir.join("package.yml"))?;
+    let image = format!("{}:{}", package_info.name, package_info.version);
+    let image_file = package_dir.join("image.tar");
+
+    let docker = Docker::connect_with_local_defaults()?;
+
+    // Abort, if image is already loaded
+    if docker.inspect_image(&image).await.is_ok() {
+        println!("Image already exists in local Docker deamon.");
+        return Ok(());
+    }
+
+    println!("Image doesn't exist in Docker deamon: importing...");
+    let options = ImportImageOptions { quiet: true };
+
+    let file = TFile::open(image_file).await?;
+    let byte_stream = FramedRead::new(file, BytesCodec::new()).map(|r| {
+        let bytes = r.unwrap().freeze();
+        Ok::<_, Error>(bytes)
+    });
+
+    let body = Body::wrap_stream(byte_stream);
+    docker.import_image(options, body, None).try_collect::<Vec<_>>().await?;
 
     Ok(())
 }
