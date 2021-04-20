@@ -3,43 +3,47 @@ use std::fmt;
 use time::OffsetDateTime;
 
 #[derive(Clone, PartialEq, Message)]
-pub struct NetEvent {
-    #[prost(tag = "1", enumeration = "NetEventKind")]
+pub struct Event {
+    #[prost(tag = "1", enumeration = "EventKind")]
     pub kind: i32,
     #[prost(tag = "2", string)]
-    pub application: String,
+    pub identifier: String,
     #[prost(tag = "3", string)]
-    pub location: String,
+    pub application: String,
     #[prost(tag = "4", string)]
-    pub job_id: String,
-    #[prost(tag = "5", uint32)]
+    pub location: String,
+    #[prost(tag = "5", string)]
+    pub category: String,
+    #[prost(tag = "6", uint32)]
     pub order: u32,
-    #[prost(tag = "6", bytes)]
+    #[prost(tag = "7", bytes)]
     pub payload: Vec<u8>,
-    #[prost(tag = "7", int64)]
+    #[prost(tag = "8", int64)]
     pub timestamp: i64,
 }
 
-impl NetEvent {
+impl Event {
     ///
     ///
     ///
     pub fn new<S: Into<String> + Clone>(
-        kind: NetEventKind,
+        kind: EventKind,
+        identifier: S,
         application: S,
         location: S,
-        job_id: S,
+        category: S,
         order: u32,
         payload: Option<Vec<u8>>,
         timestamp: Option<i64>,
     ) -> Self {
         let timestamp = timestamp.unwrap_or_else(|| OffsetDateTime::now_utc().unix_timestamp());
 
-        NetEvent {
+        Event {
             kind: kind as i32,
+            identifier: identifier.into(),
             application: application.into(),
             location: location.into(),
-            job_id: job_id.into(),
+            category: category.into(),
             order,
             payload: payload.unwrap_or_default(),
             timestamp,
@@ -48,17 +52,16 @@ impl NetEvent {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Enumeration)]
-pub enum NetEventKind {
+pub enum EventKind {
     Unknown = -1,
-    Connected = 0,
-    Disconnected = 1,
-}
-
-impl fmt::Display for NetEventKind {
-    fn fmt(
-        &self,
-        f: &mut fmt::Formatter<'_>,
-    ) -> fmt::Result {
-        write!(f, "{}", format!("{:?}", self).to_uppercase())
-    }
+    Created = 0,
+    Ready = 1,
+    Initialized = 2,
+    Started = 3,
+    Heartbeat = 4,
+    Finished = 5,
+    Stopped = 6,
+    Failed = 7,
+    Connected = 8,
+    Disconnected = 9,
 }

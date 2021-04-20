@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use brane_net::interface::{NetEvent, NetEventKind};
+use brane_net::interface::{Event, EventKind};
 use clap::Clap;
 use dotenv::dotenv;
 use log::{warn, LevelFilter};
@@ -84,10 +84,11 @@ pub async fn handle_connection(
 
             if let Ok(mut destination) = TcpStream::connect(request.destination.to_string()).await {
                 // EVENT: connection has been established between source and destination.
-                emit_event(NetEventKind::Connected, &producer, &event_topic, &request, None).await?;
+                let payload = request.destination.to_string().as_bytes().to_vec();
+                emit_event(EventKind::Connected, &producer, &event_topic, &request, Some(payload)).await?;
 
                 socks6::write_reply(&mut source, socks6::SocksReply::Success).await?;
-                socks6::write_initial_data(&mut destination, &request).await?;
+                // socks6::write_initial_data(&mut destination, &request).await?;
 
                 // Patch together the source and destination sockets, collect number of bytes transfered.
                 let bytes_written = socksx::copy_bidirectional(&mut source, &mut destination).await?;
@@ -95,7 +96,7 @@ pub async fn handle_connection(
                 // EVENT: connection has been closed between source and destination.
                 let payload = bincode::serialize(&bytes_written)?;
                 emit_event(
-                    NetEventKind::Disconnected,
+                    EventKind::Disconnected,
                     &producer,
                     &event_topic,
                     &request,
@@ -120,7 +121,7 @@ pub async fn handle_connection(
 ///
 ///
 pub async fn emit_event(
-    kind: NetEventKind,
+    kind: EventKind,
     producer: &FutureProducer,
     event_topic: &str,
     request: &Socks6Request,
@@ -132,13 +133,16 @@ pub async fn emit_event(
     let job_id = request.metadata.get(&3u16).map(String::clone).unwrap_or_default();
     let order = request
         .metadata
-        .get(&4u16)
+        .get(&5u16)
         .map(|x| x.parse().unwrap_or_default())
         .unwrap_or_default();
 
     // Create new event.
     let event_key = format!("{}#{}", job_id, order);
-    let event = NetEvent::new(kind, application, location, job_id, order, payload, None);
+    let category = String::from("net");
+    let event = Event::new(kind, job_id, application, location, category, order, payload, None);
+
+    dbg!(&event);
 
     // Encode event as bytes.
     let mut payload = BytesMut::with_capacity(64);
