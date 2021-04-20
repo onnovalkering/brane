@@ -1,245 +1,189 @@
-use crate::{packages, registry};
 use anyhow::Result;
-use brane_dsl::compiler::{Compiler, CompilerOptions};
-use brane_sys::local::LocalSystem;
-use brane_vm::environment::InMemoryEnvironment;
-use brane_vm::machine::Machine;
-use brane_vm::vault::InMemoryVault;
-use console::style;
-use futures::executor::block_on;
-use linefeed::{Interface, ReadResult};
-use serde::{Deserialize, Serialize};
-use serde_json::{self, json};
-use serde_yaml;
-use specifications::common::Value;
-use specifications::instructions::Instruction;
-use std::fs::File;
-use std::io::BufReader;
+use std::borrow::Cow::{self, Borrowed, Owned};
+use rustyline::completion::{Completer, FilenameCompleter, Pair};
+use rustyline::config::OutputStreamType;
+use rustyline::error::ReadlineError;
+use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
+use rustyline::hint::{Hinter, HistoryHinter};
+use rustyline::validate::{self, MatchingBracketValidator, Validator};
+use rustyline::{CompletionType, Config, Context, EditMode, Editor};
+use rustyline_derive::Helper;
 use std::path::PathBuf;
-use uuid::Uuid;
+use std::fs;
+use brane_dsl_wip::{
+    compiler,
+    vm::{VM, InterpretResult}
+};
 
-type Map<T> = std::collections::HashMap<String, T>;
-
-#[serde(tag = "t", content = "c", rename_all = "camelCase")]
-#[derive(Clone, Debug, Deserialize, Serialize)]
-enum CompileServiceMessage {
-    Code(String),
-    Variables(Map<String>),
+#[derive(Helper)]
+struct ReplHelper {
+    completer: FilenameCompleter,
+    highlighter: MatchingBracketHighlighter,
+    validator: MatchingBracketValidator,
+    hinter: HistoryHinter,
+    colored_prompt: String,
 }
 
-impl CompileServiceMessage {
-    pub fn from_string(s: String) -> Result<Self> {
-        let result = serde_json::from_str(&s)?;
-        Ok(result)
+impl Completer for ReplHelper {
+    type Candidate = Pair;
+
+    ///
+    ///
+    ///
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        ctx: &Context<'_>,
+    ) -> Result<(usize, Vec<Pair>), ReadlineError> {
+        self.completer.complete(line, pos, ctx)
     }
 }
 
-pub async fn start(
-    secrets_file: Option<PathBuf>,
-    co_address: Option<PathBuf>,
-) -> Result<()> {
-    // Prepare DSL compiler
-    let package_index = registry::get_package_index().await?;
-    let mut compiler = Compiler::new(CompilerOptions::repl(), package_index)?;
+impl Hinter for ReplHelper {
+    type Hint = String;
 
-    if let Some(co_address) = co_address {
-        return start_compile_service(co_address, &mut compiler).await;
-    } else {
-        return start_repl(&mut compiler, secrets_file);
+    ///
+    ///
+    ///
+    fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
+        self.hinter
+            .hint(line, pos, ctx)
+            .map(|h| h.lines().next().map(|l| l.to_string()))
+            .flatten()
     }
 }
 
-///
-///
-///
-async fn start_compile_service(
-    co_address: PathBuf,
-    compiler: &mut Compiler,
-) -> Result<()> {
-    println!("Starting compile-only service\n");
-
-    let context = zmq::Context::new();
-    let socket = context.socket(zmq::REP)?;
-
-    let address = co_address.into_os_string().into_string().unwrap();
-    let endpoint = format!("ipc://{}", address);
-
-    debug!("endpoint: {}", endpoint);
-    socket.bind(&endpoint)?;
-
-    loop {
-        let data = socket.recv_string(0)?;
-        if let Ok(data) = data {
-            debug!("data: {}", data);
-
-            let message = CompileServiceMessage::from_string(data)?;
-            let response = match message {
-                CompileServiceMessage::Code(code) => {
-                    let result = compiler.compile(&code);
-                    match result {
-                        Ok(instructions) => json!({
-                            "variant": "ok",
-                            "content": instructions,
-                        }),
-                        Err(err) => {
-                            debug!("{}", err);
-                            json!({
-                                "variant": "err",
-                                "content": err.to_string(),
-                            })
-                        }
-                    }
-                }
-                CompileServiceMessage::Variables(variables) => {
-                    compiler.inject(variables);
-                    json!({
-                        "variant": "ok",
-                    })
-                }
-            };
-
-            let response_json = serde_json::to_string(&response)?;
-            debug!("Response: {}", response_json);
-
-            socket.send(&response_json, 0)?;
+impl Highlighter for ReplHelper {
+    ///
+    ///
+    ///
+    fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
+        &'s self,
+        prompt: &'p str,
+        default: bool,
+    ) -> Cow<'b, str> {
+        if default {
+            Borrowed(&self.colored_prompt)
         } else {
-            warn!("Failed to read compile-service request, ignoring..");
-            socket.send("", 0)?;
-        };
-    }
-}
-
-fn start_repl(
-    compiler: &mut Compiler,
-    secrets_file: Option<PathBuf>,
-) -> Result<()> {
-    // Prepare machine
-    let secrets: Map<Value> = if let Some(secrets_file) = secrets_file {
-        let reader = BufReader::new(File::open(&secrets_file)?);
-        serde_yaml::from_reader(reader)?
-    } else {
-        Default::default()
-    };
-
-    let session_id = Uuid::new_v4();
-
-    let environment = InMemoryEnvironment::new(None, None);
-    let system = LocalSystem::new(session_id);
-    let vault = InMemoryVault::new(secrets);
-
-    let mut machine = Machine::new(Box::new(environment), Box::new(system), Box::new(vault));
-
-    println!("Starting interactive session, press Ctrl+D to exit.\n");
-
-    let interface = Interface::new("brane-repl")?;
-    interface.set_prompt("brane> ")?;
-
-    while let ReadResult::Input(line) = interface.read_line()? {
-        if !line.trim().is_empty() {
-            interface.add_history_unique(line.clone());
-        };
-
-        let instructions = compiler.compile(&line);
-        debug!("Instructions: {:?}", instructions);
-
-        match instructions {
-            Ok(instructions) => {
-                let instructions = preprocess_instructions(&instructions)?;
-                let output = machine.walk(&instructions)?;
-
-                match output {
-                    Value::Unit => {}
-                    _ => print(&output, false),
-                }
-            }
-            Err(err) => {
-                error!("{:?}", err);
-            }
+            Borrowed(prompt)
         }
     }
 
-    println!("Goodbye.");
+    ///
+    ///
+    ///
+    fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
+        Owned("\x1b[1m".to_owned() + hint + "\x1b[m")
+    }
+
+    ///
+    ///
+    ///
+    fn highlight<'l>(&self, line: &'l str, pos: usize) -> Cow<'l, str> {
+        self.highlighter.highlight(line, pos)
+    }
+
+    ///
+    ///
+    ///
+    fn highlight_char(&self, line: &str, pos: usize) -> bool {
+        self.highlighter.highlight_char(line, pos)
+    }
+}
+
+impl Validator for ReplHelper {
+    ///
+    ///
+    ///
+    fn validate(
+        &self,
+        ctx: &mut validate::ValidationContext,
+    ) -> rustyline::Result<validate::ValidationResult> {
+        self.validator.validate(ctx)
+    }
+
+    ///
+    ///
+    ///
+    fn validate_while_typing(&self) -> bool {
+        self.validator.validate_while_typing()
+    }
+}
+
+pub async fn start(clear: bool) -> Result<()> {
+    let config = Config::builder()
+        .history_ignore_space(true)
+        .completion_type(CompletionType::Circular)
+        .edit_mode(EditMode::Emacs)
+        .output_stream(OutputStreamType::Stdout)
+        .build();
+
+    let repl_helper = ReplHelper {
+        completer: FilenameCompleter::new(),
+        highlighter: MatchingBracketHighlighter::new(),
+        hinter: HistoryHinter {},
+        colored_prompt: "".to_owned(),
+        validator: MatchingBracketValidator::new(),
+    };
+
+    let history_file = get_history_file();
+    if clear && history_file.exists() {
+        fs::remove_file(&history_file)?;
+    }
+
+    let mut rl = Editor::with_config(config);
+    rl.set_helper(Some(repl_helper));
+    rl.load_history(&history_file).ok();
+
+    println!("Welcome to the Brane REPL, press Ctrl+D to exit.\n");
+
+    let mut vm = VM::new();
+
+    let mut count = 1;
+    loop {
+        let p = format!("{}> ", count);
+
+        rl.helper_mut().expect("No helper").colored_prompt = format!("\x1b[1;32m{}\x1b[0m", p);
+
+        let readline = rl.readline(&p);
+        match readline {
+            Ok(line) => {
+                rl.add_history_entry(line.as_str());
+                if let Ok(program) = brane_dsl_wip::scan_and_parse(line){
+                    let function = compiler::compile(program)?;
+                    if let InterpretResult::InterpretOk(Some(value)) = vm.run(Some(function)) {
+                        println!("{:?}", value);
+                    }
+                } else {
+                    println!("Invalid; scanner or parser error.");
+                }
+            }
+            Err(ReadlineError::Interrupted) => {
+                println!("Keyboard interrupt not (yet) supported. Press Ctrl+D to exit.");
+            }
+            Err(ReadlineError::Eof) => {
+                break;
+            }
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
+        }
+
+        count += 1;
+    }
+
+    rl.save_history(&history_file).unwrap();
+
     Ok(())
 }
 
 ///
 ///
 ///
-fn preprocess_instructions(instructions: &Vec<Instruction>) -> Result<Vec<Instruction>> {
-    let mut instructions = instructions.clone();
-
-    for instruction in &mut instructions {
-        match instruction {
-            Instruction::Act(act) => {
-                let name = act.meta.get("name").expect("No `name` property in metadata.");
-                let version = act.meta.get("version").expect("No `version` property in metadata.");
-                let kind = act.meta.get("kind").expect("No `kind` property in metadata.");
-
-                match kind.as_str() {
-                    "dsl" => {
-                        let instr_file = block_on(registry::get_package_source(&name, &version, &kind))?;
-                        if instr_file.exists() {
-                            act.meta
-                                .insert(String::from("instr_file"), String::from(instr_file.to_string_lossy()));
-                        }
-                    }
-                    "cwl" | "ecu" | "oas" => {
-                        let image_file = block_on(registry::get_package_source(&name, &version, &kind))?;
-                        if image_file.exists() {
-                            act.meta
-                                .insert(String::from("image_file"), String::from(image_file.to_string_lossy()));
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            Instruction::Sub(sub) => {
-                if let Some(_) = sub.meta.get("kind") {
-                    let name = sub.meta.get("name").expect("No `name` property in metadata.");
-                    let version = sub.meta.get("version").expect("No `version` property in metadata.");
-
-                    let package_dir = packages::get_package_dir(&name, Some(version))?;
-                    let instructions_file = package_dir.join("instructions.yml");
-                    let instructions_reader = BufReader::new(File::open(&instructions_file)?);
-
-                    sub.instructions = serde_yaml::from_reader(instructions_reader)?;
-                }
-
-                debug!("Preprocess nested sub instrucations.");
-                sub.instructions = preprocess_instructions(&sub.instructions)?;
-            }
-            _ => continue,
-        }
-    }
-
-    debug!("{:#?}", instructions);
-
-    Ok(instructions)
-}
-
-///
-///
-///
-fn print(
-    value: &Value,
-    indent: bool,
-) {
-    if indent {
-        print!("   ");
-    }
-
-    match value {
-        Value::Array { entries, .. } => {
-            println!("[");
-            for entry in entries.iter() {
-                print(entry, true);
-            }
-            println!("]")
-        }
-        Value::Boolean(b) => println!("{}", style(b).cyan()),
-        Value::Integer(i) => println!("{}", style(i).cyan()),
-        Value::Real(r) => println!("{}", style(r).cyan()),
-        Value::Unicode(s) => println!("{}", style(s).cyan()),
-        _ => println!("{:#?}", value),
-    }
+fn get_history_file() -> PathBuf {
+    appdirs::user_data_dir(Some("brane"), None, false)
+        .expect("Couldn't determine Brane data directory.")
+        .join("repl_history.txt")
 }
