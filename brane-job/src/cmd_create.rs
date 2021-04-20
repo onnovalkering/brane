@@ -41,6 +41,7 @@ pub async fn handle(
     validate_command(&command).with_context(context)?;
     let application = command.application.clone().unwrap();
     let correlation_id = command.identifier.clone().unwrap();
+    let image = command.image.clone().unwrap();
 
     // Retreive location metadata and credentials.
     let location_id = command.location.clone().unwrap();
@@ -123,7 +124,8 @@ pub async fn handle(
     let order = 0; // A CREATE event is always the first, thus order=0.
     let key = format!("{}#{}", job_id, order);
     let category = String::from("job");
-    let event = Event::new(EventKind::Created, job_id, application, location_id, category, order, None, None);
+    let payload = image.into_bytes();
+    let event = Event::new(EventKind::Created, job_id, application, location_id, category, order, Some(payload), None);
 
     Ok(vec![(key, event)])
 }
@@ -315,7 +317,6 @@ fn handle_local(
 
     Ok(())
 }
-
 
 ///
 ///
