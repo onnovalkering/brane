@@ -6,6 +6,7 @@ use clap::Clap;
 use dotenv::dotenv;
 use log::LevelFilter;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use specifications::common::Value;
 use std::path::PathBuf;
 use std::{future::Future, process};
@@ -22,12 +23,9 @@ struct Opts {
     #[clap(short, long, env = "BRANE_JOB_ID")]
     job_id: String,
     #[clap(short, long, env = "BRANE_CALLBACK_TO")]
-    callback_to: String,
+    callback_to: Option<String>,
     #[clap(short, long, env = "BRANE_PROXY_ADDRESS")]
     proxy_address: Option<String>,
-    /// Disables callbacks
-    #[clap(long, env = "DISABLE_CALLBACK", takes_value = false)]
-    disable_callback: bool,
     /// Prints debug info
     #[clap(short, long, env = "DEBUG", takes_value = false)]
     debug: bool,
@@ -62,7 +60,6 @@ async fn main() -> Result<()> {
     let job_id = opts.job_id.clone();
     let callback_to = opts.callback_to.clone();
     let proxy_address = opts.proxy_address.clone();
-    let disable_callback = opts.disable_callback.clone();
 
     // Configure logger.
     let mut logger = env_logger::builder();
@@ -90,8 +87,8 @@ async fn main() -> Result<()> {
     }
 
     // Callbacks may be called at any time of the execution.
-    let callback = if !disable_callback {
-        Some(Callback::new(&application_id, &location_id, &job_id, &callback_to))
+    let callback = if let Some(callback_to) = callback_to {
+        Some(Callback::new(application_id, location_id, job_id, callback_to))
     } else {
         None
     };
@@ -113,11 +110,10 @@ async fn run(
     sub_command: SubCommand,
     callback: Option<impl Future<Output = Result<Callback>>>,
 ) -> Result<()> {
+    // Setup callback channel (gRPC) if enabled.
     let mut callback: Option<Callback> = if let Some(callback) = callback {
         let mut callback = callback.await?;
-
         callback.ready(None).await?;
-        callback.heartbeat(None).await?;
 
         Some(callback)
     } else {
@@ -143,11 +139,14 @@ async fn run(
     // Perform final FINISHED callback.
     match output {
         Ok(value) => {
-            dbg!(&value);
+            let output = serde_json::to_string(&value)?;
 
             if let Some(callback) = &mut callback.as_mut() {
-                let payload: Vec<u8> = serde_json::to_string(&value)?.into_bytes();
+                let payload: Vec<u8> = output.into_bytes();
                 callback.finished(Some(payload)).await?;
+            } else {
+                // Otherwise, print output to stdout so it can be parsed by caller.
+                println!("{}", base64::encode(&output));
             }
 
             Ok(())

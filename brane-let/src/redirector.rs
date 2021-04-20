@@ -16,6 +16,7 @@ pub async fn start(
     options: Vec<SocksOption>,
 ) -> Result<()> {
     let proxy_ip = socksx::resolve_addr(&proxy_address).await?.ip();
+    debug!("Going to setup network redirection to proxy with IP: {}.", proxy_ip);
 
     // Turn interception on as quickly as possible.
     configure_iptables(&proxy_ip)?;
@@ -33,7 +34,7 @@ pub async fn start(
                 Ok((stream, _)) => {
                     // Append (dynamic) order metadata property.
                     let mut options = options.clone();
-                    options.push(MetadataOption::new(5, order.to_string()));
+                    options.push(MetadataOption::new(4, order.to_string()));
                     order = order + 1;
 
                     tokio::spawn(redirect(stream, client.clone(), options));
@@ -89,6 +90,8 @@ async fn redirect(
 ) -> Result<()> {
     let mut incoming = incoming;
     let dst_addr = socksx::get_original_dst(&incoming)?;
+
+    debug!("Intercepted connection ({}) to: {:?}", 1, dst_addr);
 
     let (mut outgoing, _) = client.connect(dst_addr, None, Some(options)).await?;
     tokio::io::copy_bidirectional(&mut incoming, &mut outgoing).await?;

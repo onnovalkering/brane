@@ -21,7 +21,10 @@ impl Callback {
         job_id: S,
         callback_to: S,
     ) -> Result<Self> {
-        let client = CallbackServiceClient::connect(callback_to.into()).await?;
+        let callback_to = callback_to.into();
+
+        debug!("Setting up a callback channel to: {}.", callback_to);
+        let client = CallbackServiceClient::connect(callback_to).await?;
 
         Ok(Callback {
             application_id: application_id.into(),
