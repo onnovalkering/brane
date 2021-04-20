@@ -14,6 +14,8 @@ use rdkafka::{
 };
 use socksx::socks6::{self, Socks6Request, SocksReply};
 use tokio::net::{TcpListener, TcpStream};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
@@ -57,6 +59,10 @@ async fn main() -> Result<()> {
         .create()
         .context("Failed to create Kafka producer.")?;
 
+
+    // Event order counter
+    let counter = Arc::new(AtomicU32::new(0));
+
     // Start listening for SOCKS connections.
     let listener = TcpListener::bind(opts.address).await?;
     loop {
@@ -64,8 +70,9 @@ async fn main() -> Result<()> {
 
         let producer = producer.clone();
         let event_topic = event_topic.clone();
+        let counter = counter.clone();
 
-        tokio::spawn(async move { handle_connection(socket, producer, event_topic).await });
+        tokio::spawn(async move { handle_connection(socket, producer, event_topic, counter).await });
     }
 }
 
@@ -76,6 +83,7 @@ pub async fn handle_connection(
     mut source: TcpStream,
     producer: FutureProducer,
     event_topic: String,
+    counter: Arc<AtomicU32>,
 ) -> Result<()> {
     match socks6::read_request(&mut source).await {
         Ok(request) => {
@@ -85,7 +93,7 @@ pub async fn handle_connection(
             if let Ok(mut destination) = TcpStream::connect(request.destination.to_string()).await {
                 // EVENT: connection has been established between source and destination.
                 let payload = request.destination.to_string().as_bytes().to_vec();
-                emit_event(EventKind::Connected, &producer, &event_topic, &request, Some(payload)).await?;
+                emit_event(EventKind::Connected, &producer, &event_topic, &request, &counter, Some(payload)).await?;
 
                 socks6::write_reply(&mut source, socks6::SocksReply::Success).await?;
                 // socks6::write_initial_data(&mut destination, &request).await?;
@@ -100,6 +108,7 @@ pub async fn handle_connection(
                     &producer,
                     &event_topic,
                     &request,
+                    &counter,
                     Some(payload),
                 )
                 .await?;
@@ -125,17 +134,14 @@ pub async fn emit_event(
     producer: &FutureProducer,
     event_topic: &str,
     request: &Socks6Request,
+    counter: &Arc<AtomicU32>,
     payload: Option<Vec<u8>>,
 ) -> Result<()> {
     // Get metadata from SOCKS options.
     let application = request.metadata.get(&1u16).map(String::clone).unwrap_or_default();
     let location = request.metadata.get(&2u16).map(String::clone).unwrap_or_default();
     let job_id = request.metadata.get(&3u16).map(String::clone).unwrap_or_default();
-    let order = request
-        .metadata
-        .get(&5u16)
-        .map(|x| x.parse().unwrap_or_default())
-        .unwrap_or_default();
+    let order = counter.fetch_add(1, Ordering::Release);
 
     // Create new event.
     let event_key = format!("{}#{}", job_id, order);
