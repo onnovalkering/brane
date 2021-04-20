@@ -15,6 +15,7 @@ pub struct Event {
     pub application: String,
     pub job: String,
     pub location: String,
+    pub category: String,
     pub order: i32,
     pub kind: String,
     pub timestamp: String,
@@ -56,6 +57,7 @@ impl Query {
             let application = r.get_by_name("application_id").unwrap();
             let job = r.get_by_name("job_id").unwrap();
             let location = r.get_by_name("location_id").unwrap();
+            let category = r.get_by_name("category").unwrap();
             let order = r.get_by_name("event_id").unwrap();
             let kind = r.get_by_name("kind").unwrap();
 
@@ -66,6 +68,7 @@ impl Query {
                 application,
                 job,
                 location,
+                category,
                 order,
                 kind,
                 timestamp,

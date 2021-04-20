@@ -47,10 +47,11 @@ pub async fn ensure_db_tables(cassandra: &Arc<RwLock<Session>>) -> Result<()> {
             application_id text,
             job_id text,
             location_id text,
+            category text,
             event_id int,
             kind text,
             timestamp timestamp,
-            PRIMARY KEY ((application_id), job_id, location_id, event_id)
+            PRIMARY KEY ((application_id), job_id, location_id, category, event_id)
         )
     "#
     );
@@ -71,7 +72,7 @@ pub async fn ensure_db_tables(cassandra: &Arc<RwLock<Session>>) -> Result<()> {
 pub async fn start_worker(
     brokers: String,
     group_id: String,
-    event_topic: String,
+    event_topics: Vec<String>,
     events_tx: Sender<schema::Event>,
     cassandra: Arc<RwLock<Session>>,
 ) -> Result<()> {
@@ -86,15 +87,19 @@ pub async fn start_worker(
 
     // Restore previous topic/partition offset.
     let mut tpl = TopicPartitionList::new();
-    tpl.add_partition(&event_topic, 0);
+    for topic in event_topics.iter() {
+        tpl.add_partition(&topic, 0);
+    }
 
     let committed_offsets = consumer.committed_offsets(tpl.clone(), Timeout::Never)?;
     let committed_offsets = committed_offsets.to_topic_map();
-    if let Some(offset) = committed_offsets.get(&(event_topic.clone(), 0)) {
-        match offset {
-            Offset::Invalid => tpl.set_partition_offset(&event_topic, 0, Offset::Beginning)?,
-            offset => tpl.set_partition_offset(&event_topic, 0, offset.clone())?,
-        };
+    for topic in event_topics.iter() {
+        if let Some(offset) = committed_offsets.get(&(topic.clone(), 0)) {
+            match offset {
+                Offset::Invalid => tpl.set_partition_offset(&topic, 0, Offset::Beginning)?,
+                offset => tpl.set_partition_offset(&topic, 0, offset.clone())?,
+            };
+        }
     }
 
     info!("Restoring commited offsets: {:?}", &tpl);
@@ -142,17 +147,18 @@ fn process_message(
     // Insert event
     let mut insert = stmt!(
         r#"
-        INSERT INTO application_event.events (application_id, job_id, location_id, event_id, kind, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO application_event.events (application_id, job_id, location_id, category, event_id, kind, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     "#
     );
 
     insert.bind_string(0, event.application.as_str()).unwrap();
     insert.bind_string(1, event.identifier.as_str()).unwrap();
     insert.bind_string(2, event.location.as_str()).unwrap();
-    insert.bind_int32(3, event.order as i32).unwrap();
-    insert.bind_string(4, kind.as_str()).unwrap();
-    insert.bind_int64(5, event.timestamp).unwrap();
+    insert.bind_string(3, event.category.as_str()).unwrap();
+    insert.bind_int32(4, event.order as i32).unwrap();
+    insert.bind_string(5, kind.as_str()).unwrap();
+    insert.bind_int64(6, event.timestamp).unwrap();
 
     cassandra
         .read()
@@ -168,6 +174,7 @@ fn process_message(
         application: event.application.clone(),
         job: event.identifier.clone(),
         location: event.location.clone(),
+        category: event.category.clone(),
         order: event.order as i32,
         kind,
         timestamp: OffsetDateTime::from_unix_timestamp(event.timestamp.clone()).format(Format::Rfc3339),

@@ -26,8 +26,8 @@ struct Opts {
     #[clap(short, long, env = "DEBUG", takes_value = false)]
     debug: bool,
     /// Topic to receive events from
-    #[clap(short, long = "evt-topic", env = "EVENT_TOPIC")]
-    event_topic: String,
+    #[clap(short, long = "evt-topics", env = "EVENT_TOPIC", multiple = true)]
+    event_topics: Vec<String>,
     /// Consumer group id
     #[clap(short, long, default_value = "brane-log", env = "GROUP_ID")]
     group_id: String,
@@ -74,7 +74,7 @@ async fn main() -> Result<()> {
     tokio::spawn(ingestion::start_worker(
         opts.brokers.clone(),
         opts.group_id.clone(),
-        opts.event_topic.clone(),
+        opts.event_topics.clone(),
         events_tx,
         cassandra_session.clone(),
     ));
