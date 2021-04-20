@@ -19,10 +19,10 @@ services:
       context: .
       dockerfile: Dockerfile.net
     ports:
-      - "5080:5080"
+      - "5081:5081"
     restart: always
     environment:
-        ADDRESS: "0.0.0.0:5080"
+        ADDRESS: "0.0.0.0:5081"
         BROKERS: "kafka:29092"
         EVENT_TOPIC: "net-evt"
         DEBUG: "true"
