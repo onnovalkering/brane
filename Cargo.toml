@@ -5,6 +5,7 @@ members = [
     "brane-clb",
     "brane-cli",
     "brane-dsl",
+    "brane-dsl-wip",
     "brane-exec",
     "brane-init",
     "brane-job",
