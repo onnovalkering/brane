@@ -23,7 +23,8 @@ pub fn handle(callback: Callback) -> Result<Vec<(String, Event)>> {
 
     let key = format!("{}#{}", job_id, order);
     let payload = callback.payload;
-    let event = Event::new(kind, job_id, application, location_id, order as u32, Some(payload), None);
+    let category = String::from("job");
+    let event = Event::new(kind, job_id, application, location_id, category, order as u32, Some(payload), None);
 
     Ok(vec![(key, event)])
 }

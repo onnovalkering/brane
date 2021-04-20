@@ -132,11 +132,13 @@ pub struct Event {
     pub application: String,
     #[prost(tag = "4", string)]
     pub location: String,
-    #[prost(tag = "5", uint32)]
+    #[prost(tag = "5", string)]
+    pub category: String,
+    #[prost(tag = "6", uint32)]
     pub order: u32,
-    #[prost(tag = "6", bytes)]
+    #[prost(tag = "7", bytes)]
     pub payload: Vec<u8>,
-    #[prost(tag = "7", int64)]
+    #[prost(tag = "8", int64)]
     pub timestamp: i64,
 }
 
@@ -149,6 +151,7 @@ impl Event {
         identifier: S,
         application: S,
         location: S,
+        category: S,
         order: u32,
         payload: Option<Vec<u8>>,
         timestamp: Option<i64>,
@@ -160,6 +163,7 @@ impl Event {
             identifier: identifier.into(),
             application: application.into(),
             location: location.into(),
+            category: category.into(),
             order,
             payload: payload.unwrap_or_default(),
             timestamp,
@@ -178,6 +182,8 @@ pub enum EventKind {
     Finished = 5,
     Stopped = 6,
     Failed = 7,
+    Connected = 8,
+    Disconnected = 9,
 }
 
 impl fmt::Display for EventKind {

@@ -122,7 +122,8 @@ pub async fn handle(
 
     let order = 0; // A CREATE event is always the first, thus order=0.
     let key = format!("{}#{}", job_id, order);
-    let event = Event::new(EventKind::Created, job_id, application, location_id, order, None, None);
+    let category = String::from("job");
+    let event = Event::new(EventKind::Created, job_id, application, location_id, category, order, None, None);
 
     Ok(vec![(key, event)])
 }
