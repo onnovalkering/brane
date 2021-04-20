@@ -1,6 +1,6 @@
 use anyhow::Result;
 use socksx::{self, Socks6Client};
-use socksx::options::{SocksOption, MetadataOption};
+use socksx::options::SocksOption;
 use std::net::IpAddr;
 use std::process::Command;
 use std::time::Duration;
@@ -27,17 +27,11 @@ pub async fn start(
 
     tokio::spawn(async move {
         debug!("Started redirector service on: {}", REDIRECTOR_ADDRESS);
-        let mut order = 0;
 
         loop {
             match listener.accept().await {
                 Ok((stream, _)) => {
-                    // Append (dynamic) order metadata property.
-                    let mut options = options.clone();
-                    options.push(MetadataOption::new(4, order.to_string()));
-                    order = order + 1;
-
-                    tokio::spawn(redirect(stream, client.clone(), options));
+                    tokio::spawn(redirect(stream, client.clone(), options.clone()));
                 }
                 Err(err) => {
                     error!("An error occured while trying to redirect a connection: {:?}", err);
@@ -91,7 +85,7 @@ async fn redirect(
     let mut incoming = incoming;
     let dst_addr = socksx::get_original_dst(&incoming)?;
 
-    debug!("Intercepted connection ({}) to: {:?}", 1, dst_addr);
+    debug!("Intercepted connection to: {:?}.", dst_addr);
 
     let (mut outgoing, _) = client.connect(dst_addr, None, Some(options)).await?;
     tokio::io::copy_bidirectional(&mut incoming, &mut outgoing).await?;
