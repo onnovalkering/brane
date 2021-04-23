@@ -1,5 +1,0 @@
-import 'arithmetic-task'
-
-a := ?? as Integer
-b := ?? as Integer
-c := a + b

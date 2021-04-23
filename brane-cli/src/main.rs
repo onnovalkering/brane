@@ -2,7 +2,7 @@
 extern crate human_panic;
 
 use anyhow::Result;
-use brane_cli::{build_cwl, build_dsl, build_ecu, build_oas, packages, registry, repl, run, test};
+use brane_cli::{build_cwl, build_ecu, build_oas, packages, registry, repl, run, test};
 use dotenv::dotenv;
 use git2::Repository;
 use log::LevelFilter;
@@ -203,7 +203,6 @@ async fn run(options: CLI) -> Result<()> {
 
             match kind.as_str() {
                 "cwl" => build_cwl::handle(context, file, init)?,
-                "dsl" => build_dsl::handle(context, file).await?,
                 "ecu" => build_ecu::handle(context, file, init)?,
                 "oas" => build_oas::handle(context, file, init)?,
                 _ => println!("Unsupported package kind: {}", kind),
@@ -239,7 +238,6 @@ async fn run(options: CLI) -> Result<()> {
 
             match kind.as_str() {
                 "cwl" => build_cwl::handle(context, file, init)?,
-                "dsl" => build_dsl::handle(context, file).await?,
                 "ecu" => build_ecu::handle(context, file, init)?,
                 "oas" => build_oas::handle(context, file, init)?,
                 _ => println!("Unsupported package kind: {}", kind),

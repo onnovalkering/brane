@@ -1,4 +1,5 @@
 use anyhow::Result;
+use brane_bvm::{VM, InterpretResult};
 use std::borrow::Cow::{self, Borrowed, Owned};
 use rustyline::completion::{Completer, FilenameCompleter, Pair};
 use rustyline::config::OutputStreamType;
@@ -10,10 +11,8 @@ use rustyline::{CompletionType, Config, Context, EditMode, Editor};
 use rustyline_derive::Helper;
 use std::path::PathBuf;
 use std::fs;
-use brane_dsl_wip::{
-    compiler,
-    vm::{VM, InterpretResult}
-};
+use crate::registry;
+use brane_dsl::{Compiler, CompilerOptions};
 
 #[derive(Helper)]
 struct ReplHelper {
@@ -138,7 +137,11 @@ pub async fn start(clear: bool) -> Result<()> {
 
     println!("Welcome to the Brane REPL, press Ctrl+D to exit.\n");
 
-    let mut vm = VM::new();
+    let compiler_options = CompilerOptions::new();
+    let package_index = registry::get_package_index().await?;
+
+    let mut compiler = Compiler::new(compiler_options, package_index.clone());
+    let mut vm = VM::new(package_index);
 
     let mut count = 1;
     loop {
@@ -150,17 +153,17 @@ pub async fn start(clear: bool) -> Result<()> {
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
-                if let Ok(program) = brane_dsl_wip::scan_and_parse(line){
-                    let function = compiler::compile(program)?;
-                    if let InterpretResult::InterpretOk(Some(value)) = vm.run(Some(function)) {
-                        println!("{:?}", value);
-                    }
-                } else {
-                    println!("Invalid; scanner or parser error.");
+                match compiler.compile(line) {
+                    Ok(function) => {
+                        if let InterpretResult::InterpretOk(value) = vm.run(Some(function)) {
+                            println!("{:?}", value);
+                        }
+                    },
+                    Err(e) => { eprintln!("{:?}", e); }
                 }
             }
             Err(ReadlineError::Interrupted) => {
-                println!("Keyboard interrupt not (yet) supported. Press Ctrl+D to exit.");
+                println!("Keyboard interrupt not supported. Press Ctrl+D to exit.");
             }
             Err(ReadlineError::Eof) => {
                 break;

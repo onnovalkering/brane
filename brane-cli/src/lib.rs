@@ -4,11 +4,13 @@ extern crate anyhow;
 extern crate log;
 #[macro_use]
 extern crate prettytable;
+#[macro_use]
+extern crate lazy_static;
 
 pub mod build_cwl;
-pub mod build_dsl;
 pub mod build_ecu;
 pub mod build_oas;
+pub mod docker;
 pub mod packages;
 pub mod registry;
 pub mod repl;

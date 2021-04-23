@@ -13,7 +13,6 @@ COPY ./brane-dsl /brane-dsl
 COPY ./brane-exec /brane-exec
 COPY ./brane-std /brane-std
 COPY ./brane-sys /brane-sys
-COPY ./brane-vm /brane-vm
 COPY ./specifications /specifications
 
 # This will prepare dependencies

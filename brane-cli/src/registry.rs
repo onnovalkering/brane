@@ -1,7 +1,7 @@
 use crate::packages;
 use crate::utils;
 use anyhow::{Context, Result};
-use brane_dsl::indexes::PackageIndex;
+use specifications::package::PackageIndex;
 use console::style;
 use console::{pad_str, Alignment};
 use dialoguer::Confirm;

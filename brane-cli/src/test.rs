@@ -1,23 +1,15 @@
 use crate::packages;
 use anyhow::{Context, Result};
-use brane_exec::{docker, ExecuteInfo};
-use brane_sys::local::LocalSystem;
-use brane_vm::environment::InMemoryEnvironment;
-use brane_vm::machine::{self, Machine};
-use brane_vm::vault::InMemoryVault;
+use crate::docker::{self, ExecuteInfo};
 use console::style;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Confirm, Password};
 use dialoguer::{Input as Prompt, Select};
-use serde_yaml;
 use serde::de::DeserializeOwned;
 use specifications::common::{Function, Parameter, Type, Value};
-use specifications::instructions::Instruction;
 use specifications::package::PackageInfo;
 use std::env;
 use std::fs;
-use std::fs::File;
-use std::io::BufReader;
 use std::path::PathBuf;
 use std::{
     fmt::{Debug, Display},
@@ -47,7 +39,6 @@ pub async fn handle(
     let package_info = PackageInfo::from_path(package_dir.join("package.yml"))?;
     let output = match package_info.kind.as_str() {
         "cwl" => test_cwl(package_dir, package_info).await?,
-        "dsl" => test_dsl(package_dir, package_info)?,
         "ecu" => test_ecu(package_dir, package_info).await?,
         "oas" => test_oas(package_dir, package_info).await?,
         _ => {
@@ -142,38 +133,6 @@ async fn test_cwl(
 
     debug!("stdout: {}", stdout);
     Ok(serde_json::from_str(&stdout)?)
-}
-
-///
-///
-///
-fn test_dsl(
-    package_dir: PathBuf,
-    package_info: PackageInfo,
-) -> Result<Value> {
-    let instructions_file = package_dir.join("instructions.yml");
-    ensure!(instructions_file.exists(), "No instructions found.");
-
-    let functions = package_info.functions.unwrap();
-    let types = package_info.types.unwrap_or_default();
-    let (_, arguments) = prompt_for_input(&functions, &types)?;
-
-    // Load instructions
-    let buf_reader = BufReader::new(File::open(instructions_file)?);
-    let instructions: Vec<Instruction> = serde_yaml::from_reader(buf_reader)?;
-    let instructions = machine::preprocess_instructions(&instructions)?;
-
-    debug!("preprocessed: {:#?}", instructions);
-
-    let session_id = Uuid::new_v4();
-
-    let environment = InMemoryEnvironment::new(Some(arguments), None);
-    let system = LocalSystem::new(session_id);
-    let vault = InMemoryVault::new(Default::default());
-
-    let mut machine = Machine::new(Box::new(environment), Box::new(system), Box::new(vault));
-
-    machine.walk(&instructions)
 }
 
 ///

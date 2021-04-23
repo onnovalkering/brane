@@ -6,7 +6,6 @@ use clap::Clap;
 use dotenv::dotenv;
 use log::LevelFilter;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
 use specifications::common::Value;
 use std::path::PathBuf;
 use std::{future::Future, process};
