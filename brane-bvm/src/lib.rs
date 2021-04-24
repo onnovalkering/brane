@@ -284,11 +284,12 @@ impl VM {
                 }
                 OpReturn => {
                     let result = self.stack.pop();
+                    dbg!(&result);
 
                     self.call_frames.pop();
-                    if self.call_frames.is_empty() {
-                        return VmResult::Ok(None);
-                    }
+                    // if self.call_frames.is_empty() {
+                    //     return VmResult::Ok(None);
+                    // }
 
                     return VmResult::Ok(result);
                 }
