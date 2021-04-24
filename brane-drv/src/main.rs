@@ -16,7 +16,7 @@ use tonic::transport::Server;
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
-    #[clap(short, long, default_value = "127.0.0.1:50052", env = "ADDRESS")]
+    #[clap(short, long, default_value = "127.0.0.1:50053", env = "ADDRESS")]
     /// Service address
     address: String,
     /// Kafka brokers
