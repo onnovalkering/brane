@@ -81,7 +81,7 @@ impl From<u8> for OpCode {
 
 #[derive(Debug, Clone)]
 pub enum Function {
-    External { name: String, arity: i32 },
+    External { package: String, name: String, arity: i32 },
     Native { name: String, arity: i32 },
     UserDefined { name: String, arity: i32, chunk: Chunk },
 }

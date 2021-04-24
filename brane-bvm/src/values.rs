@@ -1,4 +1,5 @@
 use crate::bytecode::Function;
+use specifications::common::Value as SpecValue;
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -11,9 +12,35 @@ pub enum Value {
     Class(Class),
 }
 
+impl Value {
+    pub fn as_spec_value(&self) -> SpecValue {
+        match self {
+            Value::String(value) => SpecValue::Unicode(value.clone()),
+            Value::Boolean(value) => SpecValue::Boolean(value.clone()),
+            Value::Integer(value) => SpecValue::Integer(value.clone()),
+            Value::Real(value) => SpecValue::Real(value.clone()),
+            Value::Unit => SpecValue::Unit,
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Class {
     pub name: String,
+}
+
+impl From<SpecValue> for Value {
+    fn from(value: SpecValue) -> Self {
+        match value {
+            SpecValue::Unicode(value) => Value::String(value.clone()),
+            SpecValue::Boolean(value) => Value::Boolean(value.clone()),
+            SpecValue::Integer(value) => Value::Integer(value.clone()),
+            SpecValue::Real(value) => Value::Real(value.clone()),
+            SpecValue::Unit => Value::Unit,
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl From<Function> for Value {

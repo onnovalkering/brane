@@ -26,11 +26,18 @@ pub struct VM {
     package_index: PackageIndex,
 }
 
+#[derive(Clone, Debug)]
+pub struct VmCall {
+    pub package: String,
+    pub function: String,
+    pub arguments: Vec<Value>,
+}
+
 #[repr(u8)]
-pub enum InterpretResult {
-    InterpretOk(Option<Value>),
-    InterpretCompileError,
-    InterpretRuntimeError,
+pub enum VmResult {
+    Ok(Option<Value>),
+    Call(VmCall),
+    RuntimeError,
 }
 
 impl VM {
@@ -52,24 +59,40 @@ impl VM {
         }
     }
 
-    fn call(
-        &self,
+    ///
+    ///
+    ///
+    pub fn call(
+        &mut self,
         function: Function,
         arg_count: usize,
-    ) -> CallFrame {
-        CallFrame {
+    ) -> () {
+        let new_frame = CallFrame {
             function,
             ip: 0,
-            slot_offset: self.stack.len() - arg_count - 1,
-        }
+            slot_offset: self.stack.len() - (arg_count - 1),
+        };
+
+        self.call_frames.push(new_frame);
     }
 
+    ///
+    ///
+    ///
+    pub fn result(
+        &mut self,
+        result: Value,
+    ) -> () {
+        self.stack.push(result);
+    }
+
+    ///
+    ///
+    ///
     pub fn run(
         &mut self,
         function: Option<Function>,
-    ) -> InterpretResult {
-        use InterpretResult::*;
-
+    ) -> VmResult {
         if let Some(function) = function {
             self.call_frames.push(CallFrame {
                 slot_offset: 0,
@@ -79,10 +102,10 @@ impl VM {
         }
 
         let mut frame = self.call_frames.last().unwrap().clone();
-        let chunk = if let Function::UserDefined { chunk, .. } = frame.function {
-            chunk.clone()
+        let chunk = if let Function::UserDefined { chunk, .. } = frame.function.clone() {
+            chunk
         } else {
-            return InterpretRuntimeError;
+            return VmResult::RuntimeError;
         };
 
         // Decodes and dispatches the instruction
@@ -93,7 +116,8 @@ impl VM {
             debug!("{}", debug);
 
             if frame.ip >= chunk.code.len() {
-                return InterpretOk(None);
+                self.call_frames.pop();
+                return VmResult::Ok(None);
             }
 
             let instruction: OpCode = chunk.code[frame.ip].into();
@@ -263,10 +287,10 @@ impl VM {
 
                     self.call_frames.pop();
                     if self.call_frames.is_empty() {
-                        return InterpretOk(None);
+                        return VmResult::Ok(None);
                     }
 
-                    return InterpretResult::InterpretOk(result);
+                    return VmResult::Ok(result);
                 }
                 OpTrue => self.stack.push(true.into()),
                 OpFalse => self.stack.push(false.into()),
@@ -400,14 +424,13 @@ impl VM {
                     let func = if let Value::Function(func) = func {
                         func
                     } else {
-                        return InterpretRuntimeError;
+                        return VmResult::RuntimeError;
                     };
 
                     match func {
                         Function::UserDefined { .. } => {
-                            let new_frame = self.call(func, arg_count as usize);
-                            self.call_frames.push(new_frame);
-                            if let InterpretOk(Some(result)) = self.run(None) {
+                            self.call(func, arg_count as usize);
+                            if let VmResult::Ok(Some(result)) = self.run(None) {
                                 for _i in vec![0; offset as usize] {
                                     self.stack.pop();
                                 }
@@ -422,9 +445,21 @@ impl VM {
                             }
                             _ => unreachable!(),
                         },
-                        Function::External { name, .. } => {
-                            println!("exec {}", name);
-                            todo!();
+                        Function::External { name, package, arity } => {
+                            let arguments = (0..arity)
+                                .map(|_| self.stack.pop().unwrap())
+                                .collect();
+
+                            let call = VmCall {
+                                package,
+                                function: name,
+                                arguments,
+                            };
+
+                            self.call_frames.pop();
+                            self.call_frames.push(frame.clone());
+
+                            return VmResult::Call(call);
                         }
                     }
                 }
@@ -432,13 +467,14 @@ impl VM {
                     let constant = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
-                    if let Some(Value::String(name)) = chunk.constants.get(constant as usize) {
-                        if let Some(package) = self.package_index.get(name, None) {
+                    if let Some(Value::String(package_name)) = chunk.constants.get(constant as usize) {
+                        if let Some(package) = self.package_index.get(package_name, None) {
                             if let Some(functions) = &package.functions {
                                 for (name, function) in functions {
                                     self.globals.insert(
                                         name.clone(),
                                         Value::Function(Function::External {
+                                            package: package_name.clone(),
                                             name: name.clone(),
                                             arity: function.parameters.len() as i32,
                                         }),
