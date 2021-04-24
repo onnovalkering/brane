@@ -110,6 +110,10 @@ enum SubCommand {
     Repl {
         #[structopt(short, long, help = "Clear history before session")]
         clear: bool,
+        #[structopt(short, long, help = "Create a remote REPL session")]
+        remote: Option<String>,
+        #[structopt(short, long, help = "Attach to an existing remote session")]
+        attach: Option<String>,
     },
 
     #[structopt(name = "run", about = "Run a DSL script locally")]
@@ -268,8 +272,8 @@ async fn run(options: CLI) -> Result<()> {
         Remove { name, version, force } => {
             packages::remove(name, version, force).await?;
         }
-        Repl { clear } => {
-            repl::start(clear).await?;
+        Repl { clear, remote, attach } => {
+            repl::start(clear, remote, attach).await?;
         }
         Run { file, secrets } => {
             run::handle(file, secrets).await?;

@@ -1,6 +1,7 @@
 use anyhow::{Result, Context as _};
 use brane_bvm::{VM, VmResult, VmCall};
 use brane_bvm::values::Value;
+use brane_drv::grpc::{CreateSessionRequest, DriverServiceClient, ExecuteRequest};
 use crate::docker::{self, ExecuteInfo};
 use std::borrow::Cow::{self, Borrowed, Owned};
 use rustyline::completion::{Completer, FilenameCompleter, Pair};
@@ -128,7 +129,11 @@ fn get_history_file() -> PathBuf {
 ///
 ///
 ///
-pub async fn start(clear: bool) -> Result<()> {
+pub async fn start(
+    clear: bool,
+    remote: Option<String>,
+    attach: Option<String>,
+) -> Result<()> {
     let config = Config::builder()
         .history_ignore_space(true)
         .completion_type(CompletionType::Circular)
@@ -155,13 +160,84 @@ pub async fn start(clear: bool) -> Result<()> {
 
     println!("Welcome to the Brane REPL, press Ctrl+D to exit.\n");
 
+    if let Some(remote) = remote {
+        remote_repl(&mut rl, remote, attach).await?;
+    } else {
+        local_repl(&mut rl).await?;
+    }
+
+
+    rl.save_history(&history_file).unwrap();
+
+    Ok(())
+}
+
+///
+///
+///
+async fn remote_repl(
+    rl: &mut Editor<ReplHelper>,
+    remote: String,
+    attach: Option<String>
+) -> Result<()> {
+    let mut client = DriverServiceClient::connect(remote).await?;
+    let session = if let Some(attach) = attach {
+        attach.clone()
+    } else {
+        let request = CreateSessionRequest {};
+        let reply = client.create_session(request).await?;
+
+        reply.into_inner().uuid.clone()
+    };
+
+    let mut count: u32 = 1;
+    loop {
+        let p = format!("{}> ", count);
+
+        rl.helper_mut().expect("No helper").colored_prompt = format!("\x1b[1;32m{}\x1b[0m", p);
+
+        let readline = rl.readline(&p);
+        match readline {
+            Ok(line) => {
+                rl.add_history_entry(line.as_str());
+
+                let request = ExecuteRequest {
+                    uuid: session.clone(),
+                    input: line.clone()
+                };
+
+                let response = client.execute(request).await?;
+                println!("{}", response.into_inner().output);
+            }
+            Err(ReadlineError::Interrupted) => {
+                println!("Keyboard interrupt not supported. Press Ctrl+D to exit.");
+            }
+            Err(ReadlineError::Eof) => {
+                break;
+            }
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
+        }
+
+        count += 1;
+    }
+
+    Ok(())
+}
+
+///
+///
+///
+async fn local_repl(rl: &mut Editor<ReplHelper>) -> Result<()> {
     let compiler_options = CompilerOptions::new();
     let package_index = registry::get_package_index().await?;
 
     let mut compiler = Compiler::new(compiler_options, package_index.clone());
     let mut vm = VM::new(package_index);
 
-    let mut count = 1;
+    let mut count: u32 = 1;
     loop {
         let p = format!("{}> ", count);
 
@@ -211,8 +287,6 @@ pub async fn start(clear: bool) -> Result<()> {
 
         count += 1;
     }
-
-    rl.save_history(&history_file).unwrap();
 
     Ok(())
 }

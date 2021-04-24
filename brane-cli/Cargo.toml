@@ -14,6 +14,7 @@ appdirs = "0.2"
 base64 = "0.12"
 bollard = "0.7"
 brane-bvm = { path = "../brane-bvm" }
+brane-drv = { path = "../brane-drv" }
 brane-dsl = { path = "../brane-dsl" }
 brane-oas = { path = "../brane-oas" }
 chrono = "0.4"
