@@ -5,10 +5,11 @@ members = [
     "brane-cfg",
     "brane-clb",
     "brane-cli",
+    "brane-drv",
     "brane-dsl",
     "brane-job",
-    "brane-log",
     "brane-let",
+    "brane-log",
     "brane-oas",
     "specifications",
 ]
