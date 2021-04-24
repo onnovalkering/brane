@@ -1,5 +1,7 @@
-use anyhow::Result;
-use brane_bvm::{VM, InterpretResult};
+use anyhow::{Result, Context as _};
+use brane_bvm::{VM, VmResult, VmCall};
+use brane_bvm::values::Value;
+use crate::docker::{self, ExecuteInfo};
 use std::borrow::Cow::{self, Borrowed, Owned};
 use rustyline::completion::{Completer, FilenameCompleter, Pair};
 use rustyline::config::OutputStreamType;
@@ -11,8 +13,12 @@ use rustyline::{CompletionType, Config, Context, EditMode, Editor};
 use rustyline_derive::Helper;
 use std::path::PathBuf;
 use std::fs;
-use crate::registry;
+use crate::{registry, packages};
 use brane_dsl::{Compiler, CompilerOptions};
+use specifications::package::PackageInfo;
+use specifications::common::Value as SpecValue;
+use std::collections::HashMap;
+use serde::de::DeserializeOwned;
 
 #[derive(Helper)]
 struct ReplHelper {
@@ -110,6 +116,18 @@ impl Validator for ReplHelper {
     }
 }
 
+///
+///
+///
+fn get_history_file() -> PathBuf {
+    appdirs::user_data_dir(Some("brane"), None, false)
+        .expect("Couldn't determine Brane data directory.")
+        .join("repl_history.txt")
+}
+
+///
+///
+///
 pub async fn start(clear: bool) -> Result<()> {
     let config = Config::builder()
         .history_ignore_space(true)
@@ -155,8 +173,25 @@ pub async fn start(clear: bool) -> Result<()> {
                 rl.add_history_entry(line.as_str());
                 match compiler.compile(line) {
                     Ok(function) => {
-                        if let InterpretResult::InterpretOk(value) = vm.run(Some(function)) {
-                            println!("{:?}", value);
+                        vm.call(function, 1usize);
+
+                        loop {
+                            match vm.run(None) {
+                                VmResult::Call(call) => {
+                                    let result = make_function_call(call).await?;
+                                    println!("{:?}", result);
+                                    vm.result(result);
+                                },
+                                VmResult::Ok(value) => {
+                                    println!("ok: {:?}", value);
+                                    break;
+                                },
+                                VmResult::RuntimeError => {
+                                    eprintln!("Runtime errro!");
+                                    break;
+                                }
+                            }
+
                         }
                     },
                     Err(e) => { eprintln!("{:?}", e); }
@@ -185,8 +220,65 @@ pub async fn start(clear: bool) -> Result<()> {
 ///
 ///
 ///
-fn get_history_file() -> PathBuf {
-    appdirs::user_data_dir(Some("brane"), None, false)
-        .expect("Couldn't determine Brane data directory.")
-        .join("repl_history.txt")
+async fn make_function_call(
+    call: VmCall,
+) -> Result<Value> {
+    let package_dir = packages::get_package_dir(&call.package, Some("latest"))?;
+    let package_file = package_dir.join("package.yml");
+    let package_info = PackageInfo::from_path(package_file)?;
+    let functions = package_info.functions.expect("Package has no functions!");
+
+    let image = format!("{}:{}", package_info.name, package_info.version);
+    let image_file = Some(package_dir.join("image.tar"));
+
+    let mut arguments: HashMap<String, SpecValue> = HashMap::new();
+    let function = functions.get(&call.function).expect("Function does not exist!");
+    for (i, p) in function.parameters.iter().enumerate() {
+        arguments.insert(p.name.clone(), call.arguments.get(i).unwrap().as_spec_value());
+    }
+
+    let command = vec![
+        String::from("--application-id"),
+        String::from("test"),
+        String::from("--location-id"),
+        String::from("localhost"),
+        String::from("--job-id"),
+        String::from("1"),
+        String::from("code"),
+        call.function.clone(),
+        base64::encode(serde_json::to_string(&arguments)?),
+    ];
+
+    let exec = ExecuteInfo::new(image, image_file, None, Some(command));
+
+    let (stdout, stderr) = docker::run_and_wait(exec).await?;
+    debug!("stderr: {}", stderr);
+    debug!("stdout: {}", stdout);
+
+    let output = stdout.lines().last().unwrap_or_default().to_string();
+    let output: Result<SpecValue> = decode_b64(output);
+    match output {
+        Ok(value) => Ok(Value::from(value)),
+        Err(err) => {
+            println!("{:?}", err);
+            Ok(Value::Unit)
+        }
+    }
+}
+
+///
+///
+///
+fn decode_b64<T>(input: String) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    let input =
+        base64::decode(input).with_context(|| "Decoding failed, encoded input doesn't seem to be Base64 encoded.")?;
+
+    let input = String::from_utf8(input[..].to_vec())
+        .with_context(|| "Conversion failed, decoded input doesn't seem to be UTF-8 encoded.")?;
+
+    serde_json::from_str(&input)
+        .with_context(|| "Deserialization failed, decoded input doesn't seem to be as expected.")
 }
