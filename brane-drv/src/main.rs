@@ -1,18 +1,30 @@
 use anyhow::{bail, Context, Result};
 use brane_drv::grpc::DriverServiceServer;
 use brane_drv::handler::DriverHandler;
+use brane_job::interface::{Event, EventKind};
+use brane_bvm::values::Value;
 use clap::Clap;
 use dotenv::dotenv;
 use log::{info};
 use log::LevelFilter;
+use prost::Message as _;
+use futures::TryStreamExt;
 use rdkafka::{
     admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
     producer::FutureProducer,
+    consumer::{Consumer, StreamConsumer},
     error::RDKafkaErrorCode,
     ClientConfig,
+    TopicPartitionList,
+    Offset,
+    util::Timeout,
+    Message as _
 };
 use tonic::transport::Server;
 use specifications::package::PackageIndex;
+use specifications::common::Value as SpecValue;
+use std::sync::Arc;
+use dashmap::DashMap;
 
 
 #[derive(Clap)]
@@ -35,6 +47,9 @@ struct Opts {
     /// Print debug info
     #[clap(short, long, env = "DEBUG", takes_value = false)]
     debug: bool,
+    /// Consumer group id
+    #[clap(short, long, default_value = "brane-drv")]
+    group_id: String,
 }
 
 #[tokio::main]
@@ -58,6 +73,7 @@ async fn main() -> Result<()> {
 
     let packages = reqwest::get(&opts.package_index_url).await?.json().await?;
     let package_index = PackageIndex::from_value(packages)?;
+    dbg!(&package_index);
 
     let producer: FutureProducer = ClientConfig::new()
         .set("bootstrap.servers", &opts.brokers)
@@ -65,10 +81,24 @@ async fn main() -> Result<()> {
         .create()
         .context("Failed to create Kafka producer.")?;
 
+    // Start event monitor in the background.
+    let states: Arc<DashMap<String, String>> = Arc::new(DashMap::new());
+    let results: Arc<DashMap<String, Value>> = Arc::new(DashMap::new());
+
+    tokio::spawn(start_event_monitor(
+        opts.brokers.clone(),
+        opts.group_id.clone(),
+        opts.event_topic.clone(),
+        states.clone(),
+        results.clone(),
+    ));
+
     let handler = DriverHandler {
         package_index,
         producer,
         command_topic,
+        states,
+        results,
     };
 
     // Start gRPC server with callback service.
@@ -112,6 +142,105 @@ async fn ensure_topics(
             },
         }
     }
+
+    Ok(())
+}
+
+async fn start_event_monitor(
+    brokers: String,
+    group_id: String,
+    topic: String,
+    states: Arc<DashMap<String, String>>,
+    results: Arc<DashMap<String, Value>>,
+) -> Result<()> {
+    let consumer: StreamConsumer = ClientConfig::new()
+        .set("group.id", group_id)
+        .set("bootstrap.servers", brokers)
+        .set("enable.partition.eof", "false")
+        .set("session.timeout.ms", "6000")
+        .set("enable.auto.commit", "true")
+        .create()
+        .context("Failed to create Kafka consumer.")?;
+
+    // Restore previous topic/partition offset.
+    let mut tpl = TopicPartitionList::new();
+    tpl.add_partition(&topic, 0);
+
+    let committed_offsets = consumer.committed_offsets(tpl.clone(), Timeout::Never)?;
+    let committed_offsets = committed_offsets.to_topic_map();
+    if let Some(offset) = committed_offsets.get(&(topic.clone(), 0)) {
+        match offset {
+            Offset::Invalid => tpl.set_partition_offset(&topic, 0, Offset::Beginning)?,
+            offset => tpl.set_partition_offset(&topic, 0, offset.clone())?,
+        };
+    }
+
+    info!("Restoring commited offsets: {:?}", &tpl);
+    consumer
+        .assign(&tpl)
+        .context("Failed to manually assign topic, partition, and/or offset to consumer.")?;
+
+    consumer
+        .stream()
+        .try_for_each(|borrowed_message| {
+            let owned_message = borrowed_message.detach();
+            let owned_states = states.clone();
+            let owned_results = results.clone();
+
+            async move {
+                if let Some(payload) = owned_message.payload() {
+                    // Decode payload into a Event message.
+                    let event = Event::decode(payload).unwrap();
+                    let kind = EventKind::from_i32(event.kind).unwrap();
+
+                    dbg!(&event);
+
+                    let event_id: Vec<_> = event.identifier.split('-').collect();
+                    let correlation_id = event_id.first().unwrap().to_string();
+
+                    match kind {
+                        EventKind::Unknown => {
+                            owned_states.insert(correlation_id, String::from("unkown"));
+                        }
+                        EventKind::Created => {
+                            owned_states.insert(correlation_id, String::from("created"));
+                        }
+                        EventKind::Ready => {
+                            owned_states.insert(correlation_id, String::from("created"));
+                        }
+                        EventKind::Initialized => {
+                            owned_states.insert(correlation_id, String::from("initialized"));
+                        }
+                        EventKind::Started => {
+                            owned_states.insert(correlation_id, String::from("started"));
+                        }
+                        EventKind::Finished => {
+                            let payload = String::from_utf8_lossy(&event.payload).to_string();
+                            let value: SpecValue = serde_json::from_str(&payload).unwrap();
+                            let value = Value::from(value);
+
+                            owned_states.insert(correlation_id.clone(), String::from("finished"));
+                            owned_results.insert(correlation_id.clone(), value);
+                            dbg!(&owned_results);
+                        }
+                        EventKind::Stopped => {
+                            owned_states.insert(correlation_id, String::from("stopped"));
+                        }
+                        EventKind::Failed => {
+                            owned_states.insert(correlation_id, String::from("failed"));
+                        }
+                        _ => {
+                            unreachable!();
+                        }
+                    }
+
+                    dbg!(&owned_states);
+                }
+
+                Ok(())
+            }
+        })
+        .await?;
 
     Ok(())
 }
