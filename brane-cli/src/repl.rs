@@ -1,9 +1,10 @@
-use anyhow::{Result, Context as _};
-use brane_bvm::{VM, VmResult, VmCall};
-use brane_bvm::values::Value;
-use brane_drv::grpc::{CreateSessionRequest, DriverServiceClient, ExecuteRequest};
 use crate::docker::{self, ExecuteInfo};
-use std::borrow::Cow::{self, Borrowed, Owned};
+use crate::{packages, registry};
+use anyhow::{Context as _, Result};
+use brane_bvm::values::Value;
+use brane_bvm::{VmCall, VmResult, VM};
+use brane_drv::grpc::{CreateSessionRequest, DriverServiceClient, ExecuteRequest};
+use brane_dsl::{Compiler, CompilerOptions};
 use rustyline::completion::{Completer, FilenameCompleter, Pair};
 use rustyline::config::OutputStreamType;
 use rustyline::error::ReadlineError;
@@ -12,14 +13,13 @@ use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{self, MatchingBracketValidator, Validator};
 use rustyline::{CompletionType, Config, Context, EditMode, Editor};
 use rustyline_derive::Helper;
-use std::path::PathBuf;
-use std::fs;
-use crate::{registry, packages};
-use brane_dsl::{Compiler, CompilerOptions};
-use specifications::package::PackageInfo;
-use specifications::common::Value as SpecValue;
-use std::collections::HashMap;
 use serde::de::DeserializeOwned;
+use specifications::common::Value as SpecValue;
+use specifications::package::PackageInfo;
+use std::borrow::Cow::{self, Borrowed, Owned};
+use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 
 #[derive(Helper)]
 struct ReplHelper {
@@ -52,7 +52,12 @@ impl Hinter for ReplHelper {
     ///
     ///
     ///
-    fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
+    fn hint(
+        &self,
+        line: &str,
+        pos: usize,
+        ctx: &Context<'_>,
+    ) -> Option<String> {
         self.hinter
             .hint(line, pos, ctx)
             .map(|h| h.lines().next().map(|l| l.to_string()))
@@ -79,21 +84,32 @@ impl Highlighter for ReplHelper {
     ///
     ///
     ///
-    fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
+    fn highlight_hint<'h>(
+        &self,
+        hint: &'h str,
+    ) -> Cow<'h, str> {
         Owned("\x1b[1m".to_owned() + hint + "\x1b[m")
     }
 
     ///
     ///
     ///
-    fn highlight<'l>(&self, line: &'l str, pos: usize) -> Cow<'l, str> {
+    fn highlight<'l>(
+        &self,
+        line: &'l str,
+        pos: usize,
+    ) -> Cow<'l, str> {
         self.highlighter.highlight(line, pos)
     }
 
     ///
     ///
     ///
-    fn highlight_char(&self, line: &str, pos: usize) -> bool {
+    fn highlight_char(
+        &self,
+        line: &str,
+        pos: usize,
+    ) -> bool {
         self.highlighter.highlight_char(line, pos)
     }
 }
@@ -166,7 +182,6 @@ pub async fn start(
         local_repl(&mut rl).await?;
     }
 
-
     rl.save_history(&history_file).unwrap();
 
     Ok(())
@@ -178,7 +193,7 @@ pub async fn start(
 async fn remote_repl(
     rl: &mut Editor<ReplHelper>,
     remote: String,
-    attach: Option<String>
+    attach: Option<String>,
 ) -> Result<()> {
     let mut client = DriverServiceClient::connect(remote).await?;
     let session = if let Some(attach) = attach {
@@ -203,7 +218,7 @@ async fn remote_repl(
 
                 let request = ExecuteRequest {
                     uuid: session.clone(),
-                    input: line.clone()
+                    input: line.clone(),
                 };
 
                 let response = client.execute(request).await?;
@@ -257,20 +272,21 @@ async fn local_repl(rl: &mut Editor<ReplHelper>) -> Result<()> {
                                     let result = make_function_call(call).await?;
                                     println!("{:?}", result);
                                     vm.result(result);
-                                },
+                                }
                                 VmResult::Ok(value) => {
                                     println!("ok: {:?}", value);
                                     break;
-                                },
+                                }
                                 VmResult::RuntimeError => {
                                     eprintln!("Runtime errro!");
                                     break;
                                 }
                             }
-
                         }
-                    },
-                    Err(e) => { eprintln!("{:?}", e); }
+                    }
+                    Err(e) => {
+                        eprintln!("{:?}", e);
+                    }
                 }
             }
             Err(ReadlineError::Interrupted) => {
@@ -294,9 +310,7 @@ async fn local_repl(rl: &mut Editor<ReplHelper>) -> Result<()> {
 ///
 ///
 ///
-async fn make_function_call(
-    call: VmCall,
-) -> Result<Value> {
+async fn make_function_call(call: VmCall) -> Result<Value> {
     let package_dir = packages::get_package_dir(&call.package, Some("latest"))?;
     let package_file = package_dir.join("package.yml");
     let package_info = PackageInfo::from_path(package_file)?;
@@ -304,12 +318,6 @@ async fn make_function_call(
 
     let image = format!("{}:{}", package_info.name, package_info.version);
     let image_file = Some(package_dir.join("image.tar"));
-
-    let mut arguments: HashMap<String, SpecValue> = HashMap::new();
-    let function = functions.get(&call.function).expect("Function does not exist!");
-    for (i, p) in function.parameters.iter().enumerate() {
-        arguments.insert(p.name.clone(), call.arguments.get(i).unwrap().as_spec_value());
-    }
 
     let command = vec![
         String::from("--application-id"),
@@ -320,7 +328,7 @@ async fn make_function_call(
         String::from("1"),
         String::from("code"),
         call.function.clone(),
-        base64::encode(serde_json::to_string(&arguments)?),
+        base64::encode(serde_json::to_string(&call.arguments)?),
     ];
 
     let exec = ExecuteInfo::new(image, image_file, None, Some(command));

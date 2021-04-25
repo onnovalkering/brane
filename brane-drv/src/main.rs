@@ -8,14 +8,18 @@ use log::LevelFilter;
 use rdkafka::{
     admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
     producer::FutureProducer,
-    types::RDKafkaError,
+    error::RDKafkaErrorCode,
     ClientConfig,
 };
 use tonic::transport::Server;
+use specifications::package::PackageIndex;
+
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
+    #[clap(short, long, default_value = "brane-api:8080/packages", env = "PACKAGE_INDEX_URL")]
+    package_index_url: String,
     #[clap(short, long, default_value = "127.0.0.1:50053", env = "ADDRESS")]
     /// Service address
     address: String,
@@ -49,7 +53,11 @@ async fn main() -> Result<()> {
     }
 
     // Ensure that the input/output topics exists.
-    ensure_topics(vec![&opts.command_topic, &opts.event_topic], &opts.brokers).await?;
+    let command_topic = opts.command_topic.clone();
+    ensure_topics(vec![&command_topic, &opts.event_topic], &opts.brokers).await?;
+
+    let packages = reqwest::get(&opts.package_index_url).await?.json().await?;
+    let package_index = PackageIndex::from_value(packages)?;
 
     let producer: FutureProducer = ClientConfig::new()
         .set("bootstrap.servers", &opts.brokers)
@@ -57,7 +65,11 @@ async fn main() -> Result<()> {
         .create()
         .context("Failed to create Kafka producer.")?;
 
-    let handler = DriverHandler { producer };
+    let handler = DriverHandler {
+        package_index,
+        producer,
+        command_topic,
+    };
 
     // Start gRPC server with callback service.
     Server::builder()
@@ -91,7 +103,7 @@ async fn ensure_topics(
         match result {
             Ok(topic) => info!("Kafka topic '{}' created.", topic),
             Err((topic, error)) => match error {
-                RDKafkaError::TopicAlreadyExists => {
+                RDKafkaErrorCode::TopicAlreadyExists => {
                     info!("Kafka topic '{}' already exists", topic);
                 }
                 _ => {

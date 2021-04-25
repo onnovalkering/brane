@@ -1,6 +1,7 @@
 use crate::packages;
 use anyhow::{Context, Result};
 use console::style;
+use fs_extra::dir::CopyOptions;
 use specifications::common::Function;
 use specifications::container::ContainerInfo;
 use specifications::package::PackageInfo;
@@ -9,7 +10,6 @@ use std::fs::{self, File};
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
 use std::process::Command;
-use fs_extra::dir::CopyOptions;
 
 type Map<T> = std::collections::HashMap<String, T>;
 

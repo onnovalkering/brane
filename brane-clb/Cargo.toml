@@ -13,9 +13,9 @@ env_logger = "0.8"
 futures = "0.3"
 log = "0.4"
 prost = "0.6"
-rdkafka = { version = "0.24", features = ["cmake-build"], optional = true }
+rdkafka = { version = "0.26", features = ["cmake-build"], optional = true }
 time = "0.2"
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 tonic = "0.3"
 
 [features]

@@ -20,7 +20,7 @@ use rdkafka::{
     consumer::{stream_consumer::StreamConsumer, CommitMode, Consumer},
     message::ToBytes,
     producer::{FutureProducer, FutureRecord},
-    types::RDKafkaError,
+    error::RDKafkaErrorCode,
     util::Timeout,
     Message as KafkaMesage, Offset, TopicPartitionList,
 };
@@ -147,7 +147,7 @@ async fn ensure_topics(
         match result {
             Ok(topic) => info!("Kafka topic '{}' created.", topic),
             Err((topic, error)) => match error {
-                RDKafkaError::TopicAlreadyExists => {
+                RDKafkaErrorCode::TopicAlreadyExists => {
                     info!("Kafka topic '{}' already exists", topic);
                 }
                 _ => {

@@ -1,8 +1,13 @@
-use anyhow::Result;
 use crate::docker;
+use anyhow::Result;
+use bollard::errors::Error;
+use bollard::image::ImportImageOptions;
+use bollard::Docker;
 use chrono::Utc;
 use console::{pad_str, Alignment};
 use dialoguer::Confirm;
+use futures_util::stream::TryStreamExt;
+use hyper::Body;
 use indicatif::HumanDuration;
 use prettytable::format::FormatBuilder;
 use prettytable::Table;
@@ -10,15 +15,10 @@ use semver::Version;
 use specifications::package::PackageInfo;
 use std::fs;
 use std::path::PathBuf;
-use futures_util::stream::TryStreamExt;
-use bollard::errors::Error;
-use bollard::image::ImportImageOptions;
-use bollard::Docker;
-use hyper::Body;
-use tokio::fs::File as TFile;
-use tokio::stream::StreamExt;
-use tokio_util::codec::{BytesCodec, FramedRead};
 use std::time::Duration;
+use tokio::fs::File as TFile;
+use tokio_stream::StreamExt;
+use tokio_util::codec::{BytesCodec, FramedRead};
 
 const PACKAGE_NOT_FOUND: &str = "Package not found.";
 

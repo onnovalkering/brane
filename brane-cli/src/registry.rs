@@ -1,7 +1,6 @@
 use crate::packages;
 use crate::utils;
 use anyhow::{Context, Result};
-use specifications::package::PackageIndex;
 use console::style;
 use console::{pad_str, Alignment};
 use dialoguer::Confirm;
@@ -11,10 +10,11 @@ use flate2::Compression;
 use indicatif::{ProgressBar, ProgressStyle};
 use prettytable::format::FormatBuilder;
 use prettytable::Table;
-use reqwest::{self, multipart::Form, multipart::Part, Body, Client, Method};
+use reqwest::{self, multipart::Form, multipart::Part, Body, Client};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JValue};
 use serde_with::skip_serializing_none;
+use specifications::package::PackageIndex;
 use specifications::package::PackageInfo;
 use std::env;
 use std::fs::{self, File};
@@ -187,10 +187,11 @@ pub async fn push(
 
     // Upload file
     let url = get_registry_endpoint(format!("/{}/{}?checksum={}", name, version, checksum))?;
-    let request = Client::new().request(Method::POST, &url);
+    let request = Client::new().post(&url);
 
     let file = TokioFile::open(&archive_filepath).await?;
-    let reader = Body::wrap_stream(FramedRead::new(file, BytesCodec::new()));
+    let file = FramedRead::new(file, BytesCodec::new());
+    let reader = Body::wrap_stream(file);
 
     let mut form = Form::new();
     form = form.part("file", Part::stream(reader).file_name(archive_filename));

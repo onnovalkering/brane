@@ -1,19 +1,26 @@
-use crate::{docker, packages, grpc};
-use anyhow::{Result, Context as _};
+use crate::grpc;
+use anyhow::Result;
 use brane_dsl::{Compiler, CompilerOptions};
 use brane_bvm::{VM, VmResult, VmCall};
 use brane_bvm::values::Value;
-use rdkafka::producer::FutureProducer;
+use brane_job::interface::{Command, CommandKind};
+use rdkafka::producer::{FutureRecord, FutureProducer};
 use tonic::{Request, Response, Status};
+use specifications::package::PackageIndex;
+use uuid::Uuid;
+use prost::Message as _;
+use bytes::BytesMut;
+use rdkafka::util::Timeout;
+use std::time::Duration;
 use std::collections::HashMap;
 use specifications::common::Value as SpecValue;
-use specifications::package::PackageInfo;
-use uuid::Uuid;
-use serde::de::DeserializeOwned;
+use rdkafka::message::ToBytes;
 
 #[derive(Clone)]
 pub struct DriverHandler {
     pub producer: FutureProducer,
+    pub command_topic: String,
+    pub package_index: PackageIndex,
 }
 
 #[tonic::async_trait]
@@ -40,22 +47,21 @@ impl grpc::DriverService for DriverHandler {
         let request = request.into_inner();
 
         let options = CompilerOptions::new();
-        let package_index = packages::get_package_index().await.unwrap();
-        let mut compiler = Compiler::new(options, package_index.clone());
+        let mut compiler = Compiler::new(options, self.package_index.clone());
 
         let function = compiler.compile(request.input)
             .map_err(|_| Status::invalid_argument("Compilation error."))?;
 
-        let mut vm = VM::new(package_index);
+        let mut vm = VM::new(self.package_index.clone());
         vm.call(function, 1);
 
         loop {
             match vm.run(None) {
                 VmResult::Call(call) => {
-                    vm.result(make_function_call(call).await.unwrap());
+                    vm.result(make_function_call(call, &self.command_topic, &self.producer, &request.uuid).await.unwrap());
                 },
                 VmResult::Ok(value) => {
-                    let output = format!("{:?}", value);
+                    let output = value.map(|v| format!("{:?}", v)).unwrap_or_default();
                     return Ok(Response::new(grpc::ExecuteReply { output }));
                 },
                 VmResult::RuntimeError => {
@@ -71,63 +77,41 @@ impl grpc::DriverService for DriverHandler {
 ///
 async fn make_function_call(
     call: VmCall,
+    command_topic: &String,
+    producer: &FutureProducer,
+    session: &String,
 ) -> Result<Value> {
-    let package_dir = packages::get_package_dir(&call.package, Some("latest"))?;
-    let package_file = package_dir.join("package.yml");
-    let package_info = PackageInfo::from_path(package_file)?;
-    let functions = package_info.functions.expect("Package has no functions!");
-
-    let image = format!("{}:{}", package_info.name, package_info.version);
-    let image_file = Some(package_dir.join("image.tar"));
-
-    let mut arguments: HashMap<String, SpecValue> = HashMap::new();
-    let function = functions.get(&call.function).expect("Function does not exist!");
-    for (i, p) in function.parameters.iter().enumerate() {
-        arguments.insert(p.name.clone(), call.arguments.get(i).unwrap().as_spec_value());
-    }
-
+    let image = format!("{}:{}", call.package, call.version);
     let command = vec![
-        String::from("--application-id"),
-        String::from("test"),
-        String::from("--location-id"),
-        String::from("localhost"),
-        String::from("--job-id"),
-        String::from("1"),
         String::from("code"),
-        call.function.clone(),
-        base64::encode(serde_json::to_string(&arguments)?),
+        call.function.to_string(),
+        base64::encode(serde_json::to_string(&call.arguments)?),
     ];
 
-    let exec = docker::ExecuteInfo::new(image, image_file, None, Some(command));
+    let correlation_id = format!("{}-random!", session);
 
-    let (stdout, stderr) = docker::run_and_wait(exec).await?;
-    debug!("stderr: {}", stderr);
-    debug!("stdout: {}", stdout);
+    let command = Command::new(
+        CommandKind::Create,
+        Some(correlation_id.clone()),
+        Some(session.clone()),
+        Some(String::from("node1")),
+        Some(image),
+        command,
+        None,
+    );
 
-    let output = stdout.lines().last().unwrap_or_default().to_string();
-    let output: Result<SpecValue> = decode_b64(output);
-    match output {
-        Ok(value) => Ok(Value::from(value)),
-        Err(err) => {
-            println!("{:?}", err);
-            Ok(Value::Unit)
-        }
+    let mut payload = BytesMut::with_capacity(64);
+    command.encode(&mut payload)?;
+
+    let message = FutureRecord::to(&command_topic)
+        .key(&correlation_id)
+        .payload(payload.to_bytes());
+
+    dbg!(&message);
+
+    if let Err(_) = producer.send(message, Timeout::After(Duration::from_secs(5))).await {
+        bail!("Failed to send command to '{}' topic.", command_topic);
     }
-}
 
-///
-///
-///
-fn decode_b64<T>(input: String) -> Result<T>
-where
-    T: DeserializeOwned,
-{
-    let input =
-        base64::decode(input).with_context(|| "Decoding failed, encoded input doesn't seem to be Base64 encoded.")?;
-
-    let input = String::from_utf8(input[..].to_vec())
-        .with_context(|| "Conversion failed, decoded input doesn't seem to be UTF-8 encoded.")?;
-
-    serde_json::from_str(&input)
-        .with_context(|| "Deserialization failed, decoded input doesn't seem to be as expected.")
+    Ok(Value::Unit)
 }

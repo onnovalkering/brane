@@ -5,18 +5,18 @@ use bollard::container::{
 };
 use bollard::errors::Error;
 use bollard::image::{CreateImageOptions, ImportImageOptions, RemoveImageOptions};
-use bollard::models::{HostConfig, DeviceRequest};
+use bollard::models::{DeviceRequest, HostConfig};
 use bollard::Docker;
 use futures_util::stream::TryStreamExt;
+use futures_util::StreamExt;
 use hyper::Body;
+use serde::{Deserialize, Serialize};
 use std::default::Default;
+use std::env;
 use std::path::PathBuf;
 use tokio::fs::File as TFile;
-use tokio::stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use uuid::Uuid;
-use serde::{Deserialize, Serialize};
-use std::env;
 
 lazy_static! {
     static ref DOCKER_NETWORK: String = env::var("DOCKER_NETWORK").unwrap_or_else(|_| String::from("host"));
@@ -88,7 +88,7 @@ pub async fn run_and_wait(exec: ExecuteInfo) -> Result<(String, String)> {
         .await?;
 
     // Get stdout and stderr logs from container
-    let logs_options = Some(LogsOptions {
+    let logs_options = Some(LogsOptions::<String> {
         stdout: true,
         stderr: true,
         ..Default::default()

@@ -4,8 +4,6 @@ extern crate anyhow;
 extern crate log;
 
 pub mod handler;
-pub mod packages;
-pub mod docker;
 
 pub mod grpc {
     tonic::include_proto!("driver");

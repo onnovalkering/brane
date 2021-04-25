@@ -1,12 +1,12 @@
-use crate::{packages};
-use brane_oas::{self, build};
+use crate::packages;
 use anyhow::Result;
+use brane_oas::{self, build};
 use console::style;
+use openapiv3::OpenAPI;
 use serde_yaml;
 use specifications::package::PackageInfo;
 use std::fmt::Write as FmtWrite;
 use std::fs::{self, File};
-use openapiv3::OpenAPI;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;

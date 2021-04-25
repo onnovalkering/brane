@@ -8,6 +8,7 @@ use crate::bytecode::{Function, OpCode};
 use crate::values::{Class, Value};
 use std::{collections::HashMap, fmt::Write, usize};
 use specifications::package::PackageIndex;
+use specifications::common::Value as SpecValue;
 
 static FRAMES_MAX: usize = 64;
 static STACK_MAX: usize = 256;
@@ -29,8 +30,9 @@ pub struct VM {
 #[derive(Clone, Debug)]
 pub struct VmCall {
     pub package: String,
+    pub version: String,
     pub function: String,
-    pub arguments: Vec<Value>,
+    pub arguments: HashMap<String, SpecValue>,
 }
 
 #[repr(u8)]
@@ -446,13 +448,15 @@ impl VM {
                             }
                             _ => unreachable!(),
                         },
-                        Function::External { name, package, arity } => {
-                            let arguments = (0..arity)
-                                .map(|_| self.stack.pop().unwrap())
-                                .collect();
+                        Function::External { name, package, version, parameters } => {
+                            let mut arguments: HashMap<String, SpecValue> = HashMap::new();
+                            for (i, p) in parameters.iter().enumerate() {
+                                arguments.insert(p.name.clone(), self.stack.pop().unwrap().as_spec_value());
+                            }
 
                             let call = VmCall {
                                 package,
+                                version,
                                 function: name,
                                 arguments,
                             };
@@ -472,12 +476,14 @@ impl VM {
                         if let Some(package) = self.package_index.get(package_name, None) {
                             if let Some(functions) = &package.functions {
                                 for (name, function) in functions {
+
                                     self.globals.insert(
                                         name.clone(),
                                         Value::Function(Function::External {
                                             package: package_name.clone(),
+                                            version: package.version.clone(),
                                             name: name.clone(),
-                                            arity: function.parameters.len() as i32,
+                                            parameters: function.parameters.clone(),
                                         }),
                                     );
                                 }

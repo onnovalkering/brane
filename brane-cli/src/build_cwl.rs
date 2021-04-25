@@ -172,12 +172,17 @@ fn build_cwl_functions(cwl_document: &CwlDocument) -> Result<(Map<Function>, Map
 
     // Construct function
     let call_pattern = CallPattern::new(Some(name.to_lowercase()), None, None);
-    let function = Function::new(input_parameters.clone(), Some(call_pattern.clone()), return_type.clone());
+    let function = Function::new(
+        input_parameters.clone(),
+        Some(call_pattern.clone()),
+        return_type.clone(),
+    );
     functions.insert(name.to_lowercase(), function);
 
     // Construct convience function, if there is only one required parameter
     let input_type = types.get(&input_data_type).expect("unreachable");
-    let req_parameters: Vec<Parameter> = input_type.properties
+    let req_parameters: Vec<Parameter> = input_type
+        .properties
         .iter()
         .filter(|p| p.default.is_none())
         .map(|p| p.clone().into_parameter())

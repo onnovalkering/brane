@@ -1,4 +1,5 @@
 use bytes::{BufMut, BytesMut};
+use specifications::common::Parameter;
 
 use crate::values::Value;
 
@@ -81,7 +82,7 @@ impl From<u8> for OpCode {
 
 #[derive(Debug, Clone)]
 pub enum Function {
-    External { package: String, name: String, arity: i32 },
+    External { package: String, version: String, name: String, parameters: Vec<Parameter>, },
     Native { name: String, arity: i32 },
     UserDefined { name: String, arity: i32, chunk: Chunk },
 }

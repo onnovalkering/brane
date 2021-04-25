@@ -6,7 +6,7 @@ use log::LevelFilter;
 use rdkafka::{
     admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
     producer::FutureProducer,
-    types::RDKafkaError,
+    error::RDKafkaErrorCode,
     ClientConfig,
 };
 use tonic::transport::Server;
@@ -91,7 +91,7 @@ pub async fn ensure_callback_topic(
         match result {
             Ok(topic) => log::info!("Kafka topic '{}' created.", topic),
             Err((topic, error)) => match error {
-                RDKafkaError::TopicAlreadyExists => {
+                RDKafkaErrorCode::TopicAlreadyExists => {
                     log::info!("Kafka topic '{}' already exists", topic);
                 }
                 _ => {
