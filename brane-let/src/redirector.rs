@@ -1,6 +1,6 @@
 use anyhow::Result;
-use socksx::{self, Socks6Client};
 use socksx::options::SocksOption;
+use socksx::{self, Socks6Client};
 use std::net::IpAddr;
 use std::process::Command;
 use std::time::Duration;

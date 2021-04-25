@@ -25,6 +25,7 @@ const BRANE_LOCATION_ID: &str = "BRANE_LOCATION_ID";
 const BRANE_JOB_ID: &str = "BRANE_JOB_ID";
 const BRANE_CALLBACK_TO: &str = "BRANE_CALLBACK_TO";
 const BRANE_PROXY_ADDRESS: &str = "BRANE_PROXY_ADDRESS";
+const BRANE_MOUNT_DFS: &str = "BRANE_MOUNT_DFS";
 
 ///
 ///
@@ -58,8 +59,9 @@ pub async fn handle(
             namespace,
             credentials,
             proxy_address,
+            mount_dfs,
         } => {
-            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address)?;
+            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address, &mount_dfs)?;
             let credentials = credentials.resolve_secrets(&secrets);
 
             handle_k8s(command, &job_id, environment, address, namespace, credentials).await?
@@ -68,8 +70,9 @@ pub async fn handle(
             callback_to,
             network,
             proxy_address,
+            mount_dfs
         } => {
-            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address)?;
+            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address, &mount_dfs)?;
             handle_local(command, &correlation_id, environment, network)?
         }
         Location::Slurm {
@@ -78,8 +81,9 @@ pub async fn handle(
             runtime,
             credentials,
             proxy_address,
+            mount_dfs
         } => {
-            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address)?;
+            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address, &mount_dfs)?;
             let credentials = credentials.resolve_secrets(&secrets);
 
             handle_xenon(
@@ -99,8 +103,9 @@ pub async fn handle(
             runtime,
             credentials,
             proxy_address,
+            mount_dfs,
         } => {
-            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address)?;
+            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address, &mount_dfs)?;
             let credentials = credentials.resolve_secrets(&secrets);
 
             handle_xenon(
@@ -151,6 +156,7 @@ fn construct_environment<S: Into<String>>(
     job_id: S,
     callback_to: S,
     proxy_address: &Option<String>,
+    mount_dfs: &Option<String>,
 ) -> Result<HashMap<String, String>> {
     let mut environment = hashmap! {
         BRANE_APPLICATION_ID.to_string() => application_id.into(),
@@ -161,6 +167,10 @@ fn construct_environment<S: Into<String>>(
 
     if let Some(proxy_address) = proxy_address {
         environment.insert(BRANE_PROXY_ADDRESS.to_string(), proxy_address.clone());
+    }
+
+    if let Some(mount_dfs) = mount_dfs {
+        environment.insert(BRANE_MOUNT_DFS.to_string(), mount_dfs.clone());
     }
 
     Ok(environment)
@@ -270,8 +280,9 @@ fn create_k8s_job_description(
                         "securityContext": {
                             "capabilities": {
                                 "drop": ["all"],
-                                "add": ["NET_BIND_SERVICE", "NET_ADMIN"]
+                                "add": ["NET_BIND_SERVICE", "NET_ADMIN", "SYS_ADMIN"]
                             },
+                            "privileged": true // Quickfix, needs to be dynamic based on capabilities/devices used.
                         }
                     }],
                     "restartPolicy": "Never",
@@ -408,8 +419,17 @@ fn create_docker_job_description(
         String::from("--cap-add"),
         String::from("NET_BIND_SERVICE"),
         String::from("--cap-add"),
-        String::from("NET_RAW")
+        String::from("NET_RAW"),
     ];
+
+    if environment.contains_key(BRANE_MOUNT_DFS) {
+        arguments.push(String::from("--cap-add"));
+        arguments.push(String::from("SYS_ADMIN"));
+        arguments.push(String::from("--device"));
+        arguments.push(String::from("/dev/fuse"));
+        arguments.push(String::from("--security-opt"));
+        arguments.push(String::from("apparmor:unconfined"));
+    }
 
     if let Some(network) = network {
         arguments.push(String::from("--network"));
@@ -464,6 +484,15 @@ fn create_singularity_job_description(
         String::from("--add-caps"),
         String::from("CAP_NET_ADMIN,CAP_NET_BIND_SERVICE,CAP_NET_RAW"),
     ];
+
+    if environment.contains_key(BRANE_MOUNT_DFS) {
+        arguments.push(String::from("--add-caps"));
+        arguments.push(String::from("SYS_ADMIN"));
+        arguments.push(String::from("--bind"));
+        arguments.push(String::from("/dev/fuse"));
+        arguments.push(String::from("--security"));
+        arguments.push(String::from("apparmor:unconfined"));
+    }
 
     // Add environment variables
     for (name, value) in environment {

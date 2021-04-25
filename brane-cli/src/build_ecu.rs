@@ -13,11 +13,14 @@ use std::process::Command;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
-const INIT_URL: &str = concat!(
+const BRANELET_URL: &str = concat!(
     "https://github.com/onnovalkering/brane/releases/download/",
     concat!("v", env!("CARGO_PKG_VERSION")),
-    "/brane-init"
+    "/branelet"
 );
+
+const JUICE_URL: &str = "https://github.com/juicedata/juicefs/releases/download/v0.12.1/juicefs-0.12.1-linux-amd64.tar.gz";
+
 
 ///
 ///
@@ -25,7 +28,7 @@ const INIT_URL: &str = concat!(
 pub fn handle(
     context: PathBuf,
     file: PathBuf,
-    init_path: Option<PathBuf>,
+    branelet_path: Option<PathBuf>,
 ) -> Result<()> {
     let context = fs::canonicalize(context)?;
     debug!("Using {:?} as build context", context);
@@ -35,14 +38,14 @@ pub fn handle(
     let ecu_document = ContainerInfo::from_reader(ecu_reader)?;
 
     // Prepare package directory
-    let dockerfile = generate_dockerfile(&ecu_document, init_path.is_some())?;
+    let dockerfile = generate_dockerfile(&ecu_document, branelet_path.is_some())?;
     let package_info = generate_package_info(&ecu_document)?;
     let package_dir = packages::get_package_dir(&package_info.name, Some(&package_info.version))?;
     prepare_directory(
         &ecu_document,
         &ecu_file,
         dockerfile,
-        init_path,
+        branelet_path,
         &context,
         &package_info,
         &package_dir,
@@ -96,7 +99,7 @@ fn generate_package_info(container_info: &ContainerInfo) -> Result<PackageInfo> 
 ///
 fn generate_dockerfile(
     ecu_document: &ContainerInfo,
-    override_init: bool,
+    override_branelet: bool,
 ) -> Result<String> {
     let mut contents = String::new();
     let base = ecu_document
@@ -123,7 +126,7 @@ fn generate_dockerfile(
     }
 
     // Default dependencies
-    write!(contents, "iptables ")?;
+    write!(contents, "fuse iptables ")?;
 
     if let Some(dependencies) = &ecu_document.dependencies {
         for dependency in dependencies {
@@ -132,13 +135,16 @@ fn generate_dockerfile(
     }
     writeln!(contents)?;
 
-    // Add default init library
-    if override_init {
-        writeln!(contents, "ADD init init")?;
+    // Add default branelet
+    if override_branelet {
+        writeln!(contents, "ADD branelet branelet")?;
     } else {
-        writeln!(contents, "ADD {} init", INIT_URL)?;
-        writeln!(contents, "RUN chmod +x init")?;
+        writeln!(contents, "ADD {} branelet", BRANELET_URL)?;
+        writeln!(contents, "RUN chmod +x branelet")?;
     }
+
+    writeln!(contents, "ADD {} juicefs.tar.gz", JUICE_URL)?;
+    writeln!(contents, "RUN tar -xzf juicefs.tar.gz && rm juicefs.tar.gz && mkdir /data")?;
 
     // Copy files
     writeln!(contents, "COPY container.yml /container.yml")?;
@@ -152,7 +158,7 @@ fn generate_dockerfile(
         }
     }
 
-    writeln!(contents, "ENTRYPOINT [\"/init\"]")?;
+    writeln!(contents, "ENTRYPOINT [\"/branelet\"]")?;
 
     Ok(contents)
 }
@@ -164,7 +170,7 @@ fn prepare_directory(
     ecu_document: &ContainerInfo,
     ecu_file: &PathBuf,
     dockerfile: String,
-    init_path: Option<PathBuf>,
+    branelet_path: Option<PathBuf>,
     context: &PathBuf,
     package_info: &PackageInfo,
     package_dir: &PathBuf,
@@ -184,9 +190,9 @@ fn prepare_directory(
     let mut buffer = File::create(package_dir.join("package.yml"))?;
     write!(buffer, "{}", serde_yaml::to_string(&package_info)?)?;
 
-    // Copy custom init binary to package directory
-    if let Some(init_path) = init_path {
-        fs::copy(fs::canonicalize(init_path)?, package_dir.join("init"))?;
+    // Copy custom branelet binary to package directory
+    if let Some(branelet_path) = branelet_path {
+        fs::copy(fs::canonicalize(branelet_path)?, package_dir.join("branelet"))?;
     }
 
     // Create the working directory and copy required files.

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use brane_let::callback::Callback;
 use brane_let::exec_code;
 use brane_let::redirector;
@@ -6,11 +6,12 @@ use clap::Clap;
 use dotenv::dotenv;
 use log::LevelFilter;
 use serde::de::DeserializeOwned;
+use socksx::options::MetadataOption;
 use specifications::common::Value;
 use std::path::PathBuf;
+use std::process::Command;
 use std::{future::Future, process};
 use tokio_compat_02::FutureExt;
-use socksx::options::MetadataOption;
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
@@ -25,6 +26,8 @@ struct Opts {
     callback_to: Option<String>,
     #[clap(short, long, env = "BRANE_PROXY_ADDRESS")]
     proxy_address: Option<String>,
+    #[clap(short, long, env = "BRANE_MOUNT_DFS")]
+    mount_dfs: Option<String>,
     /// Prints debug info
     #[clap(short, long, env = "DEBUG", takes_value = false)]
     debug: bool,
@@ -70,6 +73,16 @@ async fn main() -> Result<()> {
         logger.filter_level(LevelFilter::Info).init();
     }
 
+    // Mount DFS via JuiceFS.
+    if let Some(ref mount_dfs) = opts.mount_dfs {
+        let status = Command::new("/juicefs")
+            .args(vec!["mount", "-d", mount_dfs, "/data"])
+            .status()
+            .expect("Failed to execute '/juicefs' binary.");
+
+        ensure!(status.success(), "Failed to mount distributed filesystem.");
+    }
+
     // Start redirector in the background, if proxy address is set.
     if let Some(proxy_address) = proxy_address {
         let options = vec![
@@ -78,11 +91,7 @@ async fn main() -> Result<()> {
             MetadataOption::new(3, job_id.clone()),
         ];
 
-        redirector::start(
-            proxy_address,
-            options,
-        )
-        .await?;
+        redirector::start(proxy_address, options).await?;
     }
 
     // Callbacks may be called at any time of the execution.

@@ -21,11 +21,13 @@ pub enum Location {
         namespace: String,
         credentials: LocationCredentials,
         proxy_address: Option<String>,
+        mount_dfs: Option<String>,
     },
     Local {
         callback_to: String,
         network: String,
         proxy_address: Option<String>,
+        mount_dfs: Option<String>,
     },
     Vm {
         address: String,
@@ -33,6 +35,7 @@ pub enum Location {
         runtime: String,
         credentials: LocationCredentials,
         proxy_address: Option<String>,
+        mount_dfs: Option<String>,
     },
     Slurm {
         address: String,
@@ -40,6 +43,7 @@ pub enum Location {
         runtime: String,
         credentials: LocationCredentials,
         proxy_address: Option<String>,
+        mount_dfs: Option<String>,
     },
 }
 

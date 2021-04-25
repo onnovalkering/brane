@@ -66,6 +66,18 @@ services:
       KAFKA_NUM_PARTITIONS: 1
       CONFLUENT_SUPPORT_METRICS_ENABLE: 0
 
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+    command: server /data
+    restart: always
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    volumes:
+      - data:/data
+
   postgres:
     image: postgres:12
     ports:
@@ -121,3 +133,6 @@ networks:
   default:
     external:
       name: kind
+
+volumes:
+  data:
