@@ -1,6 +1,8 @@
-use brane_bvm::bytecode::{Chunk, Function, OpCode};
 use crate::parser::ast::*;
 use anyhow::Result;
+use brane_bvm::bytecode::{Chunk, Function, OpCode};
+
+mod disassemble;
 
 #[derive(Debug, Clone)]
 pub struct Local {
@@ -19,10 +21,13 @@ pub fn compile(program: Program) -> Result<Function> {
         stmt_to_opcodes(stmt, &mut chunk, &mut locals, 0);
     }
 
-    disassemble_chunk(&chunk, "main");
+    disassemble::disassemble_chunk(&chunk, "main");
     Ok(Function::new(String::from("main"), 0, chunk))
 }
 
+///
+///
+///
 pub fn compile_function(
     block: Block,
     scope: i32,
@@ -50,8 +55,8 @@ pub fn compile_function(
         stmt_to_opcodes(stmt, &mut chunk, &mut locals, scope);
     }
 
-    disassemble_chunk(&chunk, &name);
-    let function = Function::new(name, params.len() as i32, chunk);
+    disassemble::disassemble_chunk(&chunk, &name);
+    let function = Function::new(name, params.len() as u8, chunk);
 
     Ok(function)
 }
@@ -66,31 +71,28 @@ pub fn stmt_to_opcodes(
     scope: i32,
 ) {
     match stmt {
-        Stmt::Import{ package: Ident(ident), .. } => {
+        Stmt::Import {
+            package: Ident(ident), ..
+        } => {
             let import = chunk.add_constant(ident.clone().into());
-            chunk.write(OpCode::OpImport);
-            chunk.write(import);
+            chunk.write_pair(OpCode::OpImport, import);
         }
         Stmt::DeclareClass { ident: Ident(ident) } => {
             let class = chunk.add_constant(ident.clone().into());
-            chunk.write(OpCode::OpClass);
-            chunk.write(class);
+            chunk.write_pair(OpCode::OpClass, class);
 
             let ident = chunk.add_constant(ident.into());
-            chunk.write(OpCode::OpDefineGlobal);
-            chunk.write(ident);
+            chunk.write_pair(OpCode::OpDefineGlobal, ident);
         }
         Stmt::Assign(Ident(ident), expr) => {
             // ident must be an existing local or global.
             expr_to_opcodes(expr, chunk, locals, scope);
 
             if let Some(index) = locals.iter().position(|l| l.name == ident) {
-                chunk.write(OpCode::OpSetLocal);
-                chunk.write(index as u8);
+                chunk.write_pair(OpCode::OpSetLocal, index as u8);
             } else {
                 let ident = chunk.add_constant(ident.into());
-                chunk.write(OpCode::OpSetGlobal);
-                chunk.write(ident);
+                chunk.write_pair(OpCode::OpSetGlobal, ident);
             }
         }
         Stmt::LetAssign(Ident(ident), expr) => {
@@ -108,8 +110,7 @@ pub fn stmt_to_opcodes(
             }
 
             let ident = chunk.add_constant(ident.into());
-            chunk.write(OpCode::OpDefineGlobal);
-            chunk.write(ident);
+            chunk.write_pair(OpCode::OpDefineGlobal, ident);
         }
         Stmt::Block(block) => {
             // Create a new scope (shadow).
@@ -148,8 +149,7 @@ pub fn stmt_to_opcodes(
             chunk.write(OpCode::OpJumpIfFalse);
             // Placeholders, we'll backpatch this later.
             let plh_pos = chunk.code.len();
-            chunk.write(0x00);
-            chunk.write(0x00);
+            chunk.write_pair(0x00, 0x00);
 
             chunk.write(OpCode::OpPop);
             for stmt in consequent {
@@ -162,9 +162,7 @@ pub fn stmt_to_opcodes(
             // Emit loop
             chunk.write(OpCode::OpJumpBack);
             let jump_back = (chunk.code.len() - loop_start + 2) as u16;
-            let [first, second, ..] = jump_back.to_be_bytes();
-            chunk.write(first);
-            chunk.write(second);
+            chunk.write_bytes(&jump_back.to_be_bytes()[..]);
 
             // How much to jump if condition is false (exit).
             let jump = (chunk.code.len() - plh_pos - 2) as u16;
@@ -183,8 +181,7 @@ pub fn stmt_to_opcodes(
             chunk.write(OpCode::OpJumpIfFalse);
             // Placeholders, we'll backpatch this later.
             let plh_pos = chunk.code.len();
-            chunk.write(0x00);
-            chunk.write(0x00);
+            chunk.write_pair(0x00, 0x00);
 
             chunk.write(OpCode::OpPop);
             stmt_to_opcodes(Stmt::Block(consequent), chunk, locals, scope);
@@ -192,9 +189,7 @@ pub fn stmt_to_opcodes(
             // Emit loop
             chunk.write(OpCode::OpJumpBack);
             let jump_back = (chunk.code.len() - loop_start + 2) as u16;
-            let [first, second, ..] = jump_back.to_be_bytes();
-            chunk.write(first);
-            chunk.write(second);
+            chunk.write_bytes(&jump_back.to_be_bytes()[..]);
 
             // How much to jump?
             let jump = (chunk.code.len() - plh_pos - 2) as u16;
@@ -215,8 +210,7 @@ pub fn stmt_to_opcodes(
             chunk.write(OpCode::OpJumpIfFalse);
             // Placeholders, we'll backpatch this later.
             let plh_pos = chunk.code.len();
-            chunk.write(0x00);
-            chunk.write(0x00);
+            chunk.write_pair(0x00, 0x00);
 
             chunk.write(OpCode::OpPop);
             stmt_to_opcodes(Stmt::Block(consequent), chunk, locals, scope);
@@ -225,14 +219,11 @@ pub fn stmt_to_opcodes(
             chunk.write(OpCode::OpJump);
             // Placeholders, we'll backpatch this later.
             let else_jump_pos = chunk.code.len();
-            chunk.write(0x00);
-            chunk.write(0x00);
+            chunk.write_pair(0x00, 0x00);
 
             // How much to jump?
             let jump = (chunk.code.len() - plh_pos - 2) as u16;
-            let [first, second, ..] = jump.to_be_bytes();
-            chunk.code[plh_pos] = first;
-            chunk.code[plh_pos + 1] = second;
+            chunk.write_bytes(&jump.to_be_bytes()[..]);
 
             chunk.write(OpCode::OpPop);
 
@@ -264,12 +255,10 @@ pub fn stmt_to_opcodes(
             let function = compile_function(body, scope + 1, &params, ident.clone()).unwrap();
 
             let function = chunk.add_constant(function.into());
-            chunk.write(OpCode::OpConstant);
-            chunk.write(function);
+            chunk.write_pair(OpCode::OpConstant, function);
 
             let ident = chunk.add_constant(ident.into());
-            chunk.write(OpCode::OpDefineGlobal);
-            chunk.write(ident);
+            chunk.write_pair(OpCode::OpDefineGlobal, ident);
         }
     }
 }
@@ -339,30 +328,25 @@ pub fn expr_to_opcodes(
                 },
                 Lit::Integer(integer) => {
                     let constant = chunk.add_constant(integer.into());
-                    chunk.write(OpCode::OpConstant);
-                    chunk.write(constant);
+                    chunk.write_pair(OpCode::OpConstant, constant);
                 }
                 Lit::Real(real) => {
                     let constant = chunk.add_constant(real.into());
-                    chunk.write(OpCode::OpConstant);
-                    chunk.write(constant);
+                    chunk.write_pair(OpCode::OpConstant, constant);
                 }
                 Lit::String(string) => {
                     let constant = chunk.add_constant(string.into());
-                    chunk.write(OpCode::OpConstant);
-                    chunk.write(constant);
+                    chunk.write_pair(OpCode::OpConstant, constant);
                 }
             };
         }
         Expr::Unit => chunk.write(OpCode::OpUnit),
         Expr::Ident(Ident(ident)) => {
             if let Some(index) = locals.iter().position(|l| l.name == ident) {
-                chunk.write(OpCode::OpGetLocal);
-                chunk.write(index as u8);
+                chunk.write_pair(OpCode::OpGetLocal, index as u8);
             } else {
                 let ident = chunk.add_constant(ident.into());
-                chunk.write(OpCode::OpGetGlobal);
-                chunk.write(ident);
+                chunk.write_pair(OpCode::OpGetGlobal, ident);
             }
         }
         Expr::Call { function, arguments } => {
@@ -373,133 +357,8 @@ pub fn expr_to_opcodes(
                 expr_to_opcodes(argument, chunk, locals, scope);
             }
 
-            chunk.write(OpCode::OpCall);
-            chunk.write(arguments_n);
+            chunk.write_pair(OpCode::OpCall, arguments_n);
         }
         _ => todo!(),
     }
-}
-
-pub fn disassemble_chunk(
-    chunk: &Chunk,
-    name: &str,
-) {
-    println!("== {} ==", name);
-
-    let mut skip = 0;
-    for (offset, instruction) in chunk.code.iter().enumerate() {
-        if skip > 0 {
-            skip = skip - 1;
-            continue;
-        }
-
-        print!("{:04} ", offset);
-
-        match OpCode::from(*instruction) {
-            OpCode::OpConstant => {
-                constant_instruction("OP_CONSTANT", &chunk, offset);
-                skip = 1;
-            }
-            OpCode::OpAdd => println!("OP_ADD"),
-            OpCode::OpDivide => println!("OP_DIVIDE"),
-            OpCode::OpMultiply => println!("OP_MULTIPLY"),
-            OpCode::OpSubstract => println!("OP_SUBSTRACT"),
-            OpCode::OpNegate => println!("OP_NEGATE"),
-            OpCode::OpReturn => println!("OP_RETURN"),
-            OpCode::OpFalse => println!("OP_FALSE"),
-            OpCode::OpTrue => println!("OP_TRUE"),
-            OpCode::OpUnit => println!("OP_UNIT"),
-            OpCode::OpNot => println!("OP_NOT"),
-            OpCode::OpEqual => println!("OP_EQUAL"),
-            OpCode::OpGreater => println!("OP_GREATER"),
-            OpCode::OpLess => println!("OP_LESS"),
-            OpCode::OpPop => println!("OP_POP"),
-            OpCode::OpOr => println!("OP_OR"),
-            OpCode::OpAnd => println!("OP_AND"),
-            OpCode::OpCall => {
-                byte_instruction("OP_CALL", &chunk, offset);
-                skip = 1;
-            }
-            OpCode::OpJumpIfFalse => {
-                jump_instruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
-                skip = 2;
-            }
-            OpCode::OpJump => {
-                jump_instruction("OP_JUMP", 1, chunk, offset);
-                skip = 2;
-            }
-            OpCode::OpJumpBack => {
-                jump_instruction("OP_JUMP_BACK", -1, chunk, offset);
-                skip = 2;
-            }
-            OpCode::OpDefineGlobal => {
-                constant_instruction("OP_DEFINE_GLOBAL", &chunk, offset);
-                skip = 1;
-            }
-            OpCode::OpGetGlobal => {
-                constant_instruction("OP_GET_GLOBAL", &chunk, offset);
-                skip = 1;
-            }
-            OpCode::OpGetLocal => {
-                byte_instruction("OP_GET_LOCAL", &chunk, offset);
-                skip = 1;
-            }
-            OpCode::OpSetGlobal => {
-                byte_instruction("OP_SET_GLOBAL", &chunk, offset);
-                skip = 1;
-            }
-            OpCode::OpSetLocal => {
-                byte_instruction("OP_SET_LOCAL", &chunk, offset);
-                skip = 1;
-            }
-            OpCode::OpClass => {
-                constant_instruction("OP_CLASS", &chunk, offset);
-                skip = 1;
-            }
-            OpCode::OpImport => {
-                constant_instruction("OP_IMPORT", &chunk, offset);
-                skip = 1;
-            }
-        }
-    }
-}
-
-pub fn jump_instruction(
-    name: &str,
-    sign: i16,
-    chunk: &Chunk,
-    offset: usize,
-) {
-    let jump1 = chunk.code[offset + 1] as u16;
-    let jump2 = chunk.code[offset + 2] as u16;
-
-    let jump = (jump1 << 8) | jump2;
-    println!(
-        "{:<16} {:4} -> {}",
-        name,
-        offset,
-        offset as i32 + 3 + (sign * jump as i16) as i32
-    );
-}
-
-pub fn constant_instruction(
-    name: &str,
-    chunk: &Chunk,
-    offset: usize,
-) {
-    let constant = chunk.code[offset + 1];
-    print!("{:<16} {:4} '", name, constant);
-
-    if let Some(value) = chunk.constants.get(constant as usize) {
-        println!("{:?}'", value);
-    }
-}
-
-pub fn byte_instruction(
-    name: &str,
-    chunk: &Chunk,
-    offset: usize,
-) {
-    let slot = chunk.code[offset + 1];
-    println!("{:<16} {:4} '", name, slot);
 }

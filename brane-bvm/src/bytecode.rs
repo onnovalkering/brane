@@ -1,5 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use specifications::common::Parameter;
+use std::fmt;
 
 use crate::values::Value;
 
@@ -80,17 +81,27 @@ impl From<u8> for OpCode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Function {
     External { package: String, version: String, name: String, parameters: Vec<Parameter>, },
-    Native { name: String, arity: i32 },
-    UserDefined { name: String, arity: i32, chunk: Chunk },
+    Native { name: String, arity: u8 },
+    UserDefined { name: String, arity: u8, chunk: Chunk },
 }
+
+impl fmt::Debug for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Function::UserDefined { name, ..} | Function::External { name, .. } | Function::Native { name, .. } => write!(f, "{}(..)", name)
+        }
+    }
+}
+
+
 
 impl Function {
     pub fn new(
         name: String,
-        arity: i32,
+        arity: u8,
         chunk: Chunk,
     ) -> Self {
         Function::UserDefined { arity, name, chunk }
@@ -104,6 +115,9 @@ pub struct Chunk {
 }
 
 impl Chunk {
+    ///
+    ///
+    ///
     pub fn new() -> Self {
         Chunk {
             code: BytesMut::new(),
@@ -111,6 +125,9 @@ impl Chunk {
         }
     }
 
+    ///
+    ///
+    ///
     pub fn write<B: Into<u8>>(
         &mut self,
         byte: B,
@@ -118,6 +135,31 @@ impl Chunk {
         self.code.put_u8(byte.into());
     }
 
+    ///
+    ///
+    ///
+    pub fn write_pair<B1: Into<u8>, B2: Into<u8>>(
+        &mut self,
+        byte1: B1,
+        byte2: B2,
+    ) {
+        self.code.put_u8(byte1.into());
+        self.code.put_u8(byte2.into());
+    }
+
+    ///
+    ///
+    ///
+    pub fn write_bytes(
+        &mut self,
+        bytes: &[u8],
+    ) {
+        self.code.extend(bytes);
+    }
+
+    ///
+    ///
+    ///
     pub fn add_constant(
         &mut self,
         value: Value,

@@ -1,7 +1,8 @@
 use crate::bytecode::Function;
 use specifications::common::Value as SpecValue;
+use std::fmt;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Value {
     String(String),
     Boolean(bool),
@@ -11,6 +12,21 @@ pub enum Value {
     Function(Function),
     Class(Class),
 }
+
+impl fmt::Debug for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::String(string) => write!(f, "\"{}\"", string),
+            Value::Boolean(boolean) => write!(f, "{}", boolean),
+            Value::Integer(integer) => write!(f, "{}", integer),
+            Value::Real(real) => write!(f, "{}", real),
+            Value::Unit => write!(f, "unit"),
+            Value::Function(function) => write!(f, "{:?}", function),
+            Value::Class(class) => write!(f, "{:?}", class),
+        }
+    }
+}
+
 
 impl Value {
     pub fn as_spec_value(&self) -> SpecValue {

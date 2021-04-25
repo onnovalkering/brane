@@ -1,7 +1,7 @@
 use crate::grpc;
 use anyhow::Result;
 use brane_dsl::{Compiler, CompilerOptions};
-use brane_bvm::{VM, VmResult, VmCall, VmState};
+use brane_bvm::{VM, VmCall, VmOptions, VmResult, VmState};
 use brane_bvm::values::Value;
 use brane_job::interface::{Command, CommandKind};
 use rdkafka::producer::{FutureRecord, FutureProducer};
@@ -59,10 +59,12 @@ impl grpc::DriverService for DriverHandler {
         let function = compiler.compile(request.input)
             .map_err(|_| Status::invalid_argument("Compilation error."))?;
 
+        let options = VmOptions { always_return: true };
+
         let mut vm = if let Some(session) = self.sessions.get(&request.uuid) {
-            VM::new(self.package_index.clone(), Some(session.clone()))
+            VM::new(self.package_index.clone(), Some(session.clone()), Some(options))
         } else {
-            VM::new(self.package_index.clone(), None)
+            VM::new(self.package_index.clone(), None, Some(options))
         };
 
         vm.call(function, 1);

@@ -1,14 +1,19 @@
 #[macro_use]
 extern crate anyhow;
 
+#[path = "generator/generator.rs"]
 mod generator;
+
+#[path = "parser/parser.rs"]
 mod parser;
+
+#[path = "scanner/scanner.rs"]
 mod scanner;
 
 use crate::scanner::{Span, Tokens};
-use specifications::package::PackageIndex;
-use brane_bvm::bytecode::Function;
 use anyhow::Result;
+use brane_bvm::bytecode::Function;
+use specifications::package::PackageIndex;
 
 #[derive(Clone, Debug)]
 pub struct CompilerOptions {}
@@ -68,12 +73,11 @@ impl Compiler {
 
         match scanner::scan_tokens(input) {
             Ok((_, tokens)) => {
+                dbg!(&tokens);
                 let tokens = Tokens::new(&tokens);
 
                 match parser::parse_ast(tokens) {
-                    Ok((_, program)) => {
-                        generator::compile(program)
-                    }
+                    Ok((_, program)) => generator::compile(program),
                     e => {
                         bail!("error from parser: {:?}", e);
                     }

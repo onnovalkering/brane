@@ -9,6 +9,7 @@ use crate::values::{Class, Value};
 use std::{collections::HashMap, fmt::Write, usize};
 use specifications::package::PackageIndex;
 use specifications::common::Value as SpecValue;
+use std::cmp;
 
 static FRAMES_MAX: usize = 64;
 static STACK_MAX: usize = 256;
@@ -27,6 +28,12 @@ pub struct VM {
     stack: Vec<Value>,
     package_index: PackageIndex,
     pub state: VmState,
+    pub options: VmOptions,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct VmOptions {
+    pub always_return: bool
 }
 
 #[derive(Clone, Debug)]
@@ -45,7 +52,8 @@ pub enum VmResult {
 }
 
 impl VM {
-    pub fn new(package_index: PackageIndex, state: Option<VmState>) -> VM {
+    pub fn new(package_index: PackageIndex, state: Option<VmState>, options: Option<VmOptions>) -> VM {
+        let options = options.unwrap_or_default();
         let mut state = state.unwrap_or_default();
         state.insert(
             String::from("print"),
@@ -60,6 +68,7 @@ impl VM {
             stack: Vec::with_capacity(STACK_MAX),
             state,
             package_index,
+            options,
         }
     }
 
@@ -69,12 +78,12 @@ impl VM {
     pub fn call(
         &mut self,
         function: Function,
-        arg_count: usize,
+        arg_count: u8,
     ) -> () {
         let new_frame = CallFrame {
             function,
             ip: 0,
-            slot_offset: self.stack.len() - (arg_count - 1),
+            slot_offset: (cmp::max(0, (self.stack.len() as i16) - 1) - arg_count as i16) as usize,
         };
 
         self.call_frames.push(new_frame);
@@ -113,15 +122,23 @@ impl VM {
         };
 
         // Decodes and dispatches the instruction
+        let mut counter = 0;
         loop {
-            let mut debug = String::from("          ");
-            self.stack.iter().for_each(|v| write!(debug, "[ {:?} ]", v).unwrap());
+            counter += 1;
 
-            debug!("{}", debug);
+            let mut debug = String::from(format!("{}         ", counter));
+            self.stack.iter().for_each(|v| write!(debug, "[ {:?} ]", v).unwrap());
+            println!("{}", debug);
 
             if frame.ip >= chunk.code.len() {
-                self.call_frames.pop();
-                return VmResult::Ok(None);
+                let result = if self.options.always_return {
+                    self.stack.pop()
+                } else {
+                    None
+                };
+
+                self.stack.clear(); // Desired behaviour?
+                return VmResult::Ok(result);
             }
 
             let instruction: OpCode = chunk.code[frame.ip].into();
@@ -183,6 +200,9 @@ impl VM {
                 OpGetLocal => {
                     let index = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
+
+                    dbg!(&frame.slot_offset);
+                    dbg!(&index);
 
                     let local = self.stack.get_mut(frame.slot_offset + index as usize).unwrap().clone();
                     self.stack.push(local)
@@ -434,7 +454,7 @@ impl VM {
 
                     match func {
                         Function::UserDefined { .. } => {
-                            self.call(func, arg_count as usize);
+                            self.call(func, arg_count);
                             if let VmResult::Ok(Some(result)) = self.run(None) {
                                 for _i in vec![0; offset as usize] {
                                     self.stack.pop();
@@ -452,9 +472,12 @@ impl VM {
                         },
                         Function::External { name, package, version, parameters } => {
                             let mut arguments: HashMap<String, SpecValue> = HashMap::new();
-                            for (i, p) in parameters.iter().enumerate() {
+                            for p in parameters.iter() {
                                 arguments.insert(p.name.clone(), self.stack.pop().unwrap().as_spec_value());
                             }
+
+                            // The function itself.
+                            self.stack.pop();
 
                             let call = VmCall {
                                 package,

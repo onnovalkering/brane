@@ -13,9 +13,6 @@ pub enum Token<'a> {
     /// `break`
     Break(Span<'a>),
 
-    /// `catch`
-    Catch(Span<'a>),
-
     /// `class`
     Class(Span<'a>),
 
@@ -24,9 +21,6 @@ pub enum Token<'a> {
 
     /// `else`
     Else(Span<'a>),
-
-    /// `extends`
-    Extends(Span<'a>),
 
     /// `for`
     For(Span<'a>),
@@ -48,15 +42,6 @@ pub enum Token<'a> {
 
     /// `return`
     Return(Span<'a>),
-
-    /// `super`
-    Super(Span<'a>),
-
-    /// `this`
-    This(Span<'a>),
-
-    /// `try`
-    Try(Span<'a>),
 
     /// `unit`
     Unit(Span<'a>),

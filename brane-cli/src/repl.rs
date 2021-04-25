@@ -1,7 +1,7 @@
 use crate::docker::{self, ExecuteInfo};
 use crate::{packages, registry};
 use anyhow::{Context as _, Result};
-use brane_bvm::values::Value;
+use brane_bvm::{VmOptions, values::Value};
 use brane_bvm::{VmCall, VmResult, VM};
 use brane_drv::grpc::{CreateSessionRequest, DriverServiceClient, ExecuteRequest};
 use brane_dsl::{Compiler, CompilerOptions};
@@ -250,7 +250,8 @@ async fn local_repl(rl: &mut Editor<ReplHelper>) -> Result<()> {
     let package_index = registry::get_package_index().await?;
 
     let mut compiler = Compiler::new(compiler_options, package_index.clone());
-    let mut vm = VM::new(package_index, None);
+    let options = VmOptions { always_return: true };
+    let mut vm = VM::new(package_index, None, Some(options));
 
     let mut count: u32 = 1;
     loop {
@@ -264,7 +265,7 @@ async fn local_repl(rl: &mut Editor<ReplHelper>) -> Result<()> {
                 rl.add_history_entry(line.as_str());
                 match compiler.compile(line) {
                     Ok(function) => {
-                        vm.call(function, 1usize);
+                        vm.call(function, 0);
 
                         loop {
                             match vm.run(None) {

@@ -227,8 +227,7 @@ pub fn import_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
     comb::map(
         seq::preceded(
             tag_token!(Token::Import),
-            comb::cut(
-            seq::terminated(
+            comb::cut(seq::terminated(
                 seq::pair(
                     ident,
                     comb::opt(seq::delimited(
@@ -239,8 +238,8 @@ pub fn import_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
                         tag_token!(Token::RightBracket),
                     )),
                 ),
-                tag_token!(Token::Semicolon)
-            ))
+                tag_token!(Token::Semicolon),
+            )),
         ),
         |(package, version)| Stmt::Import { package, version },
     )
