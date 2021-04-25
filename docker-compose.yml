@@ -1,6 +1,21 @@
 version: '3.5'
 
 services:
+  brane-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8080:8080"
+    restart: always
+    environment:
+        HOST: "0.0.0.0"
+        BROKERS: "kafka:29092"
+        CALLBACK_TOPIC: "clb"
+        DEBUG: "true"
+        VAULT_HOST: "localhost:8200"
+        VAULT_TOKEN: "mytoken"
+
   brane-clb:
     build:
       context: .
