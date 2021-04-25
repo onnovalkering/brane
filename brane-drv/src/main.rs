@@ -3,6 +3,7 @@ use brane_drv::grpc::DriverServiceServer;
 use brane_drv::handler::DriverHandler;
 use brane_job::interface::{Event, EventKind};
 use brane_bvm::values::Value;
+use brane_bvm::VmState;
 use clap::Clap;
 use dotenv::dotenv;
 use log::{info};
@@ -93,12 +94,14 @@ async fn main() -> Result<()> {
         results.clone(),
     ));
 
+    let sessions: Arc<DashMap<String, VmState>> = Arc::new(DashMap::new());
     let handler = DriverHandler {
         package_index,
         producer,
         command_topic,
         states,
         results,
+        sessions,
     };
 
     // Start gRPC server with callback service.

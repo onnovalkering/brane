@@ -250,7 +250,7 @@ async fn local_repl(rl: &mut Editor<ReplHelper>) -> Result<()> {
     let package_index = registry::get_package_index().await?;
 
     let mut compiler = Compiler::new(compiler_options, package_index.clone());
-    let mut vm = VM::new(package_index);
+    let mut vm = VM::new(package_index, None);
 
     let mut count: u32 = 1;
     loop {
@@ -314,7 +314,6 @@ async fn make_function_call(call: VmCall) -> Result<Value> {
     let package_dir = packages::get_package_dir(&call.package, Some("latest"))?;
     let package_file = package_dir.join("package.yml");
     let package_info = PackageInfo::from_path(package_file)?;
-    let functions = package_info.functions.expect("Package has no functions!");
 
     let image = format!("{}:{}", package_info.name, package_info.version);
     let image_file = Some(package_dir.join("image.tar"));

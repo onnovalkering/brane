@@ -20,11 +20,13 @@ pub struct CallFrame {
     pub function: Function,
 }
 
+pub type VmState = HashMap<String, Value>;
+
 pub struct VM {
     call_frames: Vec<CallFrame>,
-    globals: HashMap<String, Value>,
     stack: Vec<Value>,
     package_index: PackageIndex,
+    pub state: VmState,
 }
 
 #[derive(Clone, Debug)]
@@ -43,9 +45,9 @@ pub enum VmResult {
 }
 
 impl VM {
-    pub fn new(package_index: PackageIndex) -> VM {
-        let mut globals = HashMap::new();
-        globals.insert(
+    pub fn new(package_index: PackageIndex, state: Option<VmState>) -> VM {
+        let mut state = state.unwrap_or_default();
+        state.insert(
             String::from("print"),
             Value::Function(Function::Native {
                 name: String::from("print"),
@@ -56,7 +58,7 @@ impl VM {
         VM {
             call_frames: Vec::with_capacity(FRAMES_MAX),
             stack: Vec::with_capacity(STACK_MAX),
-            globals,
+            state,
             package_index,
         }
     }
@@ -142,7 +144,7 @@ impl VM {
                         let value = self.stack.pop().unwrap();
 
                         if let Value::String(ident) = ident {
-                            self.globals.insert(ident.clone(), value);
+                            self.state.insert(ident.clone(), value);
                         }
                     } else {
                         panic!("Tried to assign to undefined variable: {:?}", ident);
@@ -156,7 +158,7 @@ impl VM {
                         let value = self.stack.pop().unwrap();
 
                         if let Value::String(ident) = ident {
-                            self.globals.insert(ident.clone(), value);
+                            self.state.insert(ident.clone(), value);
                         }
                     } else {
                         unreachable!()
@@ -168,7 +170,7 @@ impl VM {
 
                     if let Some(ident) = chunk.constants.get(ident as usize) {
                         if let Value::String(ident) = ident {
-                            if let Some(value) = self.globals.get(ident) {
+                            if let Some(value) = self.state.get(ident) {
                                 self.stack.push(value.clone());
                             } else {
                                 panic!("Tried to access undefined variable: {:?}", ident);
@@ -477,7 +479,7 @@ impl VM {
                             if let Some(functions) = &package.functions {
                                 for (name, function) in functions {
 
-                                    self.globals.insert(
+                                    self.state.insert(
                                         name.clone(),
                                         Value::Function(Function::External {
                                             package: package_name.clone(),

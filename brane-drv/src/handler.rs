@@ -1,7 +1,7 @@
 use crate::grpc;
 use anyhow::Result;
 use brane_dsl::{Compiler, CompilerOptions};
-use brane_bvm::{VM, VmResult, VmCall};
+use brane_bvm::{VM, VmResult, VmCall, VmState};
 use brane_bvm::values::Value;
 use brane_job::interface::{Command, CommandKind};
 use rdkafka::producer::{FutureRecord, FutureProducer};
@@ -25,7 +25,8 @@ pub struct DriverHandler {
     pub command_topic: String,
     pub package_index: PackageIndex,
     pub states: Arc<DashMap<String, String>>,
-    pub results: Arc<DashMap<String, Value>>
+    pub results: Arc<DashMap<String, Value>>,
+    pub sessions: Arc<DashMap<String, VmState>>,
 }
 
 #[tonic::async_trait]
@@ -58,7 +59,12 @@ impl grpc::DriverService for DriverHandler {
         let function = compiler.compile(request.input)
             .map_err(|_| Status::invalid_argument("Compilation error."))?;
 
-        let mut vm = VM::new(self.package_index.clone());
+        let mut vm = if let Some(session) = self.sessions.get(&request.uuid) {
+            VM::new(self.package_index.clone(), Some(session.clone()))
+        } else {
+            VM::new(self.package_index.clone(), None)
+        };
+
         vm.call(function, 1);
 
         loop {
@@ -75,6 +81,8 @@ impl grpc::DriverService for DriverHandler {
                 },
                 VmResult::Ok(value) => {
                     let output = value.map(|v| format!("{:?}", v)).unwrap_or_default();
+
+                    self.sessions.insert(request.uuid.clone(), vm.state.clone());
                     return Ok(Response::new(grpc::ExecuteReply { output }));
                 },
                 VmResult::RuntimeError => {
@@ -188,5 +196,3 @@ impl Future for Call {
         return Poll::Pending;
     }
 }
-
-
