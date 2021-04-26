@@ -1,50 +1,42 @@
 use anyhow::{bail, Context, Result};
-use brane_cfg::{Infrastructure, Secrets};
-use brane_job::{
-    clb_heartbeat, clb_lifecycle,
-    interface::{Callback, CallbackKind, Command, CommandKind},
-};
-use brane_job::{cmd_create, interface::Event};
-use bytes::BytesMut;
+use brane_cfg::infrastructure::Location;
+use brane_cfg::Infrastructure;
+use brane_job::interface::{Command, CommandKind};
+use bytes::{Bytes, BytesMut};
 use clap::Clap;
 use dotenv::dotenv;
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
-use grpcio::{Channel, ChannelBuilder, EnvBuilder};
 use log::LevelFilter;
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use prost::Message;
 use rdkafka::{
     admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
     config::ClientConfig,
     consumer::{stream_consumer::StreamConsumer, CommitMode, Consumer},
+    error::RDKafkaErrorCode,
     message::ToBytes,
     producer::{FutureProducer, FutureRecord},
-    error::RDKafkaErrorCode,
     util::Timeout,
     Message as KafkaMesage, Offset, TopicPartitionList,
 };
-use std::sync::Arc;
 use tokio::task::JoinHandle;
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
-    /// Topic to receive callbacks from
-    #[clap(short, long = "clb-topic", env = "CALLBACK_TOPIC")]
-    callback_topic: String,
     /// Topic to receive commands from
-    #[clap(short = 'o', long = "cmd-topic", env = "COMMAND_TOPIC")]
-    command_topic: String,
+    #[clap(short = 'o', long = "cmd-from-topic", env = "COMMAND_FROM_TOPIC")]
+    command_from_topic: String,
     /// Kafka brokers
     #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
     brokers: String,
     /// Print debug info
     #[clap(short, long, env = "DEBUG", takes_value = false)]
     debug: bool,
-    /// Topic to send events to
-    #[clap(short, long = "evt-topic", env = "EVENT_TOPIC")]
-    event_topic: String,
+    /// Topic to send commands to
+    #[clap(short, long = "cmd-to-topic", env = "COMMAND_TO_TOPIC")]
+    command_to_topic: String,
     /// Consumer group id
     #[clap(short, long, default_value = "brane-job", env = "GROUP_ID")]
     group_id: String,
@@ -54,12 +46,6 @@ struct Opts {
     /// Number of workers
     #[clap(short = 'w', long, default_value = "1", env = "NUM_WORKERS")]
     num_workers: u8,
-    /// Secrets store
-    #[clap(short, long, default_value = "./secrets.yml", env = "SECRETS")]
-    secrets: String,
-    /// Xenon gRPC endpoint
-    #[clap(short, long, default_value = "localhost:50051", env = "XENON")]
-    xenon: String,
 }
 
 #[tokio::main]
@@ -78,21 +64,10 @@ async fn main() -> Result<()> {
     }
 
     // Ensure that the input/output topics exists.
-    ensure_topics(
-        vec![&opts.callback_topic, &opts.command_topic, &opts.event_topic],
-        &opts.brokers,
-    )
-    .await?;
+    ensure_topics(vec![&opts.command_from_topic, &opts.command_to_topic], &opts.brokers).await?;
 
     let infra = Infrastructure::new(opts.infra.clone())?;
     infra.validate()?;
-
-    let secrets = Secrets::new(opts.secrets.clone())?;
-    secrets.validate()?;
-
-    // Prepare Xenon gRPC channel.
-    let xenon_env = Arc::new(EnvBuilder::new().build());
-    let xenon_channel = ChannelBuilder::new(xenon_env).connect(&opts.xenon);
 
     // Spawn workers, using Tokio tasks and thread pool.
     let workers = (0..opts.num_workers)
@@ -100,12 +75,9 @@ async fn main() -> Result<()> {
             let handle = tokio::spawn(start_worker(
                 opts.brokers.clone(),
                 opts.group_id.clone(),
-                opts.callback_topic.clone(),
-                opts.command_topic.clone(),
-                opts.event_topic.clone(),
+                opts.command_from_topic.clone(),
+                opts.command_to_topic.clone(),
                 infra.clone(),
-                secrets.clone(),
-                xenon_channel.clone(),
             ));
 
             info!("Spawned asynchronous worker #{}.", i + 1);
@@ -169,15 +141,10 @@ async fn ensure_topics(
 async fn start_worker(
     brokers: String,
     group_id: String,
-    clb_topic: String,
-    cmd_topic: String,
-    evt_topic: String,
+    cmd_from_topic: String,
+    cmd_to_topic: String,
     infra: Infrastructure,
-    secrets: Secrets,
-    xenon_channel: Channel,
 ) -> Result<()> {
-    let output_topic = evt_topic.as_ref();
-
     let producer: FutureProducer = ClientConfig::new()
         .set("bootstrap.servers", &brokers)
         .set("message.timeout.ms", "5000")
@@ -193,25 +160,16 @@ async fn start_worker(
         .create()
         .context("Failed to create Kafka consumer.")?;
 
-    // TODO: make use of transactions / exactly-once semantics (EOS)
-
     // Restore previous topic/partition offset.
     let mut tpl = TopicPartitionList::new();
-    tpl.add_partition(&clb_topic, 0);
-    tpl.add_partition(&cmd_topic, 0);
+    tpl.add_partition(&cmd_from_topic, 0);
 
     let committed_offsets = consumer.committed_offsets(tpl.clone(), Timeout::Never)?;
     let committed_offsets = committed_offsets.to_topic_map();
-    if let Some(offset) = committed_offsets.get(&(clb_topic.clone(), 0)) {
+    if let Some(offset) = committed_offsets.get(&(cmd_from_topic.clone(), 0)) {
         match offset {
-            Offset::Invalid => tpl.set_partition_offset(&clb_topic, 0, Offset::Beginning)?,
-            offset => tpl.set_partition_offset(&clb_topic, 0, offset.clone())?,
-        };
-    }
-    if let Some(offset) = committed_offsets.get(&(cmd_topic.clone(), 0)) {
-        match offset {
-            Offset::Invalid => tpl.set_partition_offset(&cmd_topic, 0, Offset::Beginning)?,
-            offset => tpl.set_partition_offset(&cmd_topic, 0, offset.clone())?,
+            Offset::Invalid => tpl.set_partition_offset(&cmd_from_topic, 0, Offset::Beginning)?,
+            offset => tpl.set_partition_offset(&cmd_from_topic, 0, offset.clone())?,
         };
     }
 
@@ -224,13 +182,11 @@ async fn start_worker(
     let stream_processor = consumer.stream().try_for_each(|borrowed_message| {
         &consumer.commit_message(&borrowed_message, CommitMode::Sync).unwrap();
 
+        // Shadow with owned clones.
         let owned_message = borrowed_message.detach();
-        let owned_producer = producer.clone();
-        let owned_infra = infra.clone();
-        let owned_secrets = secrets.clone();
-        let owned_xenon_channel = xenon_channel.clone();
-        let clb_topic = clb_topic.clone();
-        let cmd_topic = cmd_topic.clone();
+        let producer = producer.clone();
+        let infra = infra.clone();
+        let cmd_to_topic = cmd_to_topic.clone();
 
         async move {
             let msg_key = owned_message
@@ -250,30 +206,16 @@ async fn start_worker(
                 return Ok(());
             }
 
-            let topic = owned_message.topic();
-            let events = if topic == &clb_topic {
-                handle_clb_message(msg_key, msg_payload)
-            } else if topic == &cmd_topic {
-                handle_cmd_message(msg_key, msg_payload, owned_infra, owned_secrets, owned_xenon_channel).await
-            } else {
-                unreachable!()
-            };
+            let processing = process_cmd_message(msg_payload, infra).await;
+            match processing {
+                Ok(payload) => {
+                    // Send event on output topic
+                    let message = FutureRecord::to(&cmd_to_topic)
+                        .key(&msg_key)
+                        .payload(payload.to_bytes());
 
-            match events {
-                Ok(events) => {
-                    for (evt_key, event) in events {
-                        // Encode event message into a payload (bytes)
-                        let mut payload = BytesMut::with_capacity(64);
-                        event.encode(&mut payload).unwrap();
-
-                        // Send event on output topic
-                        let message = FutureRecord::to(&output_topic)
-                            .key(&evt_key)
-                            .payload(payload.to_bytes());
-
-                        if let Err(error) = owned_producer.send(message, Timeout::Never).await {
-                            error!("Failed to send event (key: {}): {:?}", evt_key, error);
-                        }
+                    if let Err(error) = producer.send(message, Timeout::Never).await {
+                        error!("Failed to send command (key: {}): {:?}", msg_key, error);
                     }
                 }
                 Err(error) => error!("{:?}", error),
@@ -291,56 +233,38 @@ async fn start_worker(
 ///
 ///
 ///
-fn handle_clb_message(
-    key: String,
-    payload: &[u8],
-) -> Result<Vec<(String, Event)>> {
-    // Decode payload into a callback message.
-    let callback = Callback::decode(payload).unwrap();
-    let kind = CallbackKind::from_i32(callback.kind).unwrap();
-
-    // Ignore unkown callbacks, as we can't dispatch it.
-    if kind == CallbackKind::Unknown {
-        warn!("Received UNKOWN command (key: {}). Ignoring it.", key);
-        return Ok(vec![]);
-    }
-
-    info!("Received {} callback (key: {}).", kind, key);
-    debug!("{:?}", callback);
-
-    match kind {
-        CallbackKind::Heartbeat => clb_heartbeat::handle(callback),
-        _ => clb_lifecycle::handle(callback),
-    }
-}
-
-///
-///
-///
-async fn handle_cmd_message(
-    key: String,
+async fn process_cmd_message(
     payload: &[u8],
     infra: Infrastructure,
-    secrets: Secrets,
-    xenon_channel: Channel,
-) -> Result<Vec<(String, Event)>> {
+) -> Result<Bytes> {
+    use rand::seq::SliceRandom;
+
     // Decode payload into a command message.
-    let command = Command::decode(payload).unwrap();
+    let mut command = Command::decode(payload).unwrap();
     let kind = CommandKind::from_i32(command.kind).unwrap();
 
-    // Ignore unkown commands, as we can't dispatch it.
-    if kind == CommandKind::Unknown {
-        warn!("Received UNKOWN command (key: {}). Ignoring it.", key);
-        return Ok(vec![]);
+    // Choose random location
+    if kind == CommandKind::Create {
+        let locations = infra.get_locations()?;
+        let location = locations.choose(&mut rand::thread_rng());
+        let location = location.unwrap().clone();
+
+        info!("Assigned command '{}' to location '{}'.", command.identifier(), location);
+
+        let metadata = infra.get_location_metadata(&location)?;
+        command.location = Some(location);
+
+        match metadata {
+            Location::Kube { registry, .. } | Location::Slurm { registry, .. } | Location::Vm { registry, .. } | Location::Local { registry, ..} => {
+                let image = command.image.unwrap();
+                command.image = Some(format!("{}/library/{}", registry, image));
+            }
+        }
     }
 
-    info!("Received {} command (key: {}).", kind, key);
-    debug!("{:?}", command);
+    // Encode command message into a payload.
+    let mut payload = BytesMut::with_capacity(64);
+    command.encode(&mut payload).unwrap();
 
-    // Dispatch command message to appropriate handlers.
-    match kind {
-        CommandKind::Create => cmd_create::handle(&key, command, infra, secrets, xenon_channel).await,
-        CommandKind::Stop => unimplemented!(),
-        CommandKind::Unknown => unreachable!(),
-    }
+    Ok(Bytes::from(payload))
 }

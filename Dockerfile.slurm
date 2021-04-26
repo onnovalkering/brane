@@ -30,7 +30,10 @@ RUN apt-get update && apt-get install -y \
         ca-certificates \
         libseccomp-dev \
         squashfs-tools \
+        sudo \
         tzdata
+
+RUN echo "%xenon  ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 COPY --from=build /usr/local/singularity /usr/local/singularity
 

@@ -32,7 +32,6 @@ loop:
 noop:
 	docker build -t onnovalkering/brane-noop -f Dockerfile.noop .
 
-
 # Development setup
 start: start-services
 	tmux new-session -d -s brane 				&& \
@@ -64,7 +63,12 @@ start-ide:
 start-loop:
 	cd brane-loop && cargo run
 
-start-services: create-kind-network
+start-services: \
+	create-kind-network \
+	docker-compose-up \
+	format-dfs
+
+docker-compose-up:
 	docker-compose up -d
 
 stop-services:
@@ -91,3 +95,15 @@ delete-kind-cluster:
 
 kind-cluster-config:
 	@kind get kubeconfig --name brane | base64
+
+# JuiceFS
+
+format-dfs:
+	@docker run --network kind onnovalkering/juicefs \
+		format \
+		--access-key minio \
+		--secret-key minio123 \
+		--storage minio \
+		--bucket http://minio:9000/data \
+		redis \
+		brane

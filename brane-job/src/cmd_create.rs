@@ -60,6 +60,7 @@ pub async fn handle(
             credentials,
             proxy_address,
             mount_dfs,
+            ..
         } => {
             let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address, &mount_dfs)?;
             let credentials = credentials.resolve_secrets(&secrets);
@@ -70,7 +71,8 @@ pub async fn handle(
             callback_to,
             network,
             proxy_address,
-            mount_dfs
+            mount_dfs,
+            ..
         } => {
             let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address, &mount_dfs)?;
             handle_local(command, &correlation_id, environment, network)?
@@ -81,7 +83,8 @@ pub async fn handle(
             runtime,
             credentials,
             proxy_address,
-            mount_dfs
+            mount_dfs,
+            ..
         } => {
             let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address, &mount_dfs)?;
             let credentials = credentials.resolve_secrets(&secrets);
@@ -104,6 +107,7 @@ pub async fn handle(
             credentials,
             proxy_address,
             mount_dfs,
+            ..
         } => {
             let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address, &mount_dfs)?;
             let credentials = credentials.resolve_secrets(&secrets);
@@ -260,6 +264,9 @@ fn create_k8s_job_description(
 ) -> Result<Job> {
     let command = command.clone();
     let environment: Vec<JValue> = environment.iter().map(|(k, v)| json!({ "name": k, "value": v })).collect();
+
+    // Kubernetes jobs require lowercase names
+    let job_id = job_id.to_lowercase();
 
     let job_description = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
@@ -459,6 +466,8 @@ fn create_docker_job_description(
     let job_description = JobDescription {
         arguments: Some(arguments),
         executable: Some(executable),
+        stdout: Some(format!("stdout-{}.txt", job_id)),
+        stderr: Some(format!("stderr-{}.txt", job_id)),
         ..Default::default()
     };
 
@@ -470,28 +479,24 @@ fn create_docker_job_description(
 ///
 fn create_singularity_job_description(
     command: &Command,
-    _job_id: &String,
+    job_id: &String,
     environment: HashMap<String, String>,
 ) -> Result<JobDescription> {
     let command = command.clone();
 
-    // Format: singularity run [-B /source:/target] {image} {arguments}
-    let executable = String::from("singularity");
+    // TODO: don't require sudo
+    let executable = String::from("sudo");
     let mut arguments = vec![
+        String::from("singularity"),
         String::from("run"),
-        String::from("--drop-caps"),
-        String::from("ALL"),
-        String::from("--add-caps"),
-        String::from("CAP_NET_ADMIN,CAP_NET_BIND_SERVICE,CAP_NET_RAW"),
+        String::from("--nohttps"),
     ];
 
-    if environment.contains_key(BRANE_MOUNT_DFS) {
+    if !environment.contains_key(BRANE_MOUNT_DFS) {
+        arguments.push(String::from("--drop-caps"));
+        arguments.push(String::from("ALL"));
         arguments.push(String::from("--add-caps"));
-        arguments.push(String::from("SYS_ADMIN"));
-        arguments.push(String::from("--bind"));
-        arguments.push(String::from("/dev/fuse"));
-        arguments.push(String::from("--security"));
-        arguments.push(String::from("apparmor:unconfined"));
+        arguments.push(String::from("CAP_NET_ADMIN,CAP_NET_BIND_SERVICE,CAP_NET_RAW"));
     }
 
     // Add environment variables
@@ -512,14 +517,20 @@ fn create_singularity_job_description(
     // Add command
     arguments.extend(command.command);
 
+    dbg!(&arguments.join(" "));
+
     let job_description = JobDescription {
         arguments: Some(arguments),
         executable: Some(executable),
+        stdout: Some(format!("stdout-{}.txt", job_id)),
+        stderr: Some(format!("stderr-{}.txt", job_id)),
         ..Default::default()
     };
 
     Ok(job_description)
 }
+
+
 
 ///
 ///

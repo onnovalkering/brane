@@ -128,7 +128,7 @@ impl VM {
 
             let mut debug = String::from(format!("{}         ", counter));
             self.stack.iter().for_each(|v| write!(debug, "[ {:?} ]", v).unwrap());
-            println!("{}", debug);
+            debug!("{}", debug);
 
             if frame.ip >= chunk.code.len() {
                 let result = if self.options.always_return {
@@ -200,9 +200,6 @@ impl VM {
                 OpGetLocal => {
                     let index = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
-
-                    dbg!(&frame.slot_offset);
-                    dbg!(&index);
 
                     let local = self.stack.get_mut(frame.slot_offset + index as usize).unwrap().clone();
                     self.stack.push(local)

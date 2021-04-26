@@ -19,6 +19,7 @@ pub enum Location {
         address: String,
         callback_to: String,
         namespace: String,
+        registry: String,
         credentials: LocationCredentials,
         proxy_address: Option<String>,
         mount_dfs: Option<String>,
@@ -26,6 +27,7 @@ pub enum Location {
     Local {
         callback_to: String,
         network: String,
+        registry: String,
         proxy_address: Option<String>,
         mount_dfs: Option<String>,
     },
@@ -33,6 +35,7 @@ pub enum Location {
         address: String,
         callback_to: String,
         runtime: String,
+        registry: String,
         credentials: LocationCredentials,
         proxy_address: Option<String>,
         mount_dfs: Option<String>,
@@ -41,6 +44,7 @@ pub enum Location {
         address: String,
         callback_to: String,
         runtime: String,
+        registry: String,
         credentials: LocationCredentials,
         proxy_address: Option<String>,
         mount_dfs: Option<String>,
@@ -127,6 +131,20 @@ impl Infrastructure {
                 .context("Infrastructure file is not valid.")?;
 
             Ok(())
+        } else {
+            unreachable!()
+        }
+    }
+
+    ///
+    ///
+    ///
+    pub fn get_locations(&self) -> Result<Vec<String>> {
+        if let Store::File(store_file) = &self.store {
+            let infra_reader = BufReader::new(File::open(store_file)?);
+            let infra_document: InfrastructureDocument = serde_yaml::from_reader(infra_reader)?;
+
+            Ok(infra_document.locations.keys().map(|k| k.to_string()).collect())
         } else {
             unreachable!()
         }

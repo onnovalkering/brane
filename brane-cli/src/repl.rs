@@ -1,7 +1,7 @@
 use crate::docker::{self, ExecuteInfo};
 use crate::{packages, registry};
 use anyhow::{Context as _, Result};
-use brane_bvm::{VmOptions, values::Value};
+use brane_bvm::{values::Value, VmOptions};
 use brane_bvm::{VmCall, VmResult, VM};
 use brane_drv::grpc::{CreateSessionRequest, DriverServiceClient, ExecuteRequest};
 use brane_dsl::{Compiler, CompilerOptions};
@@ -17,7 +17,6 @@ use serde::de::DeserializeOwned;
 use specifications::common::Value as SpecValue;
 use specifications::package::PackageInfo;
 use std::borrow::Cow::{self, Borrowed, Owned};
-use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -120,9 +119,10 @@ impl Validator for ReplHelper {
     ///
     fn validate(
         &self,
-        ctx: &mut validate::ValidationContext,
+        _ctx: &mut validate::ValidationContext,
     ) -> rustyline::Result<validate::ValidationResult> {
-        self.validator.validate(ctx)
+        // self.validator.validate(ctx)
+        Ok(validate::ValidationResult::Valid(None))
     }
 
     ///
@@ -286,7 +286,7 @@ async fn local_repl(rl: &mut Editor<ReplHelper>) -> Result<()> {
                         }
                     }
                     Err(e) => {
-                        eprintln!("{:?}", e);
+                        eprintln!("\n{}", e);
                     }
                 }
             }

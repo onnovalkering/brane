@@ -19,8 +19,8 @@ const BRANELET_URL: &str = concat!(
     "/branelet"
 );
 
-const JUICE_URL: &str = "https://github.com/juicedata/juicefs/releases/download/v0.12.1/juicefs-0.12.1-linux-amd64.tar.gz";
-
+const JUICE_URL: &str =
+    "https://github.com/juicedata/juicefs/releases/download/v0.12.1/juicefs-0.12.1-linux-amd64.tar.gz";
 
 ///
 ///
@@ -144,7 +144,10 @@ fn generate_dockerfile(
     }
 
     writeln!(contents, "ADD {} juicefs.tar.gz", JUICE_URL)?;
-    writeln!(contents, "RUN tar -xzf juicefs.tar.gz && rm juicefs.tar.gz && mkdir /data")?;
+    writeln!(
+        contents,
+        "RUN tar -xzf juicefs.tar.gz && rm juicefs.tar.gz && mkdir /data"
+    )?;
 
     // Copy files
     writeln!(contents, "COPY container.yml /container.yml")?;

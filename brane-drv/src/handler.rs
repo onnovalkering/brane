@@ -67,7 +67,7 @@ impl grpc::DriverService for DriverHandler {
             VM::new(self.package_index.clone(), None, Some(options))
         };
 
-        vm.call(function, 1);
+        vm.call(function, 0);
 
         loop {
             match vm.run(None) {

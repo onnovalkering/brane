@@ -11,6 +11,7 @@ members = [
     "brane-let",
     "brane-net",
     "brane-oas",
+    "brane-plr",
     "specifications",
 ]
 

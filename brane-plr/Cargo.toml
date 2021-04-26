@@ -1,34 +1,24 @@
 [package]
-name = "brane-job"
+name = "brane-plr"
 version = "0.4.0"
 authors = ["Onno Valkering"]
 edition = "2018"
 
 [dependencies]
 anyhow = "1"
-base64 = "0.13"
-bincode = "1.3"
 brane-cfg = { path = "../brane-cfg" }
+brane-job = { path = "../brane-job" }
 bytes = "1"
 clap = "3.0.0-beta.2"
 dotenv = "0.15"
 env_logger = "0.8"
 futures = "0.3"
-grpcio = { version = "0.8", features = ["openssl"] }
-k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_20"] }
-kube = "0.52"
+hyper = "0.13"
 log = "0.4"
-maplit = "1"
 prost = "0.7"
-protobuf = "2.22"
 rand = "0.8"
 rdkafka = { version = "0.26", features = ["cmake-build"] }
 serde = "1"
 serde_json = "1"
 serde_yaml = "0.8"
-time = "0.2"
 tokio = { version = "1", features = ["full"] }
-xenon-rs = { git = "https://github.com/onnovalkering/xenon-rs" }
-
-[dev-dependencies]
-dashmap = "4.0"
