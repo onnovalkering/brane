@@ -3,9 +3,12 @@ use anyhow::Result;
 use brane_dsl::{Compiler, CompilerOptions};
 use brane_bvm::{VM, VmCall, VmOptions, VmResult, VmState};
 use brane_bvm::values::Value;
+use brane_bvm::bytecode::Function;
 use brane_job::interface::{Command, CommandKind};
 use rdkafka::producer::{FutureRecord, FutureProducer};
 use tonic::{Request, Response, Status};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 use specifications::package::PackageIndex;
 use uuid::Uuid;
 use prost::Message as _;
@@ -31,6 +34,8 @@ pub struct DriverHandler {
 
 #[tonic::async_trait]
 impl grpc::DriverService for DriverHandler {
+    type ExecuteStream = ReceiverStream<Result<grpc::ExecuteReply, Status>>;
+
     ///
     ///
     ///
@@ -50,48 +55,81 @@ impl grpc::DriverService for DriverHandler {
     async fn execute(
         &self,
         request: Request<grpc::ExecuteRequest>,
-    ) -> Result<Response<grpc::ExecuteReply>, Status> {
+    ) -> Result<Response<Self::ExecuteStream>, Status> {
         let request = request.into_inner();
+        let package_index = self.package_index.clone();
+        let sessions = self.sessions.clone();
 
-        let options = CompilerOptions::new();
-        let mut compiler = Compiler::new(options, self.package_index.clone());
+        let command_topic = self.command_topic.clone();
+        let producer = self.producer.clone();
+        let states = self.states.clone();
+        let results = self.results.clone();
 
-        let function = compiler.compile(request.input)
-            .map_err(|_| Status::invalid_argument("Compilation error."))?;
+        let (tx, rx) = mpsc::channel::<Result<grpc::ExecuteReply, Status>>(10);
 
-        let options = VmOptions { always_return: true };
+        tokio::spawn(async move {
+            let options = CompilerOptions::new();
+            let mut compiler = Compiler::new(options, package_index.clone());
 
-        let mut vm = if let Some(session) = self.sessions.get(&request.uuid) {
-            VM::new(self.package_index.clone(), Some(session.clone()), Some(options))
-        } else {
-            VM::new(self.package_index.clone(), None, Some(options))
-        };
+            let function = compiler.compile(request.input)
+                .map_err(|_| Status::invalid_argument("Compilation error."));
 
-        vm.call(function, 0);
+            if function.is_err() {
+                tx.send(Err(function.unwrap_err())).await.unwrap();
+                return;
+            }
 
-        loop {
-            match vm.run(None) {
-                VmResult::Call(call) => {
-                    vm.result(make_function_call(
-                        call,
-                        &self.command_topic,
-                        &self.producer,
-                        &request.uuid,
-                        self.states.clone(),
-                        self.results.clone(),
-                    ).await.unwrap());
-                },
-                VmResult::Ok(value) => {
-                    let output = value.map(|v| format!("{:?}", v)).unwrap_or_default();
+            let function = function.unwrap();
 
-                    self.sessions.insert(request.uuid.clone(), vm.state.clone());
-                    return Ok(Response::new(grpc::ExecuteReply { output }));
-                },
-                VmResult::RuntimeError => {
-                    return Err(Status::invalid_argument("Runtime error."))
+            // Disassemble bytecode to representative format
+            let bytecode = if let Function::UserDefined { chunk, .. } = &function {
+                chunk.disassemble().unwrap() // Infallible
+            } else {
+                unreachable!()
+            };
+
+            let reply = grpc::ExecuteReply { output: String::new(), bytecode: bytecode.clone(), close: false };
+            tx.send(Ok(reply)).await.unwrap();
+
+            let options = VmOptions { always_return: true };
+            let mut vm = if let Some(session) = sessions.get(&request.uuid) {
+                VM::new(package_index.clone(), Some(session.clone()), Some(options))
+            } else {
+                VM::new(package_index.clone(), None, Some(options))
+            };
+
+            vm.call(function, 0);
+
+            loop {
+                match vm.run(None) {
+                    VmResult::Call(call) => {
+                        vm.result(make_function_call(
+                            call,
+                            &command_topic,
+                            &producer,
+                            &request.uuid,
+                            states.clone(),
+                            results.clone(),
+                        ).await.unwrap());
+                    },
+                    VmResult::Ok(value) => {
+                        let output = value.map(|v| format!("{:?}", v)).unwrap_or_default();
+
+                        sessions.insert(request.uuid.clone(), vm.state.clone());
+                        let reply = grpc::ExecuteReply { output, bytecode: String::new(), close: true };
+                        tx.send(Ok(reply)).await.unwrap();
+                        break;
+                    },
+                    VmResult::RuntimeError => {
+                        tx.send(Err(Status::invalid_argument("Runtime error."))).await.unwrap();
+                    }
                 }
             }
-        }
+
+            return;
+        });
+
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 }
 

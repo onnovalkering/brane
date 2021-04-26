@@ -1,6 +1,7 @@
 use crate::docker::{self, ExecuteInfo};
 use crate::{packages, registry};
 use anyhow::{Context as _, Result};
+use brane_bvm::bytecode::Function;
 use brane_bvm::{values::Value, VmOptions};
 use brane_bvm::{VmCall, VmResult, VM};
 use brane_drv::grpc::{CreateSessionRequest, DriverServiceClient, ExecuteRequest};
@@ -222,7 +223,20 @@ async fn remote_repl(
                 };
 
                 let response = client.execute(request).await?;
-                println!("{}", response.into_inner().output);
+                let mut stream = response.into_inner();
+
+                while let Some(reply) = stream.message().await? {
+                    if !reply.bytecode.is_empty() {
+                        debug!("\n{}", reply.bytecode);
+                    }
+                    if !reply.output.is_empty() {
+                        println!("{}", reply.output);
+                    }
+
+                    if reply.close {
+                        break;
+                    }
+                }
             }
             Err(ReadlineError::Interrupted) => {
                 println!("Keyboard interrupt not supported. Press Ctrl+D to exit.");
@@ -265,8 +279,11 @@ async fn local_repl(rl: &mut Editor<ReplHelper>) -> Result<()> {
                 rl.add_history_entry(line.as_str());
                 match compiler.compile(line) {
                     Ok(function) => {
-                        vm.call(function, 0);
+                        if let Function::UserDefined { chunk, ..} = &function {
+                            debug!("\n{}", chunk.disassemble()?);
+                        }
 
+                        vm.call(function, 0);
                         loop {
                             match vm.run(None) {
                                 VmResult::Call(call) => {
@@ -275,11 +292,14 @@ async fn local_repl(rl: &mut Editor<ReplHelper>) -> Result<()> {
                                     vm.result(result);
                                 }
                                 VmResult::Ok(value) => {
-                                    println!("ok: {:?}", value);
+                                    let output = value.map(|v| format!("{:?}", v)).unwrap_or_default();
+                                    if !output.is_empty() {
+                                        println!("{}", output);
+                                    }
                                     break;
                                 }
                                 VmResult::RuntimeError => {
-                                    eprintln!("Runtime errro!");
+                                    eprintln!("Runtime error!");
                                     break;
                                 }
                             }

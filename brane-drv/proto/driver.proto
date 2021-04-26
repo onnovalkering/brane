@@ -3,7 +3,7 @@ package driver;
 
 service DriverService {
     rpc CreateSession (CreateSessionRequest) returns (CreateSessionReply);
-    rpc Execute (ExecuteRequest) returns (ExecuteReply);
+    rpc Execute (ExecuteRequest) returns (stream ExecuteReply);
 }
 
 message CreateSessionRequest { }
@@ -18,5 +18,7 @@ message ExecuteRequest {
 }
 
 message ExecuteReply {
-    string output = 1;
+    bool close = 1;
+    string output = 2;
+    string bytecode = 3;
 }
