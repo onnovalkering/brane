@@ -85,7 +85,10 @@ async fn main() -> Result<()> {
     .await?;
 
     let infra = Infrastructure::new(opts.infra.clone())?;
+    infra.validate()?;
+
     let secrets = Secrets::new(opts.secrets.clone())?;
+    secrets.validate()?;
 
     // Prepare Xenon gRPC channel.
     let xenon_env = Arc::new(EnvBuilder::new().build());
@@ -218,7 +221,7 @@ async fn start_worker(
         .context("Failed to manually assign topic, partition, and/or offset to consumer.")?;
 
     // Create the outer pipeline on the message stream.
-    let stream_processor = consumer.start().try_for_each(|borrowed_message| {
+    let stream_processor = consumer.stream().try_for_each(|borrowed_message| {
         &consumer.commit_message(&borrowed_message, CommitMode::Sync).unwrap();
 
         let owned_message = borrowed_message.detach();

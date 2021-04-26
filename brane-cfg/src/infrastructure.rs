@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crate::Secrets;
 use serde::Deserialize;
 use std::fs::{self, File};
@@ -120,6 +120,21 @@ impl Infrastructure {
     ///
     ///
     ///
+    pub fn validate(&self) -> Result<()> {
+        if let Store::File(store_file) = &self.store {
+            let infra_reader = BufReader::new(File::open(store_file)?);
+            let _: InfrastructureDocument = serde_yaml::from_reader(infra_reader)
+                .context("Infrastructure file is not valid.")?;
+
+            Ok(())
+        } else {
+            unreachable!()
+        }
+    }
+
+    ///
+    ///
+    ///
     pub fn get_location_metadata<S: Into<String>>(&self, location: S) -> Result<Location> {
         let location = location.into();
 
@@ -132,12 +147,7 @@ impl Infrastructure {
                 .get(&location)
                 .map(Location::clone);
 
-            ensure!(metadata.is_some(), "Location '{}' not found in infrastructure metadata.", location);
-            let metadata = metadata.unwrap();
-
-            // TODO: validate metadata
-
-            Ok(metadata)
+            metadata.ok_or(anyhow!("Location '{}' not found in infrastructure metadata.", location))
         } else {
             unreachable!()
         }

@@ -22,6 +22,21 @@ impl Secrets {
     ///
     ///
     ///
+    pub fn validate(&self) -> Result<()> {
+        if let Store::File(store_file) = &self.store {
+            let infra_reader = BufReader::new(File::open(store_file)?);
+            let _: HashMap<String, String> = serde_yaml::from_reader(infra_reader)
+                .context("Secrets file is not valid.")?;
+
+            Ok(())
+        } else {
+            unreachable!()
+        }
+    }
+
+    ///
+    ///
+    ///
     pub fn get<S: Into<String>>(&self, secret_key: S) -> Result<String> {
         let secret_key = secret_key.into();
 
@@ -34,8 +49,7 @@ impl Secrets {
                 .get(&secret_key)
                 .map(String::clone);
 
-            ensure!(secret.is_some(), "Secret '{}' not in secrets store.", secret_key);
-            Ok(secret.unwrap())
+            secret.ok_or(anyhow!("Secret '{}' not in secrets store.", secret_key))
         } else {
             unreachable!()
         }
