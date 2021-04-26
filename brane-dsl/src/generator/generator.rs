@@ -21,7 +21,6 @@ pub fn compile(program: Program) -> Result<Function> {
         stmt_to_opcodes(stmt, &mut chunk, &mut locals, 0);
     }
 
-    disassemble::disassemble_chunk(&chunk, "main");
     Ok(Function::new(String::from("main"), 0, chunk))
 }
 
@@ -55,7 +54,6 @@ pub fn compile_function(
         stmt_to_opcodes(stmt, &mut chunk, &mut locals, scope);
     }
 
-    disassemble::disassemble_chunk(&chunk, &name);
     let function = Function::new(name, params.len() as u8, chunk);
 
     Ok(function)
@@ -223,7 +221,9 @@ pub fn stmt_to_opcodes(
 
             // How much to jump?
             let jump = (chunk.code.len() - plh_pos - 2) as u16;
-            chunk.write_bytes(&jump.to_be_bytes()[..]);
+            let [first, second, ..] = jump.to_be_bytes();
+            chunk.code[plh_pos] = first;
+            chunk.code[plh_pos + 1] = second;
 
             chunk.write(OpCode::OpPop);
 

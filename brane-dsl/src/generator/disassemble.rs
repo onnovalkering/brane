@@ -4,6 +4,8 @@ pub fn disassemble_chunk(
     chunk: &Chunk,
     name: &str,
 ) {
+    dbg!(&chunk.code.iter());
+
     println!("== {} ==", name);
 
     let mut skip = 0;

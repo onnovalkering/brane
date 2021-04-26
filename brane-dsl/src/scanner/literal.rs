@@ -60,10 +60,12 @@ fn string<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>)
         "string",
         seq::preceded(
             cc::char('\"'),
-            comb::cut(seq::terminated(
-                bc::escaped(cc::alphanumeric1, '\\', cc::one_of("\"n\\")),
-                cc::char('\"'),
-            )),
+            comb::cut(
+                seq::terminated(
+                    bc::escaped(cc::alphanumeric1, '\\', cc::one_of("\"n\\")),
+                    cc::char('\"'),
+                )
+            ),
         ),
     )(input)
 }
