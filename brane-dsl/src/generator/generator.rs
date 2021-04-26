@@ -2,8 +2,6 @@ use crate::parser::ast::*;
 use anyhow::Result;
 use brane_bvm::bytecode::{Chunk, Function, OpCode};
 
-mod disassemble;
-
 #[derive(Debug, Clone)]
 pub struct Local {
     pub name: String,

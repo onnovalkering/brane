@@ -1,6 +1,7 @@
+use anyhow::Result;
 use bytes::{BufMut, BytesMut};
 use specifications::common::Parameter;
-use std::fmt;
+use std::fmt::{self, Write};
 
 use crate::values::Value;
 
@@ -168,4 +169,142 @@ impl Chunk {
 
         (self.constants.len() as u8) - 1
     }
+
+    ///
+    ///
+    ///
+    pub fn disassemble(&self) -> Result<String> {
+        let mut result = String::new();
+        let mut skip = 0;
+
+        for (offset, instruction) in self.code.iter().enumerate() {
+            if skip > 0 {
+                skip = skip - 1;
+                continue;
+            }
+
+            write!(result, "{:04} ", offset)?;
+            match OpCode::from(*instruction) {
+                OpCode::OpConstant => {
+                    constant_instruction("OP_CONSTANT", &self, offset, &mut result);
+                    skip = 1;
+                }
+                OpCode::OpAdd => { writeln!(result, "OP_ADD")?; }
+                OpCode::OpDivide => { writeln!(result, "OP_DIVIDE")?; }
+                OpCode::OpMultiply => { writeln!(result, "OP_MULTIPLY")?; }
+                OpCode::OpSubstract => { writeln!(result, "OP_SUBSTRACT")?; }
+                OpCode::OpNegate => { writeln!(result, "OP_NEGATE")?; }
+                OpCode::OpReturn => { writeln!(result, "OP_RETURN")?; }
+                OpCode::OpFalse => { writeln!(result, "OP_FALSE")?; }
+                OpCode::OpTrue => { writeln!(result, "OP_TRUE")?; }
+                OpCode::OpUnit => { writeln!(result, "OP_UNIT")?; }
+                OpCode::OpNot => { writeln!(result, "OP_NOT")?; }
+                OpCode::OpEqual => { writeln!(result, "OP_EQUAL")?; }
+                OpCode::OpGreater => { writeln!(result, "OP_GREATER")?; }
+                OpCode::OpLess => { writeln!(result, "OP_LESS")?; }
+                OpCode::OpPop => { writeln!(result, "OP_POP")?; }
+                OpCode::OpOr => { writeln!(result, "OP_OR")?; }
+                OpCode::OpAnd => { writeln!(result, "OP_AND")?; }
+                OpCode::OpCall => {
+                    byte_instruction("OP_CALL", &self, offset, &mut result);
+                    skip = 1;
+                }
+                OpCode::OpJumpIfFalse => {
+                    jump_instruction("OP_JUMP_IF_FALSE", 1, self, offset, &mut result);
+                    skip = 2;
+                }
+                OpCode::OpJump => {
+                    jump_instruction("OP_JUMP", 1, self, offset, &mut result);
+                    skip = 2;
+                }
+                OpCode::OpJumpBack => {
+                    jump_instruction("OP_JUMP_BACK", -1, self, offset, &mut result);
+                    skip = 2;
+                }
+                OpCode::OpDefineGlobal => {
+                    constant_instruction("OP_DEFINE_GLOBAL", &self, offset, &mut result);
+                    skip = 1;
+                }
+                OpCode::OpGetGlobal => {
+                    constant_instruction("OP_GET_GLOBAL", &self, offset, &mut result);
+                    skip = 1;
+                }
+                OpCode::OpGetLocal => {
+                    byte_instruction("OP_GET_LOCAL", &self, offset, &mut result);
+                    skip = 1;
+                }
+                OpCode::OpSetGlobal => {
+                    byte_instruction("OP_SET_GLOBAL", &self, offset, &mut result);
+                    skip = 1;
+                }
+                OpCode::OpSetLocal => {
+                    byte_instruction("OP_SET_LOCAL", &self, offset, &mut result);
+                    skip = 1;
+                }
+                OpCode::OpClass => {
+                    constant_instruction("OP_CLASS", &self, offset, &mut result);
+                    skip = 1;
+                }
+                OpCode::OpImport => {
+                    constant_instruction("OP_IMPORT", &self, offset, &mut result);
+                    skip = 1;
+                }
+            }
+        }
+
+        Ok(result)
+    }
+}
+
+///
+///
+///
+fn jump_instruction(
+    name: &str,
+    sign: i16,
+    chunk: &Chunk,
+    offset: usize,
+    result: &mut String,
+) {
+    let jump1 = chunk.code[offset + 1] as u16;
+    let jump2 = chunk.code[offset + 2] as u16;
+
+    let jump = (jump1 << 8) | jump2;
+    writeln!(
+        result,
+        "{:<16} {:4} -> {}",
+        name,
+        offset,
+        offset as i32 + 3 + (sign * jump as i16) as i32
+    ).unwrap();
+}
+
+///
+///
+///
+fn constant_instruction(
+    name: &str,
+    chunk: &Chunk,
+    offset: usize,
+    result: &mut String,
+) {
+    let constant = chunk.code[offset + 1];
+    write!(result, "{:<16} {:4} | ", name, constant).unwrap();
+
+    if let Some(value) = chunk.constants.get(constant as usize) {
+        writeln!(result, "{:?}", value).unwrap();
+    }
+}
+
+///
+///
+///
+fn byte_instruction(
+    name: &str,
+    chunk: &Chunk,
+    offset: usize,
+    result: &mut String,
+) {
+    let slot = chunk.code[offset + 1];
+    writeln!(result, "{:<16} {:4} | ", name, slot).unwrap();
 }
