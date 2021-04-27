@@ -23,13 +23,12 @@ export class RendererWidget extends Widget implements IRenderMime.IRenderer {
 
     renderModel(model: IRenderMime.IMimeModel): Promise<void> {
         const data = model.data[this._mimeType] as JSONObject;
-        const invocation = data["invocation"] as JSONObject;
 
         return new Promise((resolve) => {
             if (!this._renderer) {
-                this._renderer = new Renderer(invocation, this.node, resolve);
+                this._renderer = new Renderer(data, this.node, resolve);
             } else {
-                this._renderer.update(invocation, resolve);
+                this._renderer.update(data, resolve);
             }
         });
     }

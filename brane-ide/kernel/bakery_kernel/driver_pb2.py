@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x0c\x64river.proto\x12\x06\x64river\"\x16\n\x14\x43reateSessionRequest\"\"\n\x12\x43reateSessionReply\x12\x0c\n\x04uuid\x18\x01 \x01(\t\"-\n\x0e\x45xecuteRequest\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12\r\n\x05input\x18\x02 \x01(\t\"\x1e\n\x0c\x45xecuteReply\x12\x0e\n\x06output\x18\x01 \x01(\t2\x93\x01\n\rDriverService\x12I\n\rCreateSession\x12\x1c.driver.CreateSessionRequest\x1a\x1a.driver.CreateSessionReply\x12\x37\n\x07\x45xecute\x12\x16.driver.ExecuteRequest\x1a\x14.driver.ExecuteReplyb\x06proto3'
+  serialized_pb=b'\n\x0c\x64river.proto\x12\x06\x64river\"\x16\n\x14\x43reateSessionRequest\"\"\n\x12\x43reateSessionReply\x12\x0c\n\x04uuid\x18\x01 \x01(\t\"-\n\x0e\x45xecuteRequest\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12\r\n\x05input\x18\x02 \x01(\t\"?\n\x0c\x45xecuteReply\x12\r\n\x05\x63lose\x18\x01 \x01(\x08\x12\x0e\n\x06output\x18\x02 \x01(\t\x12\x10\n\x08\x62ytecode\x18\x03 \x01(\t2\x95\x01\n\rDriverService\x12I\n\rCreateSession\x12\x1c.driver.CreateSessionRequest\x1a\x1a.driver.CreateSessionReply\x12\x39\n\x07\x45xecute\x12\x16.driver.ExecuteRequest\x1a\x14.driver.ExecuteReply0\x01\x62\x06proto3'
 )
 
 
@@ -130,8 +130,22 @@ _EXECUTEREPLY = _descriptor.Descriptor(
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='output', full_name='driver.ExecuteReply.output', index=0,
-      number=1, type=9, cpp_type=9, label=1,
+      name='close', full_name='driver.ExecuteReply.close', index=0,
+      number=1, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='output', full_name='driver.ExecuteReply.output', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='bytecode', full_name='driver.ExecuteReply.bytecode', index=2,
+      number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -149,7 +163,7 @@ _EXECUTEREPLY = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=131,
-  serialized_end=161,
+  serialized_end=194,
 )
 
 DESCRIPTOR.message_types_by_name['CreateSessionRequest'] = _CREATESESSIONREQUEST
@@ -195,8 +209,8 @@ _DRIVERSERVICE = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=164,
-  serialized_end=311,
+  serialized_start=197,
+  serialized_end=346,
   methods=[
   _descriptor.MethodDescriptor(
     name='CreateSession',

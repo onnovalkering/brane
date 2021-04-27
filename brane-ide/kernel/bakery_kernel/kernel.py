@@ -34,6 +34,8 @@ class BakeryKernel(Kernel):
         self.session_uuid = None
 
     def do_execute(self, code, silent, store_history=True, user_expressions=None, allow_stdin=False):
+        self.current_bytecode = None
+
         if not code.strip():
             return self.complete()
 
@@ -46,9 +48,11 @@ class BakeryKernel(Kernel):
 
         interrupted = False
         try:
-            result = self.driver.Execute(ExecuteRequest(uuid=self.session_uuid, input=code))
-            if len(result.output) > 0:
-                self.publish_stream('stdout', result.output)
+            stream = self.driver.Execute(ExecuteRequest(uuid=self.session_uuid, input=code))
+            for reply in stream:
+                status = self.create_status_json(reply)
+                self.publish_status(status, not reply.close)
+
         except KeyboardInterrupt:
             # TODO: support keyboard interrupt (like CLI REPL)
             interrupted = True
@@ -162,7 +166,17 @@ class BakeryKernel(Kernel):
 
         self.send_response(self.iopub_socket, 'stream', content)
 
-    def publish_status(self, status, invocation_uuid, update):
+    def create_status_json(self, reply):
+        if len(reply.bytecode) > 0:
+            self.current_bytecode = reply.bytecode
+
+        return {
+            "done": reply.close,
+            "output": reply.output,
+            "bytecode": self.current_bytecode,
+        }
+
+    def publish_status(self, status, update):
         """
         Publishes a status payload on Jupyter's IOPub channel.
         Subsequent calls should be updates, to support delta rendering.
@@ -172,9 +186,7 @@ class BakeryKernel(Kernel):
                 'application/vnd.brane.invocation+json': status
             },
             'metadata': {},
-            'transient': {
-                'display_id': invocation_uuid
-            }
+            'transient': {}
         }
 
         message_type = "update_display_data" if update else "display_data"

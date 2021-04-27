@@ -19,7 +19,7 @@ class DriverServiceStub(object):
                 request_serializer=driver__pb2.CreateSessionRequest.SerializeToString,
                 response_deserializer=driver__pb2.CreateSessionReply.FromString,
                 )
-        self.Execute = channel.unary_unary(
+        self.Execute = channel.unary_stream(
                 '/driver.DriverService/Execute',
                 request_serializer=driver__pb2.ExecuteRequest.SerializeToString,
                 response_deserializer=driver__pb2.ExecuteReply.FromString,
@@ -49,7 +49,7 @@ def add_DriverServiceServicer_to_server(servicer, server):
                     request_deserializer=driver__pb2.CreateSessionRequest.FromString,
                     response_serializer=driver__pb2.CreateSessionReply.SerializeToString,
             ),
-            'Execute': grpc.unary_unary_rpc_method_handler(
+            'Execute': grpc.unary_stream_rpc_method_handler(
                     servicer.Execute,
                     request_deserializer=driver__pb2.ExecuteRequest.FromString,
                     response_serializer=driver__pb2.ExecuteReply.SerializeToString,
@@ -92,7 +92,7 @@ class DriverService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/driver.DriverService/Execute',
+        return grpc.experimental.unary_stream(request, target, '/driver.DriverService/Execute',
             driver__pb2.ExecuteRequest.SerializeToString,
             driver__pb2.ExecuteReply.FromString,
             options, channel_credentials,

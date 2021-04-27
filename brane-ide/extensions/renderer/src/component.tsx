@@ -1,21 +1,13 @@
 import { JSONObject } from '@lumino/coreutils';
 import * as ReactDOM from 'react-dom';
 import * as React from 'react';
-import JSONTree from 'react-json-tree'
 import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import BarLoader from "react-spinners/BarLoader";
-import { DateTime, Settings } from "luxon";
 
 type Props = {
     inProgress: boolean;
-    instructions: any;
     output: string;
-    info: {
-        status: string,
-        created: string,
-        started: string,
-        stopped: string,
-    };
+    bytecode: string;
 }
 
 class Renderer {
@@ -48,67 +40,15 @@ class Renderer {
      * @param invocation
      */
     deriveProps(invocation: JSONObject): Props {
-        const inProgress = invocation["status"] != "complete";
-        const instructions = JSON.parse(invocation["instructions_json"] as string);
-        const output = this.formatOutput(invocation["return_json"] as string);
-
-        function formatDateTime(dt: string): string {
-            if (!dt) {
-                return "";
-            }
-
-            return DateTime.fromISO(dt, { zone: 'UTC' })
-                .setZone(Settings.defaultZoneName)
-                .toLocaleString(DateTime.DATETIME_FULL_WITH_SECONDS);
-        }
+        const inProgress = !(invocation["done"] as boolean);
+        const output = invocation["output"] as string;
+        const bytecode = invocation["bytecode"] as string;
 
         return {
             inProgress,
-            instructions,
             output,
-            info: {
-                status: invocation["status"] as string,
-                created: formatDateTime(invocation["created"] as string),
-                started: formatDateTime(invocation["started"] as string),
-                stopped: formatDateTime(invocation["stopped"] as string),
-            },
+            bytecode,
         };
-    }
-
-    formatOutput(return_json: string): string {
-        let output = "";
-        if (return_json) {
-            const value = JSON.parse(return_json)
-            console.log(value);
-
-            const variant = value["v"];
-            const content = value["c"];
-            switch (variant) {
-                case "boolean":
-                case "integer":
-                case "real":
-                case "unicode":
-                    output = `${content}`
-                    break;
-                case "struct":
-                    const type = content["type"];
-                    switch (type) {
-                        case "Directory":
-                        case "File":
-                            output = content["properties"]["url"]["c"]
-                            break;
-                        default:
-                            output = JSON.stringify(content)
-                            break;
-                    }
-                    break;
-                default:
-                    output = JSON.stringify(content)
-                    break;
-            }
-        }
-
-        return output;
     }
 
     /**
@@ -117,10 +57,10 @@ class Renderer {
      */
     _render(callback: Function) {
         console.log("ReactApp: _render()");
-        const { inProgress, instructions, output, info } = this.deriveProps(this._invocation);
+        const { inProgress, output, bytecode } = this.deriveProps(this._invocation);
 
         ReactDOM.render(
-            <App inProgress={inProgress} instructions={instructions} output={output} info={info} />,
+            <App inProgress={inProgress} output={output} bytecode={bytecode} />,
             this._container,
             () => callback(),
         );
@@ -133,13 +73,18 @@ class App extends React.Component<Props> {
      */
     render() {
         console.log("App: render()");
+        const bytecode_opcodes = this.props.bytecode.split("\n").filter(x => x.length > 0);
+        const bytecode_list_items = [];
+
+        for (let opcode of bytecode_opcodes) {
+            bytecode_list_items.push(<li key={opcode}>{opcode}</li>);
+        }
 
         return (
             <Tabs>
                 <TabList>
                     <Tab>Output</Tab>
-                    <Tab>Information</Tab>
-                    <Tab>IR</Tab>
+                    <Tab>Bytecode</Tab>
                 </TabList>
 
                 <TabPanel>
@@ -152,38 +97,8 @@ class App extends React.Component<Props> {
                 </TabPanel>
 
                 <TabPanel>
-                    <div className="invocation-renderer__information">
-                        <table>
-                            <tr>
-                                <td>Status:</td>
-                                <td><span className="uppercase">{this.props.info.status}</span></td>
-                            </tr>
-                            <tr>
-                                <td>Created:</td>
-                                <td>{this.props.info.created}</td>
-                            </tr>
-                            <tr>
-                                <td>Started:</td>
-                                <td>{this.props.info.started}</td>
-                            </tr>
-                            <tr>
-                                <td>Stopped:</td>
-                                <td>{this.props.info.stopped}</td>
-                            </tr>
-                        </table>
-                    </div>
-                </TabPanel>
-
-                <TabPanel>
-                    <div className="invocation-renderer__ir">
-                        <JSONTree
-                            data={this.props.instructions}
-                            hideRoot={true}
-                            theme={"google"}
-                            getItemString={(type, data, itemType, itemString) =>
-                                <span className="uppercase">{data["variant"]}</span>
-                            }
-                        />
+                    <div className="invocation-renderer__bytecode">
+                        <ul>{bytecode_list_items}</ul>
                     </div>
                 </TabPanel>
             </Tabs>
