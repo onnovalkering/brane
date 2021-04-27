@@ -1,53 +1,46 @@
-FROM rust:1.50 as build
-
-RUN apt-get update && apt-get install -y \
-    cmake \
- && rm -rf /var/lib/apt/lists/*
-
-RUN USER=root cargo new --bin brane-cli
-WORKDIR /brane-cli
-
-# Copy over project manifests
-COPY ./brane-cli/Cargo.toml ./Cargo.toml
-COPY ./brane-dsl /brane-dsl
-COPY ./brane-exec /brane-exec
-COPY ./brane-std /brane-std
-COPY ./brane-sys /brane-sys
-COPY ./specifications /specifications
-
-# This will prepare dependencies
-RUN cargo build --release
-RUN rm src/*.rs
-
-# Copy over project source code
-COPY ./brane-cli/src ./src
-
-# This will build a release binary
-RUN rm ./target/release/deps/brane_cli*
-RUN cargo build --release
-
-# 703d8b2dcb88: updated Jan 2021
-FROM jupyter/minimal-notebook:703d8b2dcb88
-
-COPY --from=build /brane-cli/target/release/brane-cli /usr/local/bin/brane-cli
-
-COPY ./brane-ide/kernel /kernel
-COPY ./brane-ide/extensions /extensions
+# 584f43f06586: JupyterLab 3.0.14
+FROM jupyter/minimal-notebook:584f43f06586
 
 USER root
+WORKDIR /
 
-RUN conda install --yes jupyterlab=3.0.1
+# JuiceFS
+ENV VERSION="0.12.1"
+ENV RELEASE="juicefs-$VERSION-linux-amd64"
 
-RUN brane-cli -s login http://brane-api:8080 --username jovyan
+RUN apt-get update && apt-get install -y \
+    curl \
+ && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /kernel
+RUN curl -LO "https://github.com/juicedata/juicefs/releases/download/v$VERSION/$RELEASE.tar.gz" \
+ && tar -xf "$RELEASE.tar.gz" \
+ && rm "$RELEASE.tar.gz"
+
+# Install kernel dependencies
+RUN pip install \
+    filetype==1.0.7 \
+    grpcio-tools==1.37.0 \
+    grpcio==1.37.0
+
+COPY ./brane-ide/kernels /kernels
+COPY ./brane-ide/extensions /extensions
+
+WORKDIR /kernels/bscript
 RUN python setup.py install \
  && python install.py
 
-WORKDIR /extensions
-RUN jupyter labextension install js9
-RUN jupyter labextension install renderer
+WORKDIR /
+RUN jupyter labextension install extensions/renderer
 
-# Switch back to jovyan to avoid accidental container runs as root
-USER $NB_UID
-WORKDIR $HOME
+# Mount DFS before starting Jupyter (start-notebook.sh).
+RUN mkdir -p "${HOME}/data" \
+ && printf '%s\n' "#!/usr/bin/env bash" >> ./entrypoint.sh \
+ && printf '%s\n' "/juicefs mount -d \${BRANE_MOUNT_DFS} ${HOME}/data" >> ./entrypoint.sh \
+ && printf '%s\n' "cd ${HOME}" >> ./entrypoint.sh \
+ && printf '%s\n' "su jovyan<<'EOF'" >> ./entrypoint.sh \
+ && printf '%s\n' "export PATH=\"/opt/conda/bin:$PATH\"" >> ./entrypoint.sh \
+ && printf '%s\n' "tini -g -- start-notebook.sh" >> ./entrypoint.sh \
+ && printf '%s\n' "EOF" >> ./entrypoint.sh \
+ && chmod +x ./entrypoint.sh
+
+ENTRYPOINT [ "./entrypoint.sh" ]
