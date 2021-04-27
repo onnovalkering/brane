@@ -1,19 +1,20 @@
 from base64 import b64encode
 from grpc import insecure_channel
-from imghdr import what
 from io import BytesIO
 from ipykernel.kernelbase import Kernel
-from os import getenv
+from os import getenv, path
 from requests import get, post
 from time import sleep
 from urllib.parse import urljoin
+from filetype import image_match
+from json import loads
 
 # Generated gRPC code
 from .driver_pb2 import CreateSessionRequest, ExecuteRequest
 from .driver_pb2_grpc import DriverServiceStub
 
-BRANE_API_URL = getenv('BRANE_API_URL', 'brane-api:8080')
 BRANE_DRV_URL = getenv('BRANE_DRV_URL', 'brane-drv:50053')
+BRANE_DATA_DIR = getenv('BRANE_DATA_DIR', '/home/jovyan/data')
 
 class BakeryKernel(Kernel):
     implementation = 'Bakery'
@@ -34,6 +35,10 @@ class BakeryKernel(Kernel):
         self.session_uuid = None
 
     def do_execute(self, code, silent, store_history=True, user_expressions=None, allow_stdin=False):
+        """
+
+
+        """
         self.current_bytecode = None
 
         if not code.strip():
@@ -53,6 +58,10 @@ class BakeryKernel(Kernel):
                 status = self.create_status_json(reply)
                 self.publish_status(status, not reply.close)
 
+                if reply.close:
+                    file_output = self.try_as_file_output(reply.output)
+                    self.send_response(self.iopub_socket, "display_data", file_output)
+
         except KeyboardInterrupt:
             # TODO: support keyboard interrupt (like CLI REPL)
             interrupted = True
@@ -63,7 +72,9 @@ class BakeryKernel(Kernel):
             return self.complete()
 
     def complete(self):
-        # This marks the current cell as complete
+        """
+        This marks the current cell as complete
+        """
         return {
             'status': 'ok',
             'execution_count': self.execution_count,
@@ -78,8 +89,6 @@ class BakeryKernel(Kernel):
         """
         magics = {
             'attach': self.attach,
-            'display': self.display,
-            'js9': self.js9,
             'session': lambda: self.publish_stream('stdout', self.session_uuid),
         }
 
@@ -96,48 +105,6 @@ class BakeryKernel(Kernel):
         Attach to an existing session. Variables will be restored, imports not.
         """
         self.session_uuid = session_uuid
-
-    def display(self, variable):
-        """
-        Retreives and displays a 'File' variable.
-        """
-        response = get(f"todo$SESSIONS_ENDPOINT/{self.session_uuid}/files/{variable}")
-        if response.headers['content-type'] == 'text/plain':
-            content = {
-                'data': {
-                    'text/plain': response.text
-                },
-                'metadata': {}
-            }
-        else:
-            with BytesIO(response.content) as b:
-                image = b.read()
-
-            image_type = what(None, image)
-            image_data = b64encode(image).decode('ascii')
-
-            content = {
-                'data': {
-                    f'image/{image_type}': image_data
-                },
-                'metadata': {}
-            }
-
-        self.send_response(self.iopub_socket, "display_data", content)
-
-    def js9(self, variable):
-        """
-        Displays a 'File' variable using JS9, only FITS files are supported.
-        """
-        file_url = f"todo$SESSIONS_ENDPOINT/{self.session_uuid}/files/{variable}"
-        content = {
-            'data': {
-                'image/fits': file_url
-            },
-            'metadata': {}
-        }
-
-        self.send_response(self.iopub_socket, "display_data", content)
 
     def publish_json(self, data, update):
         """
@@ -191,3 +158,58 @@ class BakeryKernel(Kernel):
 
         message_type = "update_display_data" if update else "display_data"
         self.send_response(self.iopub_socket, message_type, content)
+
+    def try_as_file_output(self, output: str):
+        """
+
+        """
+        if not output.startswith("\"/data/"):
+            return None
+
+        output = output.strip('"').replace("/data", BRANE_DATA_DIR)
+        if not path.isfile(output):
+            return None
+
+        extension = path.splitext(output)[1]
+
+        # Render as JSON, if file extension is .json
+        if extension == '.json':
+            try:
+                with open (output, 'rb') as f:
+                    json_data = loads(f.read())
+            except:
+                json_data = {
+                    'message': 'Please check the file, it doesn\'t seems to be valid JSON.'
+                }
+
+            return {
+                'data': {
+                    'application/json': json_data
+                },
+                'metadata': {}
+            }
+
+        # Render as HTML, if file extension is .html
+        extension = path.splitext(output)[1]
+        if extension == '.html':
+            with open (output, 'r') as f:
+                html_data = f.read()
+
+            return {
+                'data': {
+                    'text/html': html_data
+                },
+                'metadata': {}
+            }
+
+        kind = image_match(output)
+        if kind is not None:
+            with open (output, 'rb') as f:
+                image_data = b64encode(f.read()).decode('ascii')
+
+            return {
+                'data': {
+                    kind.mime: image_data
+                },
+                'metadata': {}
+            }

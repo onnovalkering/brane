@@ -1,11 +1,18 @@
 .PHONY: install
 
-install: install-kernel install-extensions
+install: install-kernels install-extensions
 
-install-kernel:
-	cd kernel \
-	pipenv run -- python setup.py install \
- && pipenv run -- python install.py --sys-prefix
+install-kernels: \
+	install-bakery-kernel \
+	install-bscript-kernel
+
+install-bakery-kernel:
+	pipenv shell "cd kernels/bakery && python setup.py install && exit" \
+ && pipenv shell "cd kernels/bakery && python install.py --sys-prefix && exit"
+
+install-bscript-kernel:
+	pipenv shell "cd kernels/bscript && python setup.py install && exit" \
+ && pipenv shell "cd kernels/bscript && python install.py --sys-prefix && exit"
 
 install-extensions: install-js9 install-renderer
 
@@ -22,7 +29,7 @@ clear:
 	pipenv --rm
 
 start:
-	BRANE_API_URL="`hostname`:8080" BRANE_DRV_URL="localhost:50053" pipenv run -- jupyter lab --ip 0.0.0.0 --LabApp.token=''
+	BRANE_DRV_URL="localhost:50053" pipenv run -- jupyter lab --ip 0.0.0.0 --LabApp.token=''
 
 generate-grpc:
 	pipenv run -- python -m grpc_tools.protoc --proto_path ../brane-drv/proto --python_out=. --grpc_python_out=. ../brane-drv/proto/driver.proto
