@@ -81,13 +81,13 @@ impl Compiler {
                     Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
                         bail!("{}", convert_parser_error(tokens, e));
                     },
-                    _ => bail!("unkown error from parser"),
+                    _ => bail!("Compiler error: unkown error from parser."),
                 }
             }
             Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
                 bail!("{}", convert_scanner_error(input, e));
             }
-            _ => bail!("Unkown error from scanner"),
+            _ => bail!("Compiler error: Unkown error from scanner."),
         }
     }
 }

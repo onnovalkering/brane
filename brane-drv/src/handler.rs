@@ -72,7 +72,7 @@ impl grpc::DriverService for DriverHandler {
             let mut compiler = Compiler::new(options, package_index.clone());
 
             let function = compiler.compile(request.input)
-                .map_err(|_| Status::invalid_argument("Compilation error."));
+                .map_err(|e| Status::invalid_argument(e.to_string()));
 
             if function.is_err() {
                 tx.send(Err(function.unwrap_err())).await.unwrap();
