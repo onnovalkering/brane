@@ -62,7 +62,7 @@ fn string<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>)
             cc::char('\"'),
             comb::cut(
                 seq::terminated(
-                    bc::escaped(cc::alphanumeric1, '\\', cc::one_of("\"n\\")),
+                    bc::escaped(bc::is_not("\""), '\\', cc::one_of("\"n\\")),
                     cc::char('\"'),
                 )
             ),
