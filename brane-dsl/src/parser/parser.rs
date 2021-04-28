@@ -106,10 +106,14 @@ pub fn let_assign_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>
     input: Tokens<'a>
 ) -> IResult<Tokens, Stmt, E> {
     comb::map(
-        seq::delimited(
+        seq::preceded(
             tag_token!(Token::Let),
-            seq::separated_pair(ident, tag_token!(Token::Assign), expr),
-            tag_token!(Token::Semicolon),
+            comb::cut(
+                seq::terminated(
+                    seq::separated_pair(ident, tag_token!(Token::Assign), expr),
+                    tag_token!(Token::Semicolon),
+                )
+            )
         ),
         |(ident, expr)| Stmt::LetAssign(ident, expr),
     )
@@ -125,7 +129,7 @@ pub fn assign_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
     comb::map(
         seq::terminated(
             seq::separated_pair(ident, tag_token!(Token::Assign), expr),
-            tag_token!(Token::Semicolon),
+            comb::cut(tag_token!(Token::Semicolon)),
         ),
         |(ident, expr)| Stmt::Assign(ident, expr),
     )

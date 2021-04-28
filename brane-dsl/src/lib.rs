@@ -75,6 +75,7 @@ impl Compiler {
         match scanner::scan_tokens(input) {
             Ok((_, tokens)) => {
                 let tokens = Tokens::new(&tokens);
+                dbg!(&tokens);
 
                 match parser::parse_ast(tokens) {
                     Ok((_, program)) => generator::compile(program),
@@ -188,7 +189,7 @@ pub fn convert_parser_error(
                 writeln!(result, "{} in section '{}', at: {}", i, s, line).unwrap()
             }
             e => {
-                dbg!(&e);
+                writeln!(result, "Compiler error: unkown error from parser: {:?}", e).unwrap();
             }
         }
     }
