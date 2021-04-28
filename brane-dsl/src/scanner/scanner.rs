@@ -1,3 +1,4 @@
+mod comments;
 mod literal;
 mod tokens;
 
@@ -12,14 +13,29 @@ pub type Span<'a> = nom_locate::LocatedSpan<&'a str>;
 ///
 ///
 pub fn scan_tokens(input: Span) -> IResult<Span, Vec<Token>, VerboseError<Span>> {
-    comb::all_consuming(multi::many0(scan_token)).parse(input)
+    comb::all_consuming(multi::many0(scan_token))
+        .parse(input)
+        .map(|(s, t)| {
+            let mut t = t;
+            t.retain(|t| !t.is_none());
+
+            (s, t)
+        })
 }
 
 ///
 ///
 ///
 fn scan_token<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>) -> IResult<Span<'a>, Token, E> {
-    branch::alt((keyword, operator, punctuation, literal::parse, identifier)).parse(input)
+    branch::alt((
+        comments::parse,
+        keyword,
+        operator,
+        punctuation,
+        literal::parse,
+        identifier,
+    ))
+    .parse(input)
 }
 
 ///

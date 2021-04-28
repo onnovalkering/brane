@@ -132,6 +132,9 @@ pub enum Token<'a> {
 
     /// Identifier
     Ident(Span<'a>),
+
+    /// None
+    None,
 }
 
 impl<'a> Token<'a> {
@@ -166,54 +169,27 @@ impl<'a> Token<'a> {
         }
     }
 
+    pub fn is_none(&self) -> bool {
+        if let Token::None = self {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn inner(&self) -> &Span {
         use Token::*;
 
         match self {
-            And(span) |
-            Break(span) |
-            Class(span) |
-            Continue(span) |
-            Else(span) |
-            For(span) |
-            Function(span) |
-            If(span) |
-            Import(span) |
-            Let(span) |
-            Or(span) |
-            Return(span) |
-            Unit(span) |
-            While(span) |
-            Dot(span) |
-            Colon(span) |
-            Comma(span) |
-            LeftBrace(span) |
-            LeftBracket(span) |
-            LeftParen(span) |
-            RightBrace(span) |
-            RightBracket(span) |
-            RightParen(span) |
-            Semicolon(span) |
-            Assign(span) |
-            Equal(span) |
-            Greater(span) |
-            GreaterOrEqual(span) |
-            Less(span) |
-            LessOrEqual(span) |
-            Minus(span) |
-            Not(span) |
-            NotEqual(span) |
-            Plus(span) |
-            Slash(span) |
-            Star(span) |
-            Boolean(span) |
-            Integer(span) |
-            Real(span) |
-            SemVer(span) |
-            String(span) |
-            Ident(span) => {
-                span
-            }
+            And(span) | Break(span) | Class(span) | Continue(span) | Else(span) | For(span) | Function(span)
+            | If(span) | Import(span) | Let(span) | Or(span) | Return(span) | Unit(span) | While(span) | Dot(span)
+            | Colon(span) | Comma(span) | LeftBrace(span) | LeftBracket(span) | LeftParen(span) | RightBrace(span)
+            | RightBracket(span) | RightParen(span) | Semicolon(span) | Assign(span) | Equal(span) | Greater(span)
+            | GreaterOrEqual(span) | Less(span) | LessOrEqual(span) | Minus(span) | Not(span) | NotEqual(span)
+            | Plus(span) | Slash(span) | Star(span) | Boolean(span) | Integer(span) | Real(span) | SemVer(span)
+            | String(span) | Ident(span) => span,
+            // None should have been filtered out already.
+            None => unreachable!(),
         }
     }
 }

@@ -179,27 +179,23 @@ pub fn declare_func_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>
         seq::tuple((
             seq::preceded(
                 tag_token!(Token::Function),
-                comb::cut(
-                    seq::pair(
-                        ident,
-                        delimited(
-                            tag_token!(Token::LeftParen),
-                            comb::opt(seq::pair(
-                                ident,
-                                multi::many0(seq::preceded(tag_token!(Token::Comma), ident)),
-                            )),
-                            tag_token!(Token::RightParen),
-                        ),
+                comb::cut(seq::pair(
+                    ident,
+                    delimited(
+                        tag_token!(Token::LeftParen),
+                        comb::opt(seq::pair(
+                            ident,
+                            multi::many0(seq::preceded(tag_token!(Token::Comma), ident)),
+                        )),
+                        tag_token!(Token::RightParen),
                     ),
-                )
+                )),
             ),
-            comb::cut(
-                seq::delimited(
-                    tag_token!(Token::LeftBrace),
-                    multi::many0(parse_stmt),
-                    tag_token!(Token::RightBrace),
-                )
-            ),
+            comb::cut(seq::delimited(
+                tag_token!(Token::LeftBrace),
+                multi::many0(parse_stmt),
+                tag_token!(Token::RightBrace),
+            )),
         )),
         |((ident, params), body)| {
             let params = params
@@ -224,24 +220,22 @@ pub fn if_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
     comb::map(
         seq::preceded(
             tag_token!(Token::If),
-            comb::cut(
-                seq::tuple((
-                    seq::delimited(tag_token!(Token::LeftParen), expr, tag_token!(Token::RightParen)),
+            comb::cut(seq::tuple((
+                seq::delimited(tag_token!(Token::LeftParen), expr, tag_token!(Token::RightParen)),
+                seq::delimited(
+                    tag_token!(Token::LeftBrace),
+                    multi::many0(parse_stmt),
+                    tag_token!(Token::RightBrace),
+                ),
+                comb::opt(seq::preceded(
+                    tag_token!(Token::Else),
                     seq::delimited(
                         tag_token!(Token::LeftBrace),
                         multi::many0(parse_stmt),
                         tag_token!(Token::RightBrace),
                     ),
-                    comb::opt(seq::preceded(
-                        tag_token!(Token::Else),
-                        seq::delimited(
-                            tag_token!(Token::LeftBrace),
-                            multi::many0(parse_stmt),
-                            tag_token!(Token::RightBrace),
-                        ),
-                    )),
-                ))
-            )
+                )),
+            ))),
         ),
         |(condition, consequent, alternative)| Stmt::If {
             condition,
@@ -278,7 +272,7 @@ pub fn import_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
                 )),
             ),
             |(package, version)| Stmt::Import { package, version },
-        )
+        ),
     )
     .parse(input)
 }
@@ -294,27 +288,25 @@ pub fn for_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
         comb::map(
             seq::preceded(
                 tag_token!(Token::For),
-                comb::cut(
-                    seq::pair(
-                        seq::delimited(
-                            tag_token!(Token::LeftParen),
-                            seq::tuple((
-                                let_assign_stmt,
-                                seq::terminated(expr, tag_token!(Token::Semicolon)),
-                                comb::map(
-                                    seq::separated_pair(ident, tag_token!(Token::Assign), expr),
-                                    |(ident, expr)| Stmt::Assign(ident, expr),
-                                ),
-                            )),
-                            tag_token!(Token::RightParen),
-                        ),
-                        seq::delimited(
-                            tag_token!(Token::LeftBrace),
-                            multi::many0(parse_stmt),
-                            tag_token!(Token::RightBrace),
-                        ),
-                    )
-                )
+                comb::cut(seq::pair(
+                    seq::delimited(
+                        tag_token!(Token::LeftParen),
+                        seq::tuple((
+                            let_assign_stmt,
+                            seq::terminated(expr, tag_token!(Token::Semicolon)),
+                            comb::map(
+                                seq::separated_pair(ident, tag_token!(Token::Assign), expr),
+                                |(ident, expr)| Stmt::Assign(ident, expr),
+                            ),
+                        )),
+                        tag_token!(Token::RightParen),
+                    ),
+                    seq::delimited(
+                        tag_token!(Token::LeftBrace),
+                        multi::many0(parse_stmt),
+                        tag_token!(Token::RightBrace),
+                    ),
+                )),
             ),
             |((initializer, condition, increment), consequent)| Stmt::For {
                 initializer: Box::new(initializer),
@@ -322,7 +314,7 @@ pub fn for_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
                 increment: Box::new(increment),
                 consequent,
             },
-        )
+        ),
     )
     .parse(input)
 }
@@ -357,7 +349,11 @@ pub fn return_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
     input: Tokens<'a>
 ) -> IResult<Tokens, Stmt, E> {
     comb::map(
-        seq::delimited(tag_token!(Token::Return), comb::opt(expr), comb::cut(tag_token!(Token::Semicolon))),
+        seq::delimited(
+            tag_token!(Token::Return),
+            comb::opt(expr),
+            comb::cut(tag_token!(Token::Semicolon)),
+        ),
         |expr| Stmt::Return(expr),
     )
     .parse(input)
@@ -369,7 +365,10 @@ pub fn return_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 pub fn expr_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
     input: Tokens<'a>
 ) -> IResult<Tokens, Stmt, E> {
-    comb::map(seq::terminated(expr, comb::cut(tag_token!(Token::Semicolon))), |e| Stmt::Expr(e)).parse(input)
+    comb::map(seq::terminated(expr, comb::cut(tag_token!(Token::Semicolon))), |e| {
+        Stmt::Expr(e)
+    })
+    .parse(input)
 }
 
 ///
