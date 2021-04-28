@@ -36,6 +36,8 @@ pub enum OpCode {
     OpCall,
     OpClass,
     OpImport,
+    OpNew,
+    OpDot,
 }
 
 impl Into<u8> for OpCode {
@@ -75,6 +77,8 @@ impl From<u8> for OpCode {
             0x1A => OpCode::OpCall,
             0x1B => OpCode::OpClass,
             0x1C => OpCode::OpImport,
+            0x1D => OpCode::OpNew,
+            0x1E => OpCode::OpDot,
             _ => {
                 panic!("ERROR: not a OpCode: {}", byte);
             }
@@ -89,16 +93,6 @@ pub enum Function {
     UserDefined { name: String, arity: u8, chunk: Chunk },
 }
 
-impl fmt::Debug for Function {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Function::UserDefined { name, ..} | Function::External { name, .. } | Function::Native { name, .. } => write!(f, "{}(..)", name)
-        }
-    }
-}
-
-
-
 impl Function {
     pub fn new(
         name: String,
@@ -106,6 +100,14 @@ impl Function {
         chunk: Chunk,
     ) -> Self {
         Function::UserDefined { arity, name, chunk }
+    }
+}
+
+impl fmt::Debug for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Function::UserDefined { name, ..} | Function::External { name, .. } | Function::Native { name, .. } => write!(f, "{}(..)", name)
+        }
     }
 }
 
@@ -190,21 +192,29 @@ impl Chunk {
                     skip = 1;
                 }
                 OpCode::OpAdd => { writeln!(result, "OP_ADD")?; }
+                OpCode::OpAnd => { writeln!(result, "OP_AND")?; }
                 OpCode::OpDivide => { writeln!(result, "OP_DIVIDE")?; }
-                OpCode::OpMultiply => { writeln!(result, "OP_MULTIPLY")?; }
-                OpCode::OpSubstract => { writeln!(result, "OP_SUBSTRACT")?; }
-                OpCode::OpNegate => { writeln!(result, "OP_NEGATE")?; }
-                OpCode::OpReturn => { writeln!(result, "OP_RETURN")?; }
-                OpCode::OpFalse => { writeln!(result, "OP_FALSE")?; }
-                OpCode::OpTrue => { writeln!(result, "OP_TRUE")?; }
-                OpCode::OpUnit => { writeln!(result, "OP_UNIT")?; }
-                OpCode::OpNot => { writeln!(result, "OP_NOT")?; }
                 OpCode::OpEqual => { writeln!(result, "OP_EQUAL")?; }
+                OpCode::OpFalse => { writeln!(result, "OP_FALSE")?; }
                 OpCode::OpGreater => { writeln!(result, "OP_GREATER")?; }
                 OpCode::OpLess => { writeln!(result, "OP_LESS")?; }
-                OpCode::OpPop => { writeln!(result, "OP_POP")?; }
+                OpCode::OpMultiply => { writeln!(result, "OP_MULTIPLY")?; }
+                OpCode::OpNegate => { writeln!(result, "OP_NEGATE")?; }
+                OpCode::OpNot => { writeln!(result, "OP_NOT")?; }
                 OpCode::OpOr => { writeln!(result, "OP_OR")?; }
-                OpCode::OpAnd => { writeln!(result, "OP_AND")?; }
+                OpCode::OpPop => { writeln!(result, "OP_POP")?; }
+                OpCode::OpReturn => { writeln!(result, "OP_RETURN")?; }
+                OpCode::OpSubstract => { writeln!(result, "OP_SUBSTRACT")?; }
+                OpCode::OpTrue => { writeln!(result, "OP_TRUE")?; }
+                OpCode::OpUnit => { writeln!(result, "OP_UNIT")?; }
+                OpCode::OpDot => {
+                    constant_instruction("OP_DOT", &self, offset, &mut result);
+                    skip = 1;
+                }
+                OpCode::OpNew => {
+                    byte_instruction("OP_NEW", &self, offset, &mut result);
+                    skip = 1;
+                }
                 OpCode::OpCall => {
                     byte_instruction("OP_CALL", &self, offset, &mut result);
                     skip = 1;

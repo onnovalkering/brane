@@ -1,6 +1,6 @@
 use crate::bytecode::Function;
 use specifications::common::Value as SpecValue;
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 #[derive(Clone)]
 pub enum Value {
@@ -11,6 +11,7 @@ pub enum Value {
     Unit,
     Function(Function),
     Class(Class),
+    Instance(Instance),
 }
 
 impl fmt::Debug for Value {
@@ -23,6 +24,7 @@ impl fmt::Debug for Value {
             Value::Unit => write!(f, "unit"),
             Value::Function(function) => write!(f, "{:?}", function),
             Value::Class(class) => write!(f, "{:?}", class),
+            Value::Instance(instance) => write!(f, "{:?}", instance),
         }
     }
 }
@@ -41,9 +43,49 @@ impl Value {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Class {
     pub name: String,
+    pub properties: HashMap<String, String>,
+}
+
+impl Class {
+    pub fn new(name: String, properties: HashMap<String, String>) -> Self {
+        Self {
+            name,
+            properties,
+        }
+    }
+}
+
+impl fmt::Debug for Class {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "class<{}>", self.name)
+    }
+}
+
+#[derive(Clone)]
+pub struct Instance {
+    pub class: Class,
+    pub fields: HashMap<String, Value>,
+}
+
+impl Instance {
+    pub fn new(class: Class, fields: Option<HashMap<String, Value>>) -> Self {
+        let mut fields = fields.unwrap_or_default();
+        fields.insert(String::from("__class"), class.name.clone().into());
+
+        Self {
+            class,
+            fields,
+        }
+    }
+}
+
+impl fmt::Debug for Instance {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "instance<{}>", self.class.name)
+    }
 }
 
 impl From<SpecValue> for Value {

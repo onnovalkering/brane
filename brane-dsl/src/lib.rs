@@ -75,10 +75,12 @@ impl Compiler {
         match scanner::scan_tokens(input) {
             Ok((_, tokens)) => {
                 let tokens = Tokens::new(&tokens);
-                dbg!(&tokens);
 
                 match parser::parse_ast(tokens) {
-                    Ok((_, program)) => generator::compile(program),
+                    Ok((_, program)) => {
+                        dbg!(&program);
+                        generator::compile(program)
+                    }
                     Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
                         bail!("{}", convert_parser_error(tokens, e));
                     }

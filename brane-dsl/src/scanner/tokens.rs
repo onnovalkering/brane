@@ -37,6 +37,9 @@ pub enum Token<'a> {
     /// `let`
     Let(Span<'a>),
 
+    /// `new`
+    New(Span<'a>),
+
     /// `|`
     Or(Span<'a>),
 
@@ -187,7 +190,7 @@ impl<'a> Token<'a> {
             | RightBracket(span) | RightParen(span) | Semicolon(span) | Assign(span) | Equal(span) | Greater(span)
             | GreaterOrEqual(span) | Less(span) | LessOrEqual(span) | Minus(span) | Not(span) | NotEqual(span)
             | Plus(span) | Slash(span) | Star(span) | Boolean(span) | Integer(span) | Real(span) | SemVer(span)
-            | String(span) | Ident(span) => span,
+            | String(span) | Ident(span) | New(span) => span,
             // None should have been filtered out already.
             None => unreachable!(),
         }

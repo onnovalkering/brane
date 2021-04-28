@@ -4,7 +4,7 @@ extern crate log;
 pub mod bytecode;
 pub mod values;
 
-use crate::bytecode::{Function, OpCode};
+use crate::{bytecode::{Function, OpCode}, values::Instance};
 use crate::values::{Class, Value};
 use std::{collections::HashMap, fmt::Write, usize};
 use specifications::package::PackageIndex;
@@ -218,9 +218,7 @@ impl VM {
                     let class = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
-                    if let Some(Value::String(name)) = chunk.constants.get(class as usize) {
-                        let value = Value::Class(Class { name: name.clone() });
-
+                    if let Some(value) = chunk.constants.get(class as usize) {
                         self.stack.push(value.clone());
                     } else {
                         unreachable!()
@@ -515,6 +513,54 @@ impl VM {
                         }
                     } else {
                         unreachable!()
+                    }
+                },
+                OpNew => {
+                    let properties_n = chunk.code[frame.ip];
+                    frame.ip = frame.ip + 1;
+
+                    let class = self.stack.pop();
+                    let mut properties = HashMap::new();
+
+                    (0..properties_n).for_each(|_| {
+                        let ident = self.stack.pop().unwrap();
+                        let value = self.stack.pop().unwrap();
+
+                        if let Value::String(ident) = ident {
+                            properties.insert(ident, value);
+                        }
+                    });
+
+                    if let Some(Value::Class(class)) = class {
+                        let instance = Instance::new(class, Some(properties));
+                        self.stack.push(Value::Instance(instance));
+                    } else {
+                        panic!("Not a class.");
+                    }
+                },
+                OpDot => {
+                    let target = self.stack.pop();
+
+                    let property = chunk.code[frame.ip];
+                    frame.ip = frame.ip + 1;
+
+                    let property = if let Some(Value::String(property)) = chunk.constants.get(property as usize) {
+                        property.clone()
+                    } else {
+                        warn!("constant not found!");
+                        return VmResult::RuntimeError;
+                    };
+
+                    if let Some(Value::Instance(instance)) = target {
+                        if let Some(property) = instance.fields.get(&property) {
+                            self.stack.push(property.clone());
+                        } else {
+                            warn!("Property not found!");
+                            return VmResult::RuntimeError;
+                        }
+                    } else {
+                        warn!("Not an instance!");
+                        return VmResult::RuntimeError;
                     }
                 }
             }

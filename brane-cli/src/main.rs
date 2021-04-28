@@ -157,11 +157,10 @@ async fn main() -> Result<()> {
     let mut logger = env_logger::builder();
     logger.format_module_path(false);
 
-
     if options.debug {
-        logger.filter_module("brane_cli", LevelFilter::Debug).init();
+        logger.filter_module("brane", LevelFilter::Debug).init();
     } else {
-        logger.filter_module("brane_cli", LevelFilter::Info).init();
+        logger.filter_module("brane", LevelFilter::Info).init();
 
         setup_panic!(Metadata {
             name: "Brane CLI".into(),

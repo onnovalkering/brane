@@ -43,7 +43,6 @@ fn scan_token<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<
 ///
 fn keyword<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>) -> IResult<Span<'a>, Token, E> {
     ws0(branch::alt((
-        comb::map(bc::tag("&"), |s| Token::And(s)),
         comb::map(bc::tag("break"), |s| Token::Break(s)),
         comb::map(bc::tag("class"), |s| Token::Class(s)),
         comb::map(bc::tag("continue"), |s| Token::Continue(s)),
@@ -53,10 +52,10 @@ fn keyword<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>
         comb::map(bc::tag("if"), |s| Token::If(s)),
         comb::map(bc::tag("import"), |s| Token::Import(s)),
         comb::map(bc::tag("let"), |s| Token::Let(s)),
+        comb::map(bc::tag("new"), |s| Token::New(s)),
         comb::map(bc::tag("return"), |s| Token::Return(s)),
         comb::map(bc::tag("unit"), |s| Token::Unit(s)),
         comb::map(bc::tag("while"), |s| Token::While(s)),
-        comb::map(bc::tag("|"), |s| Token::Or(s)),
     )))
     .parse(input)
 }
@@ -74,12 +73,14 @@ fn operator<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a
         comb::map(bc::tag("!="), |s| Token::NotEqual(s)),
         // One character token
         comb::map(bc::tag("!"), |s| Token::Not(s)),
+        comb::map(bc::tag("&"), |s| Token::And(s)),
         comb::map(bc::tag("*"), |s| Token::Star(s)),
         comb::map(bc::tag("+"), |s| Token::Plus(s)),
         comb::map(bc::tag("-"), |s| Token::Minus(s)),
         comb::map(bc::tag("/"), |s| Token::Slash(s)),
         comb::map(bc::tag("<"), |s| Token::Less(s)),
         comb::map(bc::tag(">"), |s| Token::Greater(s)),
+        comb::map(bc::tag("|"), |s| Token::Or(s)),
     )))
     .parse(input)
 }

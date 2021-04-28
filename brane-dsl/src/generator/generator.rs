@@ -1,6 +1,6 @@
 use crate::parser::ast::*;
 use anyhow::Result;
-use brane_bvm::bytecode::{Chunk, Function, OpCode};
+use brane_bvm::{bytecode::{Chunk, Function, OpCode}, values::{Class, Value}};
 
 #[derive(Debug, Clone)]
 pub struct Local {
@@ -73,8 +73,9 @@ pub fn stmt_to_opcodes(
             let import = chunk.add_constant(ident.clone().into());
             chunk.write_pair(OpCode::OpImport, import);
         }
-        Stmt::DeclareClass { ident: Ident(ident) } => {
-            let class = chunk.add_constant(ident.clone().into());
+        Stmt::DeclareClass { ident: Ident(ident), properties } => {
+            let class = Value::Class(Class::new(ident.clone().into(), properties));
+            let class = chunk.add_constant(class);
             chunk.write_pair(OpCode::OpClass, class);
 
             let ident = chunk.add_constant(ident.into());
@@ -276,15 +277,27 @@ pub fn expr_to_opcodes(
             lhs_operand,
             rhs_operand,
         } => {
+            // Always evaluate LHS
             expr_to_opcodes(*lhs_operand, chunk, locals, scope);
-            expr_to_opcodes(*rhs_operand, chunk, locals, scope);
+            let rhs_operand = *rhs_operand;
+
+            if let BinOp::Dot = operator {
+                if let Expr::Ident(Ident(ident)) = &rhs_operand   {
+                    let constant = chunk.add_constant(ident.clone().into());
+                    chunk.write_pair(OpCode::OpDot, constant);
+                    return;
+                } else {
+                    unreachable!()
+                }
+            }
+
+            expr_to_opcodes(rhs_operand, chunk, locals, scope);
             match operator {
                 // Arithmetic
                 BinOp::Add => chunk.write(OpCode::OpAdd),
                 BinOp::Sub => chunk.write(OpCode::OpSubstract),
                 BinOp::Mul => chunk.write(OpCode::OpMultiply),
                 BinOp::Div => chunk.write(OpCode::OpDivide),
-
                 // Equality / Comparison
                 BinOp::Eq => chunk.write(OpCode::OpEqual),
                 BinOp::Lt => chunk.write(OpCode::OpLess),
@@ -308,6 +321,8 @@ pub fn expr_to_opcodes(
                 // Logical
                 BinOp::And => chunk.write(OpCode::OpAnd),
                 BinOp::Or => chunk.write(OpCode::OpOr),
+
+                _ => unreachable!()
             }
         }
         Expr::Unary { operator, operand } => {
@@ -357,6 +372,20 @@ pub fn expr_to_opcodes(
 
             chunk.write_pair(OpCode::OpCall, arguments_n);
         }
-        _ => todo!(),
+        Expr::Instance { class, properties } => {
+            let properties_n = properties.len() as u8;
+            for property in properties {
+                if let Stmt::Assign(Ident(name), value) = property {
+                    expr_to_opcodes(value, chunk, locals, scope);
+                    expr_to_opcodes(Expr::Literal(Lit::String(name)), chunk, locals, scope);
+                } else {
+                    unreachable!();
+                }
+            }
+
+            expr_to_opcodes(Expr::Ident(class), chunk, locals, scope);
+            chunk.write_pair(OpCode::OpNew, properties_n);
+        }
+        _ => todo!()
     }
 }

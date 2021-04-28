@@ -1,4 +1,4 @@
-use std::num::NonZeroUsize;
+use std::{collections::HashMap, num::NonZeroUsize};
 
 use crate::scanner::{Token, Tokens};
 use ast::{Ident, UnOp};
@@ -164,11 +164,39 @@ pub fn declare_class_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a
             seq::preceded(tag_token!(Token::Class), ident),
             seq::delimited(
                 tag_token!(Token::LeftBrace),
-                multi::many0(parse_stmt),
+                comb::opt(seq::pair(
+                    declare_property_stmt,
+                    multi::many0(seq::preceded(tag_token!(Token::Comma), declare_property_stmt)),
+                )),
                 tag_token!(Token::RightBrace),
             ),
         )),
-        |(ident, _)| Stmt::DeclareClass { ident },
+        |(ident, properties)| {
+            let properties_items = properties
+                .map(|(h, e)| [&[h], &e[..]].concat().to_vec())
+                .unwrap_or_default();
+
+            let mut properties = HashMap::new();
+            for (Ident(name), Ident(class)) in properties_items.iter() {
+                properties.insert(name.clone(), class.clone());
+            }
+
+            Stmt::DeclareClass { ident, properties }
+        }
+    )
+    .parse(input)
+}
+
+///
+///
+///
+pub fn declare_property_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
+    input: Tokens<'a>
+) -> IResult<Tokens, (Ident, Ident), E> {
+    seq::separated_pair(
+        ident,
+        tag_token!(Token::Colon),
+        ident
     )
     .parse(input)
 }
@@ -478,8 +506,56 @@ fn expr_pratt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 pub fn expr_atom<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
     input: Tokens<'a>
 ) -> IResult<Tokens, Expr, E> {
-    branch::alt((call_expr, literal_expr, unit_expr, ident_expr)).parse(input)
+    branch::alt((instance_expr, call_expr, literal_expr, unit_expr, ident_expr)).parse(input)
 }
+
+///
+///
+///
+pub fn instance_expr<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
+    input: Tokens<'a>
+) -> IResult<Tokens, Expr, E> {
+    comb::map(
+        seq::preceded(
+            tag_token!(Token::New),
+            comb::cut(
+                seq::pair(
+                    ident,
+                    seq::delimited(
+                        tag_token!(Token::LeftBrace),
+                        comb::opt(seq::pair(
+                            instance_property_stmt,
+                            multi::many0(seq::preceded(tag_token!(Token::Comma), instance_property_stmt)),
+                        )),
+                        tag_token!(Token::RightBrace),
+                    )
+                )
+            )
+        ),
+        |(class, properties)| {
+            let properties: Vec<Stmt> = properties
+                .map(|(h, e)| [&[h], &e[..]].concat().to_vec())
+                .unwrap_or_default();
+
+            Expr::Instance { class, properties }
+        },
+    )
+    .parse(input)
+}
+
+///
+///
+///
+pub fn instance_property_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
+    input: Tokens<'a>
+) -> IResult<Tokens, Stmt, E> {
+    comb::map(
+        seq::separated_pair(ident, tag_token!(Token::Assign), expr),
+        |(ident, expr)| Stmt::Assign(ident, expr),
+    )
+    .parse(input)
+}
+
 
 /// Integrate this in pratt parser? To support, e.g., f()()() ?
 ///
@@ -589,6 +665,7 @@ fn binary_operator<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
         comb::map(tag_token!(Token::Plus), |_| BinOp::Add),
         comb::map(tag_token!(Token::Slash), |_| BinOp::Div),
         comb::map(tag_token!(Token::Star), |_| BinOp::Mul),
+        comb::map(tag_token!(Token::Dot), |_| BinOp::Dot),
     ))
     .parse(input)
 }

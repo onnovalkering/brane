@@ -1,4 +1,5 @@
 use semver::Version;
+use std::collections::HashMap;
 
 pub type Program = Block;
 pub type Block = Vec<Stmt>;
@@ -9,6 +10,7 @@ pub enum Stmt {
     Block(Block),
     DeclareClass {
         ident: Ident,
+        properties: HashMap<String, String>,
     },
     DeclareFunc {
         ident: Ident,
@@ -42,23 +44,26 @@ pub enum Stmt {
 #[derive(Clone, Debug)]
 pub enum Expr {
     Array(Vec<Expr>),
-    Call {
-        function: Ident,
-        arguments: Vec<Expr>,
-    },
     Binary {
         operator: BinOp,
         lhs_operand: Box<Expr>,
         rhs_operand: Box<Expr>,
     },
+    Call {
+        function: Ident,
+        arguments: Vec<Expr>,
+    },
     Ident(Ident),
+    Instance {
+        class: Ident,
+        properties: Vec<Stmt>,
+    },
     Unit,
     Index {
         array: Box<Expr>,
         index: Box<Expr>,
     },
     Literal(Lit),
-    Object(Vec<(Lit, Expr)>),
     Unary {
         operator: UnOp,
         operand: Box<Expr>,
@@ -109,6 +114,8 @@ pub enum BinOp {
     Mul,
     /// The `/` operator (division)
     Div,
+    /// The `.` operator (nesting)
+    Dot,
     /// The `&&` operator (logical and)
     And,
     /// The `||` operator (logical or)
@@ -139,6 +146,7 @@ impl BinOp {
             BinOp::Le | BinOp::Ge => (5, 6),    // Comparison
             BinOp::Add | BinOp::Sub => (7, 8),  // Terms
             BinOp::Mul | BinOp::Div => (9, 10), // Factors
+            BinOp::Dot => (13, 14), // Nesting
         }
     }
 }
