@@ -24,5 +24,5 @@ specifications = { path = "../specifications" }
 subprocess = "0.2"
 tokio = { version = "1", features = ["full"] }
 tokio-compat-02 = "0.2"
-tonic = "0.3"
+tonic = "0.4"
 yaml-rust = "0.4"
