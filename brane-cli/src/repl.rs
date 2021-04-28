@@ -120,10 +120,9 @@ impl Validator for ReplHelper {
     ///
     fn validate(
         &self,
-        _ctx: &mut validate::ValidationContext,
+        ctx: &mut validate::ValidationContext,
     ) -> rustyline::Result<validate::ValidationResult> {
-        // self.validator.validate(ctx)
-        Ok(validate::ValidationResult::Valid(None))
+        self.validator.validate(ctx)
     }
 
     ///
@@ -225,16 +224,28 @@ async fn remote_repl(
                 let response = client.execute(request).await?;
                 let mut stream = response.into_inner();
 
-                while let Some(reply) = stream.message().await? {
-                    if !reply.bytecode.is_empty() {
-                        debug!("\n{}", reply.bytecode);
-                    }
-                    if !reply.output.is_empty() {
-                        println!("{}", reply.output);
-                    }
+                #[allow(irrefutable_let_patterns)]
+                while let message = stream.message().await {
+                    match message {
+                        Ok(Some(reply)) => {
+                            if !reply.bytecode.is_empty() {
+                                debug!("\n{}", reply.bytecode);
+                            }
+                            if !reply.output.is_empty() {
+                                println!("{}", reply.output);
+                            }
 
-                    if reply.close {
-                        break;
+                            if reply.close {
+                                break;
+                            }
+                        },
+                        Err(status) => {
+                            eprintln!("\n{}", status.message());
+                            break;
+                        }
+                        Ok(None) => {
+                            break;
+                        }
                     }
                 }
             }
