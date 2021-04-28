@@ -5,7 +5,7 @@ pub mod bytecode;
 pub mod values;
 
 use crate::{bytecode::{Function, OpCode}, values::Instance};
-use crate::values::{Class, Value};
+use crate::values::Value;
 use std::{collections::HashMap, fmt::Write, usize};
 use specifications::package::PackageIndex;
 use specifications::common::Value as SpecValue;
@@ -52,9 +52,14 @@ pub enum VmResult {
 }
 
 impl VM {
-    pub fn new(package_index: PackageIndex, state: Option<VmState>, options: Option<VmOptions>) -> VM {
+    pub fn new<S: Into<String>>(application: S, package_index: PackageIndex, state: Option<VmState>, options: Option<VmOptions>) -> VM {
         let options = options.unwrap_or_default();
         let mut state = state.unwrap_or_default();
+        state.insert(
+            String::from("___application"),
+            Value::String(application.into()),
+        );
+
         state.insert(
             String::from("print"),
             Value::Function(Function::Native {

@@ -93,9 +93,9 @@ impl grpc::DriverService for DriverHandler {
 
             let options = VmOptions { always_return: true };
             let mut vm = if let Some(session) = sessions.get(&request.uuid) {
-                VM::new(package_index.clone(), Some(session.clone()), Some(options))
+                VM::new(&request.uuid, package_index.clone(), Some(session.clone()), Some(options))
             } else {
-                VM::new(package_index.clone(), None, Some(options))
+                VM::new(&request.uuid, package_index.clone(), None, Some(options))
             };
 
             vm.call(function, 0);

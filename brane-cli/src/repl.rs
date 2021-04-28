@@ -276,7 +276,7 @@ async fn local_repl(rl: &mut Editor<ReplHelper>) -> Result<()> {
 
     let mut compiler = Compiler::new(compiler_options, package_index.clone());
     let options = VmOptions { always_return: true };
-    let mut vm = VM::new(package_index, None, Some(options));
+    let mut vm = VM::new("local-repl", package_index, None, Some(options));
 
     let mut count: u32 = 1;
     loop {
