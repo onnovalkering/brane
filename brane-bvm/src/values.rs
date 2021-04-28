@@ -38,6 +38,18 @@ impl Value {
             Value::Integer(value) => SpecValue::Integer(value.clone()),
             Value::Real(value) => SpecValue::Real(value.clone()),
             Value::Unit => SpecValue::Unit,
+            Value::Instance(instance) => {
+                let data_type = instance.class.name.clone();
+                let mut properties: HashMap<String, SpecValue> = HashMap::new();
+                for (key, value) in &instance.fields {
+                    properties.insert(key.clone(), value.as_spec_value());
+                }
+
+                SpecValue::Struct {
+                    data_type,
+                    properties
+                }
+            }
             _ => unreachable!(),
         }
     }
@@ -96,6 +108,15 @@ impl From<SpecValue> for Value {
             SpecValue::Integer(value) => Value::Integer(value.clone()),
             SpecValue::Real(value) => Value::Real(value.clone()),
             SpecValue::Unit => Value::Unit,
+            SpecValue::Struct { data_type, properties } => {
+                let mut fields: HashMap<String, Value> = HashMap::new();
+                for (key, spec_value) in &properties {
+                    fields.insert(key.clone(), Value::from(spec_value.clone()));
+                }
+
+                let class  = Class { name: data_type.clone(), properties: HashMap::new() };
+                Value::Instance(Instance { class, fields })
+            }
             _ => unreachable!(),
         }
     }
