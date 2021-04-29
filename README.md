@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/onnovalkering/brane/develop/contrib/assets/logo.png" alt="logo" width="250"/>
+  <img src="https://raw.githubusercontent.com/onnovalkering/brane/master/contrib/assets/logo.png" alt="logo" width="250"/>
 </p>
 
 # Brane
