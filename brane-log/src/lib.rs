@@ -12,6 +12,7 @@ use tokio::sync::watch::Receiver;
 use std::sync::{Arc, RwLock};
 
 pub mod ingestion;
+pub mod interface;
 pub mod schema;
 
 pub struct Context {

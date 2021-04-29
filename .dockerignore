@@ -1,12 +1,12 @@
 .github/
 brane-api/packages
 brane-api/temporary
-brane-dsl/resources
-brane-exec/resources
+brane-cli/
 brane-ide/extensions/js9/node_modules
+brane-ide/extensions/registry/node_modules
 brane-ide/extensions/renderer/node_modules
-brane-init/
-deployment/
-docs/
+brane-ide/extensions/vault/node_modules
+brane-let/
+brane-log/target
 examples/
 target/

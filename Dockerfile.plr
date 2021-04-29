@@ -1,0 +1,28 @@
+FROM rust:1.50 as build
+
+RUN rustup component add rustfmt
+
+RUN apt-get update && apt-get install -y \
+    cmake \
+ && rm -rf /var/lib/apt/lists/*
+
+# Copy over relevant crates
+COPY ./brane-cfg ./brane-cfg
+COPY ./brane-job ./brane-job
+COPY ./brane-plr ./brane-plr
+
+# Build an optimized binary
+WORKDIR /brane-plr
+RUN cargo build --release
+
+# Define final image
+FROM ubuntu:20.04
+
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+ && rm -rf /var/lib/apt/lists/*
+
+# Copy `brane-plr` from build stage
+COPY --from=build /brane-plr/target/release/brane-plr .
+
+ENTRYPOINT [ "./brane-plr" ]

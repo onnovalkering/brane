@@ -1,8 +1,11 @@
-use crate::interface::{Command, Event, EventKind};
 use anyhow::{Context, Result};
 use base64;
+use bollard::Docker;
+use bollard::container::{Config, CreateContainerOptions, StartContainerOptions};
+use bollard::models::HostConfig;
 use brane_cfg::infrastructure::{Location, LocationCredentials};
 use brane_cfg::{Infrastructure, Secrets};
+use crate::interface::{Command, Event, EventKind};
 use grpcio::Channel;
 use k8s_openapi::api::batch::v1::Job;
 use k8s_openapi::api::core::v1::Namespace;
@@ -17,7 +20,6 @@ use std::convert::TryFrom;
 use std::iter;
 use xenon::compute::{JobDescription, Scheduler};
 use xenon::credentials::Credential;
-use std::process::Command as OsCommand;
 
 // Names of environment variables.
 const BRANE_APPLICATION_ID: &str = "BRANE_APPLICATION_ID";
@@ -75,7 +77,7 @@ pub async fn handle(
             ..
         } => {
             let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address, &mount_dfs)?;
-            handle_local(command, &correlation_id, environment, network)?
+            handle_local(command, &correlation_id, environment, network).await?
         }
         Location::Slurm {
             address,
@@ -319,19 +321,42 @@ fn create_k8s_namespace(namespace: &String) -> Result<Namespace> {
 ///
 ///
 ///
-fn handle_local(
+async fn handle_local(
     command: Command,
     job_id: &String,
     environment: HashMap<String, String>,
     network: String
 ) -> Result<()> {
-    let job_description = create_docker_job_description(&command, &job_id, environment, Some(network))?;
+    let docker = Docker::connect_with_local_defaults()?;
 
-    let process = OsCommand::new("docker")
-        .args(job_description.arguments.unwrap_or_default())
-        .spawn();
+    let name = job_id.clone();
+    let create_options = CreateContainerOptions { name: &name };
 
-    dbg!(&process);
+    let host_config = HostConfig {
+        auto_remove: Some(true),
+        network_mode: Some(network),
+        privileged: Some(true),
+        ..Default::default()
+    };
+
+    let environment = environment
+        .iter()
+        .map(|(key, value)| format!("{}={}", key, value))
+        .collect();
+
+    let create_config = Config {
+        cmd: Some(command.command),
+        env: Some(environment),
+        host_config: Some(host_config),
+        image: Some(command.image.expect("Empty `image` field on CREATE command.")),
+        ..Default::default()
+    };
+
+    // Create and start container
+    docker.create_container(Some(create_options), create_config).await?;
+    docker
+        .start_container(&name, None::<StartContainerOptions<String>>)
+        .await?;
 
     Ok(())
 }

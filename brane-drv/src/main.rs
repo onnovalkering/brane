@@ -31,7 +31,7 @@ use dashmap::DashMap;
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
-    #[clap(short, long, default_value = "brane-api:8080/packages", env = "PACKAGE_INDEX_URL")]
+    #[clap(short, long, default_value = "http://brane-api:8080/packages", env = "PACKAGE_INDEX_URL")]
     package_index_url: String,
     #[clap(short, long, default_value = "127.0.0.1:50053", env = "ADDRESS")]
     /// Service address
@@ -72,10 +72,6 @@ async fn main() -> Result<()> {
     let command_topic = opts.command_topic.clone();
     ensure_topics(vec![&command_topic, &opts.event_topic], &opts.brokers).await?;
 
-    let packages = reqwest::get(&opts.package_index_url).await?.json().await?;
-    let package_index = PackageIndex::from_value(packages)?;
-    dbg!(&package_index);
-
     let producer: FutureProducer = ClientConfig::new()
         .set("bootstrap.servers", &opts.brokers)
         .set("message.timeout.ms", "5000")
@@ -94,9 +90,10 @@ async fn main() -> Result<()> {
         results.clone(),
     ));
 
+    let package_index_url = opts.package_index_url.clone();
     let sessions: Arc<DashMap<String, VmState>> = Arc::new(DashMap::new());
     let handler = DriverHandler {
-        package_index,
+        package_index_url,
         producer,
         command_topic,
         states,
@@ -222,8 +219,10 @@ async fn start_event_monitor(
                             let value: SpecValue = serde_json::from_str(&payload).unwrap();
                             let value = Value::from(value);
 
-                            owned_states.insert(correlation_id.clone(), String::from("finished"));
+                            // Using these two hashmaps is not ideal, they lock and we're dependend on polling (from call future).
+                            // NOTE: for now we have to make sure the results are inserted before the state becomes "finished" to prevent race conditions.
                             owned_results.insert(correlation_id.clone(), value);
+                            owned_states.insert(correlation_id.clone(), String::from("finished"));
                             dbg!(&owned_results);
                         }
                         EventKind::Stopped => {

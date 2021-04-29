@@ -26,7 +26,7 @@ use dashmap::DashMap;
 pub struct DriverHandler {
     pub producer: FutureProducer,
     pub command_topic: String,
-    pub package_index: PackageIndex,
+    pub package_index_url: String,
     pub states: Arc<DashMap<String, String>>,
     pub results: Arc<DashMap<String, Value>>,
     pub sessions: Arc<DashMap<String, VmState>>,
@@ -57,7 +57,8 @@ impl grpc::DriverService for DriverHandler {
         request: Request<grpc::ExecuteRequest>,
     ) -> Result<Response<Self::ExecuteStream>, Status> {
         let request = request.into_inner();
-        let package_index = self.package_index.clone();
+        let packages = reqwest::get(&self.package_index_url).await.unwrap().json().await.unwrap();
+        let package_index = PackageIndex::from_value(packages).unwrap();
         let sessions = self.sessions.clone();
 
         let command_topic = self.command_topic.clone();
@@ -181,7 +182,7 @@ async fn make_function_call(
     }
 
     // TODO: await value to be in states & results.
-    let call = Call { correlation_id, states, results };
+    let call = Call { correlation_id: correlation_id.clone(), states: states.clone(), results: results.clone() };
     Ok(call.await)
 }
 

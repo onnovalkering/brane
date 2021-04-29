@@ -15,10 +15,17 @@ use tokio::sync::watch;
 use warp::Filter;
 use warp::ws::Ws;
 use std::sync::RwLock;
+use std::net::SocketAddr;
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
+    #[clap(short, long, default_value = "127.0.0.1:8081", env = "ADDRESS")]
+    /// Service address
+    address: String,
+    /// Cassandra endpoint
+    #[clap(short, long, default_value = "127.0.0.1", env = "CASSANDRA")]
+    cassandra: String,
     /// Kafka brokers
     #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
     brokers: String,
@@ -32,7 +39,6 @@ struct Opts {
     #[clap(short, long, default_value = "brane-log", env = "GROUP_ID")]
     group_id: String,
 }
-
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -56,7 +62,7 @@ async fn main() -> Result<()> {
     let mut cassanda_cluster = Cluster::default();
     cassanda_cluster.set_load_balance_round_robin();
     cassanda_cluster
-        .set_contact_points("127.0.0.1")
+        .set_contact_points(&opts.cassandra)
         .map_err(|_| anyhow::anyhow!("Failed to append Cassandra contact point."))?;
 
     let cassandra_session = cassanda_cluster
@@ -127,7 +133,8 @@ async fn main() -> Result<()> {
             .and(playground_filter("/graphql", Some("/subscriptions"))))
         .with(log);
 
-    warp::serve(routes).run(([127, 0, 0, 1], 8080)).await;
+    let address: SocketAddr = opts.address.clone().parse()?;
+    warp::serve(routes).run(address).await;
 
     Ok(())
 }

@@ -32,6 +32,8 @@ RUN python setup.py install \
 WORKDIR /
 RUN jupyter labextension install extensions/renderer
 
+RUN rmdir "$HOME/work"
+
 # Mount DFS before starting Jupyter (start-notebook.sh).
 RUN mkdir -p "${HOME}/data" \
  && printf '%s\n' "#!/usr/bin/env bash" >> ./entrypoint.sh \

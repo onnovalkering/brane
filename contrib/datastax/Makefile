@@ -5,7 +5,7 @@ version = 2.16.0
 all: install-dependencies build cleanup
 
 install-dependencies:
-	sudo apt-get install -y \
+	apt-get update && apt-get install -y \
 		build-essential \
 		cmake \
 		git \
@@ -13,7 +13,8 @@ install-dependencies:
 		libssl-dev \
 		zlib1g-dev \
 		libuv1 \
-		libuv1-dev
+		libuv1-dev \
+	&& rm -rf /var/lib/apt/lists/*
 
 build: checkout
 	cd cpp-driver \
@@ -21,11 +22,11 @@ build: checkout
 	&& cd build \
 	&& cmake .. \
 	&& make \
-	&& sudo make install
+	&& make install
 
 checkout:
 	if [ ! -d "./cpp-driver" ]; then \
-		git clone --depth 1 --branch ${version} git@github.com:datastax/cpp-driver.git; \
+		git clone --depth 1 --branch ${version} https://github.com/datastax/cpp-driver.git; \
 	fi
 
 cleanup:

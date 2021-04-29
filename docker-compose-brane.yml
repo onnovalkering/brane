@@ -1,0 +1,103 @@
+version: '3.5'
+
+services:
+  brane-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: always
+    environment:
+        HOST: "0.0.0.0"
+        BROKERS: "kafka:29092"
+        CALLBACK_TOPIC: "clb"
+        DEBUG: "true"
+
+  brane-clb:
+    build:
+      context: .
+      dockerfile: Dockerfile.clb
+    ports:
+      - "127.0.0.1:50052:50052"
+    restart: always
+    environment:
+        ADDRESS: "0.0.0.0:50052"
+        BROKERS: "kafka:29092"
+        CALLBACK_TOPIC: "clb"
+        DEBUG: "true"
+
+  brane-drv:
+    build:
+      context: .
+      dockerfile: Dockerfile.drv
+    ports:
+      - "127.0.0.1:50053:50053"
+    restart: always
+    environment:
+        ADDRESS: "0.0.0.0:50053"
+        BROKERS: "kafka:29092"
+        COMMAND_TOPIC: drv-cmd
+        EVENT_TOPIC: job-evt
+        DEBUG: "true"
+        PACKAGE_INDEX_URL: http://brane-api:8080/packages
+
+  brane-ide:
+    build:
+      context: .
+      dockerfile: Dockerfile.ide
+    ports:
+      - "127.0.0.1:8888:8888"
+    restart: always
+    privileged: true
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+      BRANE_MOUNT_DFS: redis
+
+  brane-job:
+    build:
+      context: .
+      dockerfile: Dockerfile.job
+    restart: always
+    volumes:
+      - ./infra.yml:/infra.yml
+      - ./secrets.yml:/secrets.yml
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+        BROKERS: "kafka:29092"
+        CALLBACK_TOPIC: clb
+        COMMAND_TOPIC: plr-cmd
+        EVENT_TOPIC: job-evt
+        DEBUG: "true"
+        XENON: "xenon:50051"
+
+  brane-log:
+    build:
+      context: .
+      dockerfile: Dockerfile.log
+    ports:
+      - "127.0.0.1:8081:8081"
+    restart: always
+    environment:
+        BROKERS: "kafka:29092"
+        EVENT_TOPIC: job-evt
+        CASSANDRA: cassandra
+
+  brane-plr:
+    build:
+      context: .
+      dockerfile: Dockerfile.plr
+    restart: always
+    volumes:
+      - ./infra.yml:/infra.yml
+      - ./secrets.yml:/secrets.yml
+    environment:
+        BROKERS: "kafka:29092"
+        COMMAND_FROM_TOPIC: drv-cmd
+        COMMAND_TO_TOPIC: plr-cmd
+        DEBUG: "true"
+
+networks:
+  default:
+    external:
+      name: kind

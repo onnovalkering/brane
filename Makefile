@@ -1,80 +1,62 @@
-build: binaries docker
-
+build: build-binaries build-docker
 
 # Build release binaries
-binaries: cli init
+build-binaries: build-cli build-let
 
-cli:
+build-cli:
 	cargo build --release --package brane-cli
 
-init:
-	cargo build --release --package brane-init --target x86_64-unknown-linux-musl
-
-branelet:
+build-let:
 	cargo build --release --package brane-let --target x86_64-unknown-linux-musl
 
-
 # Build Docker images
-docker: api ide loop
+build-images: api clb drv ide job log plr
 
-api:
+build-api-image:
 	docker build -t onnovalkering/brane-api -f Dockerfile.api .
 
-clb:
+build-clb-image:
 	docker build -t onnovalkering/brane-clb -f Dockerfile.clb .
 
-ide:
+build-drv-image:
+	docker build -t onnovalkering/brane-drv -f Dockerfile.drv .
+
+build-ide-image:
 	docker build -t onnovalkering/brane-ide -f Dockerfile.ide .
 
-loop:
-	docker build -t onnovalkering/brane-loop -f Dockerfile.loop .
+build-job-image:
+	docker build -t onnovalkering/brane-job -f Dockerfile.job .
 
-noop:
-	docker build -t onnovalkering/brane-noop -f Dockerfile.noop .
+build-log-image:
+	docker build -t onnovalkering/brane-log -f Dockerfile.log .
+
+build-plr-image:
+	docker build -t onnovalkering/brane-plr -f Dockerfile.plr .
 
 # Development setup
-start: start-services
-	tmux new-session -d -s brane 				&& \
- 	tmux rename-window 'Brane'					&& \
-	tmux send-keys 'make start-loop' 'C-m'		&& \
-	tmux split-window -h						&& \
-	tmux send-keys 'make start-api' 'C-m'		&& \
-	tmux split-window -v						&& \
-	tmux send-keys 'make start-ide' 'C-m'		&& \
-	tmux -2 attach-session -t brane
-
-stop: stop-services
-	tmux select-window -t brane:0				&& \
-	tmux select-pane -t 0 						&& \
-	tmux send-keys 'C-c'						&& \
-	tmux select-pane -t 1 						&& \
-	tmux send-keys 'C-c'						&& \
-	tmux select-pane -t 2 						&& \
-	tmux send-keys 'C-c' 'y' 'C-m'				&& \
-	sleep 1										&& \
-	tmux kill-session -t brane
-
-start-api:
-	cd brane-api && cargo run
-
-start-ide:
-	cd brane-ide && make start
-
-start-loop:
-	cd brane-loop && cargo run
-
-start-services: \
+start: \
 	create-kind-network \
-	docker-compose-up \
-	format-dfs
+	start-support \
+	format-dfs \
+	start-brane
 
-docker-compose-up:
-	docker-compose up -d
+start-support:
+	docker-compose -f docker-compose-support.yml up -d
 
-stop-services:
-	docker-compose down
+start-brane:
+	docker-compose -f docker-compose-brane.yml up -d
 
-restart-services: stop-services start-services
+stop: \
+	stop-support \
+	stop-brane
+
+stop-support:
+	docker-compose -f docker-compose-support.yml down
+
+stop-brane:
+	docker-compose -f docker-compose-brane.yml down
+
+restart: stop start
 
 # Kubernetes in Docker (kind)
 
@@ -83,7 +65,7 @@ install-kind:
 	./contrib/kind/install-kind.sh
 
 create-kind-network:
-	@if [ ! -n "$(shell docker network ls -f name=kind | grep kind)" ]; then \
+	if [ ! -n "$(shell docker network ls -f name=kind | grep kind)" ]; then \
 		docker network create kind; \
 	fi;
 
@@ -94,7 +76,7 @@ delete-kind-cluster:
 	kind delete cluster --name brane
 
 kind-cluster-config:
-	@kind get kubeconfig --name brane | base64
+	@kind get kubeconfig --internal --name brane | base64
 
 # JuiceFS
 
@@ -107,3 +89,11 @@ format-dfs:
 		--bucket http://minio:9000/data \
 		redis \
 		brane
+
+# JupyterLab
+
+jupyterlab-token:
+	@docker logs brane_brane-ide_1 2>&1 \
+	| grep "token=" \
+	| tail -1 \
+	| sed "s#.*token=##"

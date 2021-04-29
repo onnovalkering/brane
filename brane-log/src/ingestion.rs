@@ -2,7 +2,7 @@ use anyhow::{Context as AContext, Result};
 use schema::KeyValuePair;
 use time::{Format, OffsetDateTime};
 use crate::schema;
-use brane_job::interface::{Event, EventKind};
+use crate::interface::{Event, EventKind};
 use cassandra_cpp::Session;
 use futures::stream::StreamExt;
 use log::info;
