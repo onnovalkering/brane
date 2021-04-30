@@ -34,29 +34,33 @@ build-plr-image:
 	docker build -t onnovalkering/brane-plr -f Dockerfile.plr .
 
 # Development setup
-start: \
+start-instance: \
 	create-kind-network \
-	start-support \
+	start-services \
 	format-dfs \
 	start-brane
 
-start-support:
-	docker-compose -f docker-compose-support.yml up -d
+stop-instance: \
+	stop-brane \
+	stop-services
+
+start-services:
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -f docker-compose-svc.yml up -d
+
+stop-services:
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -f docker-compose-svc.yml down
 
 start-brane:
-	docker-compose -f docker-compose-brane.yml up -d
-
-stop: \
-	stop-support \
-	stop-brane
-
-stop-support:
-	docker-compose -f docker-compose-support.yml down
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -f docker-compose-brn.yml up -d
 
 stop-brane:
-	docker-compose -f docker-compose-brane.yml down
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -f docker-compose-brn.yml down
 
-restart: stop start
+start-ide:
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -f docker-compose-ide.yml up -d
+
+stop-ide:
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -f docker-compose-ide.yml down
 
 # Kubernetes in Docker (kind)
 
@@ -81,7 +85,7 @@ kind-cluster-config:
 # JuiceFS
 
 format-dfs:
-	@docker run --network kind onnovalkering/juicefs \
+	docker run --network kind onnovalkering/juicefs \
 		format \
 		--access-key minio \
 		--secret-key minio123 \
@@ -90,7 +94,7 @@ format-dfs:
 		redis \
 		brane
 
-# JupyterLab
+# JupyterLab IDE
 
 jupyterlab-token:
 	@docker logs brane_brane-ide_1 2>&1 \
