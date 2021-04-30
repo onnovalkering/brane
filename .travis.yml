@@ -1,6 +1,5 @@
 language: rust
-os: linux
-dist: bionic
+dist: focal
 
 addons:
   apt:
@@ -11,12 +10,12 @@ addons:
 cache: cargo
 
 before_script:
+  - rustup component add rustfmt
   - cargo install cargo-tarpaulin
+  - cd ./contrib/datastax && sudo make
 
 script:
-  - cargo clean
   - cargo build
-  - cargo test
 
 after_success:
   - cargo tarpaulin --workspace --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
