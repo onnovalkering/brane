@@ -1,0 +1,38 @@
+FROM rust:1.50 as build
+
+RUN rustup component add rustfmt
+
+RUN apt-get update && apt-get install -y \
+    cmake \
+    make \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY ./contrib/datastax /datastax
+
+# Build DataStax driver
+WORKDIR /datastax
+RUN make
+
+# Copy over relevant crates
+COPY ./brane-log /brane-log
+COPY ./brane-cfg /brane-cfg
+
+# Build an optimized binary
+WORKDIR /brane-log
+RUN cargo build --release
+
+# Define final image
+FROM ubuntu:20.04
+
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    libuv1 \
+ && rm -rf /var/lib/apt/lists/*
+
+# Copy `libcassandra` from the build stage
+COPY --from=build /usr/local/lib/x86_64-linux-gnu/* /lib/x86_64-linux-gnu/
+
+# Copy `brane-log from the build stage
+COPY --from=build /brane-log/target/release/brane-log .
+
+ENTRYPOINT [ "./brane-log" ]

@@ -12,7 +12,7 @@ cache: cargo
 before_script:
   - rustup component add rustfmt
   - cargo install cargo-tarpaulin
-  - cd ./contrib/datastax && sudo make
+  - pushd ./contrib/datastax && sudo make && popd
 
 script:
   - cargo build
