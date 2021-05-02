@@ -1,5 +1,5 @@
 # This Docker image will run the Xenon gRPC service.
-# The 'nlesc/xenon-slurm' image can be used for integration testing.
+# The 'onnovalkering/slurm' image can be used for integration testing.
 FROM alpine:3.10
 
 ENV VERSION="3.0.2"

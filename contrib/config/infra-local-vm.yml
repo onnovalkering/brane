@@ -1,0 +1,7 @@
+locations:
+  vm:
+    kind: local
+    network: kind
+    registry: "localhost:5000"
+    callback_to: "http://brane-clb:50052"
+    mount_dfs: "redis://redis"
