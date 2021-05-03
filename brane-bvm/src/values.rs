@@ -12,6 +12,7 @@ pub enum Value {
     Function(Function),
     Class(Class),
     Instance(Instance),
+    Array(Array),
 }
 
 impl fmt::Debug for Value {
@@ -25,6 +26,7 @@ impl fmt::Debug for Value {
             Value::Function(function) => write!(f, "{:?}", function),
             Value::Class(class) => write!(f, "{:?}", class),
             Value::Instance(instance) => write!(f, "{:?}", instance),
+            Value::Array(array) => write!(f, "{:?}", array),
         }
     }
 }
@@ -49,9 +51,25 @@ impl Value {
                     data_type,
                     properties
                 }
+            },
+            Value::Array(array) => {
+                let entries = array.entries.iter().map(|e| e.as_spec_value()).collect();
+                SpecValue::Array { data_type: array.data_type.clone(), entries }
             }
             _ => unreachable!(),
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct Array {
+    pub data_type: String,
+    pub entries: Vec<Value>,
+}
+
+impl fmt::Debug for Array {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "array<{}>", self.data_type)
     }
 }
 
@@ -116,6 +134,11 @@ impl From<SpecValue> for Value {
 
                 let class  = Class { name: data_type.clone(), properties: HashMap::new() };
                 Value::Instance(Instance { class, fields })
+            }
+            SpecValue::Array { data_type, entries } => {
+                let entries = entries.iter().map(|e| Value::from(e.clone())).collect();
+
+                Value::Array(Array { entries, data_type })
             }
             _ => unreachable!(),
         }

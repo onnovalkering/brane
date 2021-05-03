@@ -386,6 +386,14 @@ pub fn expr_to_opcodes(
             expr_to_opcodes(Expr::Ident(class), chunk, locals, scope);
             chunk.write_pair(OpCode::OpNew, properties_n);
         }
-        _ => todo!()
+        Expr::Array(entries) => {
+            let entries_n = entries.len() as u8;
+            for entry in entries {
+                expr_to_opcodes(entry, chunk, locals, scope);
+            }
+
+            chunk.write_pair(OpCode::OpArray, entries_n);
+        },
+        _ => unreachable!()
     }
 }

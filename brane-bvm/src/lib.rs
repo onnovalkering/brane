@@ -2,10 +2,11 @@
 extern crate log;
 
 pub mod bytecode;
+pub mod builtins;
 pub mod values;
 
 use crate::{bytecode::{Function, OpCode}, values::Instance};
-use crate::values::Value;
+use crate::values::{Value, Array};
 use std::{collections::HashMap, fmt::Write, usize};
 use specifications::package::PackageIndex;
 use specifications::common::Value as SpecValue;
@@ -61,13 +62,7 @@ impl VM {
             Value::String(application.into()),
         );
 
-        state.insert(
-            String::from("print"),
-            Value::Function(Function::Native {
-                name: String::from("print"),
-                arity: 1,
-            }),
-        );
+        builtins::register(&mut state);
 
         VM {
             call_frames: Vec::with_capacity(FRAMES_MAX),
@@ -461,14 +456,9 @@ impl VM {
                                 self.stack.push(result);
                             }
                         }
-                        Function::Native { name, .. } => match name.as_str() {
-                            "print" => {
-                                let value = self.stack.pop().unwrap();
-                                println!("{:?}", value);
-                                self.stack.pop();
-                            }
-                            _ => unreachable!(),
-                        },
+                        Function::Native { name, .. } => {
+                            builtins::handle(name, &mut self.stack).unwrap();
+                        }
                         Function::External { name, package, kind, version, parameters } => {
                             let mut arguments: HashMap<String, SpecValue> = HashMap::new();
                             // Reverse order because of stack
@@ -550,6 +540,29 @@ impl VM {
                         panic!("Not a class.");
                     }
                 },
+                OpArray => {
+                    let entries_n = chunk.code[frame.ip];
+                    frame.ip = frame.ip + 1;
+
+                    let entries: Vec<Value> = (0..entries_n).map(|_| { self.stack.pop().unwrap() }).rev().collect();
+
+                    if entries.is_empty() {
+                        self.stack.push(Value::Array(Array { data_type: String::from("unit"), entries }));
+                    } else {
+                        let data_type = match entries.get(0).unwrap() {
+                            Value::String(_) => String::from("string"),
+                            Value::Real(_) => String::from("real"),
+                            Value::Integer(_) => String::from("integer"),
+                            Value::Boolean(_) => String::from("boolean"),
+                            Value::Array(array) => format!("{}[]", array.data_type.clone()),
+                            Value::Instance(instance) => instance.class.name.clone(),
+                            Value::Class(_) | Value::Function(_) => todo!(),
+                            Value::Unit => String::from("unit"),
+                        };
+
+                        self.stack.push(Value::Array(Array { data_type, entries }));
+                    }
+                }
                 OpDot => {
                     let target = self.stack.pop();
 

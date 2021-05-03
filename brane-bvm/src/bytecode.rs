@@ -30,7 +30,7 @@ pub enum OpCode {
     OpJump,
     OpAnd,
     OpOr,
-    OpJumpBack, // Allow negative operand for OpJump instead?
+    OpJumpBack,
     OpSetLocal,
     OpSetGlobal,
     OpCall,
@@ -38,6 +38,7 @@ pub enum OpCode {
     OpImport,
     OpNew,
     OpDot,
+    OpArray,
 }
 
 impl Into<u8> for OpCode {
@@ -79,6 +80,7 @@ impl From<u8> for OpCode {
             0x1C => OpCode::OpImport,
             0x1D => OpCode::OpNew,
             0x1E => OpCode::OpDot,
+            0x1F => OpCode::OpArray,
             _ => {
                 panic!("ERROR: not a OpCode: {}", byte);
             }
@@ -209,6 +211,10 @@ impl Chunk {
                 OpCode::OpUnit => { writeln!(result, "OP_UNIT")?; }
                 OpCode::OpDot => {
                     constant_instruction("OP_DOT", &self, offset, &mut result);
+                    skip = 1;
+                }
+                OpCode::OpArray => {
+                    byte_instruction("OP_ARRAY", &self, offset, &mut result);
                     skip = 1;
                 }
                 OpCode::OpNew => {
