@@ -65,6 +65,7 @@ pub async fn test_generic(
     let image_file = Some(package_dir.join("image.tar"));
 
     let command = vec![
+        String::from("-d"),
         String::from("--application-id"),
         String::from("test"),
         String::from("--location-id"),
