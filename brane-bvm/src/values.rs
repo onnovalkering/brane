@@ -69,7 +69,7 @@ pub struct Array {
 
 impl fmt::Debug for Array {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "array<{}>", self.data_type)
+        write!(f, "{}", self.data_type)
     }
 }
 

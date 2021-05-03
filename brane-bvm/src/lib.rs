@@ -547,19 +547,20 @@ impl VM {
                     let entries: Vec<Value> = (0..entries_n).map(|_| { self.stack.pop().unwrap() }).rev().collect();
 
                     if entries.is_empty() {
-                        self.stack.push(Value::Array(Array { data_type: String::from("unit"), entries }));
+                        self.stack.push(Value::Array(Array { data_type: String::from("unit[]"), entries }));
                     } else {
                         let data_type = match entries.get(0).unwrap() {
                             Value::String(_) => String::from("string"),
                             Value::Real(_) => String::from("real"),
                             Value::Integer(_) => String::from("integer"),
                             Value::Boolean(_) => String::from("boolean"),
-                            Value::Array(array) => format!("{}[]", array.data_type.clone()),
+                            Value::Array(array) => array.data_type.clone(),
                             Value::Instance(instance) => instance.class.name.clone(),
                             Value::Class(_) | Value::Function(_) => todo!(),
                             Value::Unit => String::from("unit"),
                         };
 
+                        let data_type = format!("{}[]", data_type);
                         self.stack.push(Value::Array(Array { data_type, entries }));
                     }
                 }

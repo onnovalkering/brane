@@ -69,13 +69,13 @@ pub fn handle(name: String, stack: &mut Vec<Value>) -> Result<()> {
             if let Value::String(value) = value {
                 if let Value::String(seperator) = seperator {
                     let entries = value.split(&seperator).map(|e| Value::String(e.to_string())).collect();
-                    stack.push(Value::Array(Array { entries, data_type: String::from("string")}));
+                    stack.push(Value::Array(Array { entries, data_type: String::from("string[]")}));
 
                     return Ok(());
                 }
             }
 
-            stack.push(Value::Array(Array { entries: vec!(), data_type: String::from("string")}))
+            stack.push(Value::Array(Array { entries: vec!(), data_type: String::from("string[]")}))
         },
         _ => unreachable!(),
     }
