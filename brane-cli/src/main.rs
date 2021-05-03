@@ -85,7 +85,7 @@ enum SubCommand {
         #[structopt(name = "NAME", help = "Name of the package")]
         name: String,
         #[structopt(name = "VERSION", help = "Version of the package")]
-        version: Option<String>,
+        version: String,
     },
 
     #[structopt(name = "push", about = "Push a package to a registry")]

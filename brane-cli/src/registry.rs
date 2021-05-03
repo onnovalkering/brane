@@ -98,10 +98,8 @@ pub fn logout() -> Result<()> {
 ///
 pub async fn pull(
     name: String,
-    version: Option<String>,
+    version: String,
 ) -> Result<()> {
-    let version = version.expect("please provide version");
-
     let url = get_registry_endpoint(format!("/{}/{}/archive", name, version))?;
     let mut package_archive = reqwest::get(&url).await?;
 
