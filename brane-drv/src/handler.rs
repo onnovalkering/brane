@@ -147,7 +147,7 @@ async fn make_function_call(
 ) -> Result<Value> {
     let image = format!("{}:{}", call.package, call.version);
     let command = vec![
-        String::from("code"),
+        call.kind.to_string(),
         call.function.to_string(),
         base64::encode(serde_json::to_string(&call.arguments)?),
     ];

@@ -22,7 +22,6 @@ use rdkafka::{
     Message as _
 };
 use tonic::transport::Server;
-use specifications::package::PackageIndex;
 use specifications::common::Value as SpecValue;
 use std::sync::Arc;
 use dashmap::DashMap;

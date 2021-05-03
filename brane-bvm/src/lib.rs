@@ -39,6 +39,7 @@ pub struct VmOptions {
 #[derive(Clone, Debug)]
 pub struct VmCall {
     pub package: String,
+    pub kind: String,
     pub version: String,
     pub function: String,
     pub arguments: HashMap<String, SpecValue>,
@@ -308,8 +309,6 @@ impl VM {
                 }
                 OpReturn => {
                     let result = self.stack.pop();
-                    dbg!(&result);
-
                     self.call_frames.pop();
                     // if self.call_frames.is_empty() {
                     //     return VmResult::Ok(None);
@@ -470,9 +469,10 @@ impl VM {
                             }
                             _ => unreachable!(),
                         },
-                        Function::External { name, package, version, parameters } => {
+                        Function::External { name, package, kind, version, parameters } => {
                             let mut arguments: HashMap<String, SpecValue> = HashMap::new();
-                            for p in parameters.iter() {
+                            // Reverse order because of stack
+                            for p in parameters.iter().rev() {
                                 arguments.insert(p.name.clone(), self.stack.pop().unwrap().as_spec_value());
                             }
 
@@ -482,6 +482,7 @@ impl VM {
                             let call = VmCall {
                                 package,
                                 version,
+                                kind,
                                 function: name,
                                 arguments,
                             };
@@ -499,14 +500,20 @@ impl VM {
 
                     if let Some(Value::String(package_name)) = chunk.constants.get(constant as usize) {
                         if let Some(package) = self.package_index.get(package_name, None) {
+                            let kind = match package.kind.as_str() {
+                                "ecu" => String::from("code"),
+                                "oas" => String::from("oas"),
+                                _ => unreachable!(),
+                            };
+
                             if let Some(functions) = &package.functions {
                                 for (name, function) in functions {
-
                                     self.state.insert(
                                         name.clone(),
                                         Value::Function(Function::External {
                                             package: package_name.clone(),
                                             version: package.version.clone(),
+                                            kind: kind.clone(),
                                             name: name.clone(),
                                             parameters: function.parameters.clone(),
                                         }),

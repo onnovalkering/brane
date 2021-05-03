@@ -1,0 +1,28 @@
+---
+created: "2021-05-03T12:23:06.912922350Z"
+functions:
+  getreadme:
+    parameters:
+      - type: string
+        name: owner
+        optional: false
+      - type: string
+        name: repo
+        optional: false
+    pattern:
+      prefix: getreadme
+    returnType: GetreadmeOutput
+id: a9d05bbd-8f7c-4dcc-85e5-68eb66d39b99
+kind: oas
+name: github
+types:
+  GetreadmeOutput:
+    name: GetreadmeOutput
+    properties:
+      - type: string
+        name: name
+        optional: true
+      - type: string
+        name: content
+        optional: true
+version: 1.0.0

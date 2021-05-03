@@ -57,15 +57,6 @@ services:
       - "127.0.0.1:5000:5000"
     restart: always
 
-  slurm:
-    build:
-      context: .
-      dockerfile: Dockerfile.slurm
-    privileged: true
-    ports:
-      - "127.0.0.1:10022:22"
-    restart: always
-
   xenon:
     image: onnovalkering/xenon-grpc
     ports:

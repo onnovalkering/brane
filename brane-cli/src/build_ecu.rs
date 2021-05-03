@@ -58,7 +58,7 @@ pub fn handle(
     build_docker_image(&package_dir, tag)?;
 
     println!(
-        "Successfully built version {} of ECU package {}.",
+        "Successfully built version {} of container (ECU) package {}.",
         style(&package_info.version).bold().cyan(),
         style(&package_info.name).bold().cyan(),
     );

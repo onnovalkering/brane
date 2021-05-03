@@ -3,10 +3,13 @@ use base64;
 use bollard::Docker;
 use bollard::container::{Config, CreateContainerOptions, StartContainerOptions};
 use bollard::models::HostConfig;
+use bollard::image::CreateImageOptions;
 use brane_cfg::infrastructure::{Location, LocationCredentials};
 use brane_cfg::{Infrastructure, Secrets};
 use crate::interface::{Command, Event, EventKind};
 use grpcio::Channel;
+use futures_util::stream::TryStreamExt;
+use futures_util::StreamExt;
 use k8s_openapi::api::batch::v1::Job;
 use k8s_openapi::api::core::v1::Namespace;
 use kube::api::{Api, PostParams};
@@ -329,6 +332,9 @@ async fn handle_local(
 ) -> Result<()> {
     let docker = Docker::connect_with_local_defaults()?;
 
+    let image = command.image.expect("Empty `image` field on CREATE command.");
+    ensure_image(&docker, &image).await?;
+
     let name = job_id.clone();
     let create_options = CreateContainerOptions { name: &name };
 
@@ -348,7 +354,7 @@ async fn handle_local(
         cmd: Some(command.command),
         env: Some(environment),
         host_config: Some(host_config),
-        image: Some(command.image.expect("Empty `image` field on CREATE command.")),
+        image: Some(image),
         ..Default::default()
     };
 
@@ -357,6 +363,29 @@ async fn handle_local(
     docker
         .start_container(&name, None::<StartContainerOptions<String>>)
         .await?;
+
+    Ok(())
+}
+
+///
+///
+///
+async fn ensure_image(
+    docker: &Docker,
+    image: &String,
+) -> Result<()> {
+    // Abort, if image is already loaded
+    if docker.inspect_image(image).await.is_ok() {
+        debug!("Image already exists in Docker deamon.");
+        return Ok(());
+    }
+
+    let options = Some(CreateImageOptions {
+        from_image: image.clone(),
+        ..Default::default()
+    });
+
+    docker.create_image(options, None, None).try_collect::<Vec<_>>().await?;
 
     Ok(())
 }

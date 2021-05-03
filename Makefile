@@ -41,6 +41,7 @@ start-instance: \
 	start-brane
 
 stop-instance: \
+	stop-ide \
 	stop-brane \
 	stop-services
 
@@ -81,6 +82,16 @@ delete-kind-cluster:
 
 kind-cluster-config:
 	@kind get kubeconfig --internal --name brane | base64
+
+# Slurm
+
+start-slurm: create-kind-network
+	docker run --rm -dt \
+		--privileged \
+		--network kind \
+		--name slurm \
+		-p 127.0.0.1:10022:22 \
+		onnovalkering/slurm
 
 # JuiceFS
 

@@ -8,15 +8,12 @@ use dialoguer::{Input as Prompt, Select};
 use serde::de::DeserializeOwned;
 use specifications::common::{Function, Parameter, Type, Value};
 use specifications::package::PackageInfo;
-use std::env;
-use std::fs;
 use std::path::PathBuf;
 use std::{
     fmt::{Debug, Display},
     str::FromStr,
 };
-use url::Url;
-use uuid::Uuid;
+use std::fs;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -29,6 +26,7 @@ const UNSUPPORTED_PACKAGE_KIND: &str = "Package kind not supported.";
 pub async fn handle(
     name: String,
     version: Option<String>,
+    data: Option<PathBuf>,
 ) -> Result<()> {
     let version_or_latest = version.unwrap_or_else(|| String::from("latest"));
     let package_dir = packages::get_package_dir(&name, Some(&version_or_latest))?;
@@ -38,9 +36,8 @@ pub async fn handle(
 
     let package_info = PackageInfo::from_path(package_dir.join("package.yml"))?;
     let output = match package_info.kind.as_str() {
-        "cwl" => test_cwl(package_dir, package_info).await?,
-        "ecu" => test_ecu(package_dir, package_info).await?,
-        "oas" => test_oas(package_dir, package_info).await?,
+        "ecu" => test_generic("code", package_dir, package_info, data).await?,
+        "oas" => test_generic("oas", package_dir, package_info, data).await?,
         _ => {
             return Err(anyhow!(UNSUPPORTED_PACKAGE_KIND));
         }
@@ -51,96 +48,14 @@ pub async fn handle(
     Ok(())
 }
 
-fn url_to_path(url: &Url) -> Result<PathBuf> {
-    Ok(PathBuf::from(url.path()))
-}
-
 ///
 ///
 ///
-async fn test_cwl(
+pub async fn test_generic(
+    package_kind: &str,
     package_dir: PathBuf,
     package_info: PackageInfo,
-) -> Result<Value> {
-    let functions = package_info.functions.unwrap();
-    let types = package_info.types.unwrap_or_default();
-    let (function, arguments) = prompt_for_input(&functions, &types)?;
-
-    let image = format!("{}:{}", package_info.name, package_info.version);
-    let image_file = Some(package_dir.join("image.tar"));
-
-    let mut mounts = vec![
-        String::from("/var/run/docker.sock:/var/run/docker.sock"),
-        String::from("/tmp:/tmp"),
-    ];
-
-    let input = arguments.get("input").expect("Missing `input` argument");
-    if let Value::Struct { properties, .. } = input {
-        for (_, value) in properties.iter() {
-            match value {
-                Value::Array { data_type, entries } => {
-                    if data_type == "Directory[]" || data_type == "File[]" {
-                        for entry in entries {
-                            if let Value::Struct { properties, .. } = entry {
-                                let url = properties
-                                    .get("url")
-                                    .expect(&format!("Missing `url` property on {}", data_type));
-                                let path = url_to_path(&Url::parse(&url.as_string()?)?)?;
-
-                                mounts.push(format!("{0}:{0}", path.into_os_string().to_string_lossy()));
-                            }
-                        }
-                    }
-                }
-                Value::Struct { data_type, properties } => {
-                    if data_type == "Directory" || data_type == "File" {
-                        let url = properties
-                            .get("url")
-                            .expect(&format!("Missing `url` property on {}", data_type));
-                        let path = url_to_path(&Url::parse(&url.as_string()?)?)?;
-
-                        mounts.push(format!("{0}:{0}", path.into_os_string().to_string_lossy()));
-                    }
-                }
-                _ => continue,
-            }
-        }
-    }
-
-    let mut output_dir = env::temp_dir();
-    output_dir.push(format!("{}", Uuid::new_v4()));
-    fs::create_dir(&output_dir)?;
-
-    debug!("Mounts: {:#?}", mounts);
-
-    let command = vec![
-        String::from("-d"),
-        String::from("cwl"),
-        String::from("-o"),
-        String::from(output_dir.as_os_str().to_string_lossy()),
-        function,
-        base64::encode(serde_json::to_string(&arguments)?),
-    ];
-
-    debug!("{:?}", command);
-
-    let exec = ExecuteInfo::new(image, image_file, Some(mounts), Some(command));
-
-    let (stdout, stderr) = docker::run_and_wait(exec).await?;
-    if stderr.len() > 0 {
-        warn!("{}", stderr);
-    }
-
-    debug!("stdout: {}", stdout);
-    Ok(serde_json::from_str(&stdout)?)
-}
-
-///
-///
-///
-async fn test_ecu(
-    package_dir: PathBuf,
-    package_info: PackageInfo,
+    data: Option<PathBuf>,
 ) -> Result<Value> {
     let functions = package_info.functions.unwrap();
     let types = package_info.types.unwrap_or_default();
@@ -156,12 +71,23 @@ async fn test_ecu(
         String::from("localhost"),
         String::from("--job-id"),
         String::from("1"),
-        String::from("code"),
+        package_kind.to_string(),
         function,
         base64::encode(serde_json::to_string(&arguments)?),
     ];
 
-    let exec = ExecuteInfo::new(image, image_file, None, Some(command));
+    let mounts = if let Some(data) = data {
+        let data = fs::canonicalize(data)?;
+        if data.exists() {
+            Some(vec![format!("{}:/data", data.into_os_string().into_string().unwrap())])
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let exec = ExecuteInfo::new(image, image_file, mounts, Some(command));
 
     let (stdout, stderr) = docker::run_and_wait(exec).await?;
     debug!("stderr: {}", stderr);
@@ -175,39 +101,6 @@ async fn test_ecu(
             Ok(Value::Unit)
         }
     }
-}
-
-///
-///
-///
-async fn test_oas(
-    package_dir: PathBuf,
-    package_info: PackageInfo,
-) -> Result<Value> {
-    let functions = package_info.functions.unwrap();
-    let types = package_info.types.unwrap_or_default();
-    let (function, arguments) = prompt_for_input(&functions, &types)?;
-
-    let image = format!("{}:{}", package_info.name, package_info.version);
-    let image_file = Some(package_dir.join("image.tar"));
-
-    let command = vec![
-        String::from("oas"),
-        function,
-        base64::encode(serde_json::to_string(&arguments)?),
-    ];
-
-    debug!("{:?}", command);
-
-    let exec = ExecuteInfo::new(image, image_file, None, Some(command));
-
-    let (stdout, stderr) = docker::run_and_wait(exec).await?;
-    if stderr.len() > 0 {
-        warn!("{}", stderr);
-    }
-
-    debug!("stdout: {}", stdout);
-    Ok(serde_json::from_str(&stdout)?)
 }
 
 ///

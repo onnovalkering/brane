@@ -88,7 +88,7 @@ impl From<u8> for OpCode {
 
 #[derive(Clone)]
 pub enum Function {
-    External { package: String, version: String, name: String, parameters: Vec<Parameter>, },
+    External { package: String, version: String, kind: String, name: String, parameters: Vec<Parameter>, },
     Native { name: String, arity: u8 },
     UserDefined { name: String, arity: u8, chunk: Chunk },
 }

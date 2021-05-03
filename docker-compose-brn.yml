@@ -42,18 +42,6 @@ services:
         DEBUG: "true"
         PACKAGE_INDEX_URL: http://brane-api:8080/packages
 
-  brane-ide:
-    build:
-      context: .
-      dockerfile: Dockerfile.ide
-    ports:
-      - "127.0.0.1:8888:8888"
-    restart: always
-    privileged: true
-    environment:
-      JUPYTER_ENABLE_LAB: "yes"
-      BRANE_MOUNT_DFS: redis
-
   brane-job:
     build:
       context: .

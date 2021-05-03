@@ -78,7 +78,6 @@ impl Compiler {
 
                 match parser::parse_ast(tokens) {
                     Ok((_, program)) => {
-                        dbg!(&program);
                         generator::compile(program)
                     }
                     Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
@@ -161,8 +160,6 @@ pub fn convert_parser_error(
                 }
             }
             VerboseErrorKind::Nom(nom::error::ErrorKind::Tag) => {
-                dbg!(&tokens);
-
                 let mismatch = tokens.tok[0].inner();
                 let line = String::from_utf8(mismatch.get_line_beginning().to_vec()).unwrap();
                 let line_number = mismatch.location_line();

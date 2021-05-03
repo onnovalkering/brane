@@ -7,7 +7,6 @@ extern crate prettytable;
 #[macro_use]
 extern crate lazy_static;
 
-pub mod build_cwl;
 pub mod build_ecu;
 pub mod build_oas;
 pub mod docker;

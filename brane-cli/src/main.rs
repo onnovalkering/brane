@@ -2,7 +2,7 @@
 extern crate human_panic;
 
 use anyhow::Result;
-use brane_cli::{build_cwl, build_ecu, build_oas, packages, registry, repl, run, test};
+use brane_cli::{build_ecu, build_oas, packages, registry, repl, run, test};
 use dotenv::dotenv;
 use git2::Repository;
 use log::LevelFilter;
@@ -130,6 +130,8 @@ enum SubCommand {
         name: String,
         #[structopt(short, long, help = "Version of the package")]
         version: Option<String>,
+        #[structopt(short, long, help = "The directory to mount as /data")]
+        data: Option<PathBuf>,
     },
 
     #[structopt(name = "search", about = "Search a registry for packages")]
@@ -206,7 +208,6 @@ async fn run(options: CLI) -> Result<()> {
             };
 
             match kind.as_str() {
-                "cwl" => build_cwl::handle(context, file, init)?,
                 "ecu" => build_ecu::handle(context, file, init)?,
                 "oas" => build_oas::handle(context, file, init)?,
                 _ => println!("Unsupported package kind: {}", kind),
@@ -241,7 +242,6 @@ async fn run(options: CLI) -> Result<()> {
             };
 
             match kind.as_str() {
-                "cwl" => build_cwl::handle(context, file, init)?,
                 "ecu" => build_ecu::handle(context, file, init)?,
                 "oas" => build_oas::handle(context, file, init)?,
                 _ => println!("Unsupported package kind: {}", kind),
@@ -278,8 +278,8 @@ async fn run(options: CLI) -> Result<()> {
         Run { file, secrets } => {
             run::handle(file, secrets).await?;
         }
-        Test { name, version } => {
-            test::handle(name, version).await?;
+        Test { name, version, data } => {
+            test::handle(name, version, data).await?;
         }
         Search { term } => {
             registry::search(term).await?;

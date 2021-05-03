@@ -1,6 +1,7 @@
 use anyhow::{ensure, Context, Result};
 use brane_let::callback::Callback;
 use brane_let::exec_code;
+use brane_let::exec_oas;
 use brane_let::redirector;
 use clap::Clap;
 use dotenv::dotenv;
@@ -50,6 +51,16 @@ enum SubCommand {
     /// Don't perform any operation and return nothing
     #[clap(name = "no-op")]
     NoOp,
+    /// Call a Web API and return output
+    #[clap(name = "oas")]
+    WebApi {
+        /// Function to execute
+        function: String,
+        /// Input arguments
+        arguments: String,
+        #[clap(short, long, env = "BRANE_WORKDIR", default_value = "/opt/wd")]
+        working_dir: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -142,6 +153,11 @@ async fn run(
 
             Ok(Value::Unit)
         }
+        SubCommand::WebApi {
+            function,
+            arguments,
+            working_dir,
+        } => exec_oas::handle(function, decode_b64(arguments)?, working_dir, &mut callback.as_mut()).await,
     };
 
     // Perform final FINISHED callback.

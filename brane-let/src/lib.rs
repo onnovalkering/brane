@@ -5,4 +5,5 @@ extern crate log;
 
 pub mod callback;
 pub mod exec_code;
+pub mod exec_oas;
 pub mod redirector;
