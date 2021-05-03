@@ -1,8 +1,0 @@
-import github;
-import base64;
-
-let owner := "onnovalkering";
-let repo := "brane";
-
-let readme := getreadme(owner, repo);
-return decode(readme.content);

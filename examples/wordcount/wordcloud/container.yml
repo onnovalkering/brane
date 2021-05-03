@@ -1,10 +1,14 @@
-name: base64
+name: wordcloud
 version: 1.0.0
 kind: compute
 
 dependencies:
   - python3
+  - python3-pip
   - python3-yaml
+
+install:
+  - pip3 install wordcloud
 
 files:
   - run.py
@@ -14,24 +18,18 @@ entrypoint:
   exec: run.py
 
 actions:
-  'decode':
+  'create':
     command:
       args:
-        - decode
-    input:
-      - type: string
-        name: input
-    output:
-      - type: string
-        name: output
+        - create
 
-  'encode':
-    command:
-      args:
-        - encode
     input:
+      - type: string[]
+        name: words
+
       - type: string
-        name: input
+        name: file
+
     output:
       - type: string
         name: output
