@@ -39,6 +39,7 @@ pub enum OpCode {
     OpNew,
     OpDot,
     OpArray,
+    OpIndex,
 }
 
 impl Into<u8> for OpCode {
@@ -81,6 +82,7 @@ impl From<u8> for OpCode {
             0x1D => OpCode::OpNew,
             0x1E => OpCode::OpDot,
             0x1F => OpCode::OpArray,
+            0x20 => OpCode::OpIndex,
             _ => {
                 panic!("ERROR: not a OpCode: {}", byte);
             }
@@ -209,6 +211,7 @@ impl Chunk {
                 OpCode::OpSubstract => { writeln!(result, "OP_SUBSTRACT")?; }
                 OpCode::OpTrue => { writeln!(result, "OP_TRUE")?; }
                 OpCode::OpUnit => { writeln!(result, "OP_UNIT")?; }
+                OpCode::OpIndex => { writeln!(result, "OP_INDEX")?; }
                 OpCode::OpDot => {
                     constant_instruction("OP_DOT", &self, offset, &mut result);
                     skip = 1;

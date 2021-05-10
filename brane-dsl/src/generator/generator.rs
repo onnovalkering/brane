@@ -1,6 +1,7 @@
 use crate::parser::ast::*;
 use anyhow::Result;
 use brane_bvm::{bytecode::{Chunk, Function, OpCode}, values::{Class, Value}};
+use log::debug;
 
 #[derive(Debug, Clone)]
 pub struct Local {
@@ -388,12 +389,17 @@ pub fn expr_to_opcodes(
         }
         Expr::Array(entries) => {
             let entries_n = entries.len() as u8;
-            for entry in entries {
-                expr_to_opcodes(entry, chunk, locals, scope);
+            for entry in entries.iter().rev() {
+                expr_to_opcodes(entry.clone(), chunk, locals, scope);
             }
 
             chunk.write_pair(OpCode::OpArray, entries_n);
         },
-        _ => unreachable!()
+        Expr::Index { array, index } => {
+            expr_to_opcodes(*array, chunk, locals, scope);
+            expr_to_opcodes(*index, chunk, locals, scope);
+
+            chunk.write(OpCode::OpIndex);
+        },
     }
 }

@@ -588,6 +588,25 @@ impl VM {
                         warn!("Not an instance!");
                         return VmResult::RuntimeError;
                     }
+                },
+                OpIndex => {
+                    let index = self.stack.pop().expect("Empty stack while expecting `index` value.");
+                    let array = self.stack.pop().expect("Empty stack while expecting `array` value.");
+
+                    if let Value::Integer(index) = index {
+                        if let Value::Array(array) = array {
+                            let entries = array.entries;
+                            dbg!(&entries);
+
+                            if let Some(entry) = entries.get(index as usize) {
+                                self.stack.push(entry.clone());
+                            } else {
+                                return VmResult::RuntimeError;
+                            }
+                        } else {
+                            return VmResult::RuntimeError;
+                        }
+                    }
                 }
             }
         }
