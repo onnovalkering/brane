@@ -13,8 +13,7 @@ install-dependencies:
 		libssl-dev \
 		zlib1g-dev \
 		libuv1 \
-		libuv1-dev \
-	&& rm -rf /var/lib/apt/lists/*
+		libuv1-dev
 
 build: checkout
 	cd cpp-driver \
