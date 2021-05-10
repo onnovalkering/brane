@@ -5,7 +5,7 @@ VERSION="1.20.5"
 LOCAL_BIN="$HOME/.local/bin"
 
 if [ ! -d $LOCAL_BIN ]; then
-    mkidr -p $LOCAL_BIN
+    mkdir -p $LOCAL_BIN
 fi
 
 curl -LO "https://storage.googleapis.com/kubernetes-release/release/v$VERSION/bin/linux/amd64/kubectl"

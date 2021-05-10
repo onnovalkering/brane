@@ -5,7 +5,7 @@ VERSION="0.10.0"
 LOCAL_BIN="$HOME/.local/bin"
 
 if [ ! -d $LOCAL_BIN ]; then
-    mkidr -p $LOCAL_BIN
+    mkdir -p $LOCAL_BIN
 fi
 
 curl -LO "https://github.com/kubernetes-sigs/kind/releases/download/v$VERSION/kind-linux-amd64"
