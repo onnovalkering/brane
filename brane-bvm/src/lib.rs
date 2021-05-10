@@ -596,8 +596,6 @@ impl VM {
                     if let Value::Integer(index) = index {
                         if let Value::Array(array) = array {
                             let entries = array.entries;
-                            dbg!(&entries);
-
                             if let Some(entry) = entries.get(index as usize) {
                                 self.stack.push(entry.clone());
                             } else {
