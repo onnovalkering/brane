@@ -12,12 +12,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v2
         with:
           fetch-depth: 1
 
       - name: Install dependencies
-        run: sudo apt-get install -y libpq-dev libssl-dev
+        run: sudo apt-get install -y libpq-dev libssl-dev musl-tools
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.52.0
+            override: true
+            components: rustfmt, clippy
 
       - name: Build and install `libcassandra`
         run: cd ./contrib/datastax && sudo make

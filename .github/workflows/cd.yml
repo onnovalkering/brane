@@ -20,12 +20,12 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: stable
+            toolchain: 1.52.0
             target: x86_64-unknown-linux-musl
             override: true
 
-      - name: Run unit tests (optimized)
-        run: cargo test -v --lib --release
+      - name: Build and install `libcassandra`
+        run: cd ./contrib/datastax && sudo make
 
       - name: Build binaries (optimized)
         run: |
