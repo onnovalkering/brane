@@ -49,6 +49,7 @@ pub enum Expr {
         lhs_operand: Box<Expr>,
         rhs_operand: Box<Expr>,
     },
+    CallPattern(Vec<Expr>),
     Call {
         function: Ident,
         arguments: Vec<Expr>,

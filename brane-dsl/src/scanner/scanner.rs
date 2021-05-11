@@ -88,7 +88,7 @@ fn operator<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a
 ///
 ///
 ///
-fn punctuation<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(i: Span<'a>) -> IResult<Span<'a>, Token, E> {
+fn punctuation<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>) -> IResult<Span<'a>, Token, E> {
     ws0(branch::alt((
         comb::map(bc::tag("("), |s| Token::LeftParen(s)),
         comb::map(bc::tag(")"), |s| Token::RightParen(s)),
@@ -101,20 +101,21 @@ fn punctuation<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(i: Span<'a>
         comb::map(bc::tag("{"), |s| Token::LeftBrace(s)),
         comb::map(bc::tag("}"), |s| Token::RightBrace(s)),
     )))
-    .parse(i)
+    .parse(input)
 }
 
 ///
 ///
 ///
 fn identifier<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>) -> IResult<Span<'a>, Token, E> {
-    comb::map(
+    ws0(comb::map(
         comb::recognize(seq::pair(
             branch::alt((cc::alpha1, bc::tag("_"))),
             multi::many0(branch::alt((cc::alphanumeric1, bc::tag("_")))),
         )),
         |s| Token::Ident(s),
-    )(input)
+    ))
+    .parse(input)
 }
 
 ///
