@@ -5,7 +5,7 @@ use brane_bvm::bytecode::Function;
 use brane_bvm::{values::Value, VmOptions};
 use brane_bvm::{VmCall, VmResult, VM};
 use brane_drv::grpc::{CreateSessionRequest, DriverServiceClient, ExecuteRequest};
-use brane_dsl::{Compiler, CompilerOptions};
+use brane_dsl::{Compiler, CompilerOptions, Lang};
 use rustyline::completion::{Completer, FilenameCompleter, Pair};
 use rustyline::config::OutputStreamType;
 use rustyline::error::ReadlineError;
@@ -146,6 +146,7 @@ fn get_history_file() -> PathBuf {
 ///
 ///
 pub async fn start(
+    bakery: bool,
     clear: bool,
     remote: Option<String>,
     attach: Option<String>,
@@ -177,9 +178,9 @@ pub async fn start(
     println!("Welcome to the Brane REPL, press Ctrl+D to exit.\n");
 
     if let Some(remote) = remote {
-        remote_repl(&mut rl, remote, attach).await?;
+        remote_repl(&mut rl, bakery, remote, attach).await?;
     } else {
-        local_repl(&mut rl).await?;
+        local_repl(&mut rl, bakery).await?;
     }
 
     rl.save_history(&history_file).unwrap();
@@ -192,6 +193,7 @@ pub async fn start(
 ///
 async fn remote_repl(
     rl: &mut Editor<ReplHelper>,
+    _bakery: bool,
     remote: String,
     attach: Option<String>,
 ) -> Result<()> {
@@ -270,10 +272,16 @@ async fn remote_repl(
 ///
 ///
 ///
-async fn local_repl(rl: &mut Editor<ReplHelper>) -> Result<()> {
-    let compiler_options = CompilerOptions::new();
+async fn local_repl(
+    rl: &mut Editor<ReplHelper>,
+    bakery: bool,
+) -> Result<()> {
+    let compiler_options = if bakery {
+        CompilerOptions::new(Lang::Bakery)
+    } else {
+        CompilerOptions::new(Lang::BraneScript)
+    };
     let package_index = registry::get_package_index().await?;
-
     let mut compiler = Compiler::new(compiler_options, package_index.clone());
     let options = VmOptions { always_return: true };
     let mut vm = VM::new("local-repl", package_index, None, Some(options));

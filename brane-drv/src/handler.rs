@@ -1,6 +1,6 @@
 use crate::grpc;
 use anyhow::Result;
-use brane_dsl::{Compiler, CompilerOptions};
+use brane_dsl::{Compiler, CompilerOptions, Lang};
 use brane_bvm::{VM, VmCall, VmOptions, VmResult, VmState};
 use brane_bvm::values::Value;
 use brane_bvm::bytecode::Function;
@@ -69,7 +69,7 @@ impl grpc::DriverService for DriverHandler {
         let (tx, rx) = mpsc::channel::<Result<grpc::ExecuteReply, Status>>(10);
 
         tokio::spawn(async move {
-            let options = CompilerOptions::new();
+            let options = CompilerOptions::new(Lang::BraneScript);
             let mut compiler = Compiler::new(options, package_index.clone());
 
             let function = compiler.compile(request.input)

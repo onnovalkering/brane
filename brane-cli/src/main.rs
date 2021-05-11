@@ -108,6 +108,8 @@ enum SubCommand {
 
     #[structopt(name = "repl", about = "Start an interactive DSL session")]
     Repl {
+        #[structopt(short, long, help = "Use Bakery instead of BraneScript")]
+        bakery: bool,
         #[structopt(short, long, help = "Clear history before session")]
         clear: bool,
         #[structopt(short, long, help = "Create a remote REPL session")]
@@ -272,8 +274,8 @@ async fn run(options: CLI) -> Result<()> {
         Remove { name, version, force } => {
             packages::remove(name, version, force).await?;
         }
-        Repl { clear, remote, attach } => {
-            repl::start(clear, remote, attach).await?;
+        Repl { bakery, clear, remote, attach } => {
+            repl::start(bakery, clear, remote, attach).await?;
         }
         // Run { file, secrets } => {
         //     run::handle(file, secrets).await?;
