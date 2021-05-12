@@ -18,6 +18,12 @@ pub enum Stmt {
         body: Block,
     },
     Expr(Expr),
+    For {
+        initializer: Box<Stmt>,
+        condition: Expr,
+        increment: Box<Stmt>,
+        consequent: Block,
+    },
     If {
         condition: Expr,
         consequent: Block,
@@ -26,12 +32,6 @@ pub enum Stmt {
     Import {
         package: Ident,
         version: Option<Version>,
-    },
-    For {
-        initializer: Box<Stmt>,
-        condition: Expr,
-        increment: Box<Stmt>,
-        consequent: Block,
     },
     LetAssign(Ident, Expr),
     Return(Option<Expr>),
@@ -49,59 +49,54 @@ pub enum Expr {
         lhs_operand: Box<Expr>,
         rhs_operand: Box<Expr>,
     },
-    CallPattern(Vec<Expr>),
     Call {
         function: Ident,
         arguments: Vec<Expr>,
     },
     Ident(Ident),
-    Instance {
-        class: Ident,
-        properties: Vec<Stmt>,
-    },
-    Unit,
     Index {
         array: Box<Expr>,
         index: Box<Expr>,
     },
+    Instance {
+        class: Ident,
+        properties: Vec<Stmt>,
+    },
     Literal(Lit),
+    Pattern(Vec<Expr>),
     Unary {
         operator: UnOp,
         operand: Box<Expr>,
     },
+    Unit,
+}
+
+#[derive(Clone, Debug)]
+pub struct Ident(pub String);
+
+#[derive(Clone, Debug)]
+pub enum Lit {
+    Boolean(bool),
+    Integer(i64),
+    Real(f64),
+    String(String),
+}
+
+impl Lit {
+    pub fn data_type(&self) -> String {
+        match self {
+            Lit::Boolean(_) => String::from("boolean"),
+            Lit::Integer(_) => String::from("integer"),
+            Lit::Real(_) => String::from("real"),
+            Lit::String(_) => String::from("string"),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
 pub enum Operator {
-    Unary(UnOp),
     Binary(BinOp),
-}
-
-#[derive(Clone, Debug)]
-/// Operations with one operand.
-pub enum UnOp {
-    /// The '[' operator (index)
-    Idx,
-    /// The `!` operator (logical inversion)
-    Not,
-    /// The `-` operator (negation)
-    Neg,
-    /// The '(' operator (prioritize)
-    Prio,
-}
-
-impl UnOp {
-    ///
-    ///
-    ///
-    pub fn binding_power(&self) -> (u8, u8) {
-        match &self {
-            UnOp::Not => (0, 11),
-            UnOp::Neg => (0, 11),
-            UnOp::Idx => (11, 0),
-            UnOp::Prio => (0, 0), // Handled seperatly by pratt parser.
-        }
-    }
+    Unary(UnOp),
 }
 
 #[derive(Clone, Debug)]
@@ -153,12 +148,28 @@ impl BinOp {
 }
 
 #[derive(Clone, Debug)]
-pub struct Ident(pub String);
+/// Operations with one operand.
+pub enum UnOp {
+    /// The '[' operator (index)
+    Idx,
+    /// The `!` operator (logical inversion)
+    Not,
+    /// The `-` operator (negation)
+    Neg,
+    /// The '(' operator (prioritize)
+    Prio,
+}
 
-#[derive(Clone, Debug)]
-pub enum Lit {
-    Boolean(bool),
-    Integer(i64),
-    Real(f64),
-    String(String),
+impl UnOp {
+    ///
+    ///
+    ///
+    pub fn binding_power(&self) -> (u8, u8) {
+        match &self {
+            UnOp::Not => (0, 11),
+            UnOp::Neg => (0, 11),
+            UnOp::Idx => (11, 0),
+            UnOp::Prio => (0, 0), // Handled seperatly by pratt parser.
+        }
+    }
 }

@@ -400,6 +400,9 @@ pub fn expr_to_opcodes(
 
             chunk.write(OpCode::OpIndex);
         },
-        Expr::CallPattern(_) => unreachable!()
+        Expr::Pattern(_) => {
+            // Converted into one or more `Expr::Call` expressions.
+            unreachable!()
+        }
     }
 }
