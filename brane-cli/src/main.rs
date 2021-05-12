@@ -118,13 +118,11 @@ enum SubCommand {
         attach: Option<String>,
     },
 
-    // #[structopt(name = "run", about = "Run a DSL script locally")]
-    // Run {
-    //     #[structopt(name = "FILE", help = "Path to the file to run")]
-    //     file: PathBuf,
-    //     #[structopt(short, long, name = "SECRETS", help = "File containing secrets")]
-    //     secrets: Option<PathBuf>,
-    // },
+    #[structopt(name = "run", about = "Run a DSL script locally")]
+    Run {
+        #[structopt(name = "FILE", help = "Path to the file to run")]
+        file: PathBuf,
+    },
 
     #[structopt(name = "test", about = "Test a package locally")]
     Test {
@@ -277,9 +275,9 @@ async fn run(options: CLI) -> Result<()> {
         Repl { bakery, clear, remote, attach } => {
             repl::start(bakery, clear, remote, attach).await?;
         }
-        // Run { file, secrets } => {
-        //     run::handle(file, secrets).await?;
-        // }
+        Run { file } => {
+            run::handle(file).await?;
+        }
         Test { name, version, data } => {
             test::handle(name, version, data).await?;
         }
