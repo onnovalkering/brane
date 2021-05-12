@@ -22,8 +22,9 @@ actions:
         - add
 
     pattern:
+      prefix: "add"
       infix:
-        - "+"
+        - "to"
 
     input:
       - name: a
@@ -41,8 +42,9 @@ actions:
         - substract
 
     pattern:
+      prefix: "substract"
       infix:
-        - "-"
+        - "from"
 
     input:
       - name: a
@@ -60,8 +62,9 @@ actions:
         - multiply
 
     pattern:
+      prefix: "multiply"
       infix:
-        - "*"
+        - "by"
 
     input:
       - name: a
@@ -79,8 +82,9 @@ actions:
         - divide
 
     pattern:
+      prefix: "divide"
       infix:
-        - "/"
+        - "by"
 
     input:
       - name: a
