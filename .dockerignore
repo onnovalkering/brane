@@ -1,7 +1,6 @@
 .github/
 brane-api/packages
 brane-api/temporary
-brane-cli/
 brane-ide/extensions/js9/node_modules
 brane-ide/extensions/registry/node_modules
 brane-ide/extensions/renderer/node_modules

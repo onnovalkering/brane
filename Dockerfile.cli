@@ -1,0 +1,34 @@
+FROM rust:1.52 as build
+
+RUN rustup component add rustfmt
+
+RUN apt-get update && apt-get install -y \
+    cmake \
+ && rm -rf /var/lib/apt/lists/*
+
+# Copy over relevant crates
+COPY ./brane-bvm ./brane-bvm
+COPY ./brane-cfg ./brane-cfg
+COPY ./brane-cli ./brane-cli
+COPY ./brane-drv ./brane-drv
+COPY ./brane-dsl ./brane-dsl
+COPY ./brane-oas ./brane-oas
+COPY ./brane-job ./brane-job
+COPY ./specifications ./specifications
+
+# Build an optimized binary
+WORKDIR /brane-cli
+RUN cargo update
+RUN cargo build --release
+
+# Define final image
+FROM ubuntu:20.04
+
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+ && rm -rf /var/lib/apt/lists/*
+
+# Copy `brane` from build stage
+COPY --from=build /brane-cli/target/release/brane .
+
+ENTRYPOINT [ "./brane" ]
