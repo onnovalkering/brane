@@ -13,3 +13,11 @@ futures = "0.3"
 log = "0.4"
 specifications = { path = "../specifications" }
 tokio = { version = "1.6", features = ["full"] }
+
+[dev-dependencies]
+criterion = { version = "0.3", features = ["async", "async_futures"] }
+brane-dsl = { path = "../brane-dsl" }
+
+[[bench]]
+name = "fibonacci"
+harness = false
