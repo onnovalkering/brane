@@ -7,12 +7,12 @@ pub mod values;
 
 use crate::values::{Array, Value};
 use crate::{
-    bytecode::{Function, OpCode},
+    bytecode::{Function, opcodes::*},
     values::Instance,
 };
 use anyhow::Result;
-use async_trait::async_trait;
 use async_recursion::async_recursion;
+use async_trait::async_trait;
 use futures::{stream, StreamExt};
 use specifications::common::Value as SpecValue;
 use specifications::package::PackageIndex;
@@ -62,7 +62,10 @@ pub struct VmCall {
 
 #[async_trait]
 pub trait VmExecutor {
-    async fn execute(&self, call: VmCall) -> Result<Value>;
+    async fn execute(
+        &self,
+        call: VmCall,
+    ) -> Result<Value>;
 }
 
 #[repr(u8)]
@@ -174,19 +177,18 @@ where
                 return VmResult::Ok(result);
             }
 
-            let instruction: OpCode = chunk.code[frame.ip].into();
+            let instruction: u8 = chunk.code[frame.ip];
             frame.ip = frame.ip + 1;
 
-            use OpCode::*;
             match instruction {
-                OpSetLocal => {
+                OP_SET_LOCAL => {
                     let index = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
                     let value = self.stack.pop().unwrap();
                     self.stack[frame.slot_offset + index as usize] = value;
                 }
-                OpSetGlobal => {
+                OP_SET_GLOBAL => {
                     let ident = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
@@ -200,7 +202,7 @@ where
                         panic!("Tried to assign to undefined variable: {:?}", ident);
                     }
                 }
-                OpDefineGlobal => {
+                OP_DEFINE_GLOBAL => {
                     let ident = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
@@ -214,7 +216,7 @@ where
                         unreachable!()
                     }
                 }
-                OpGetGlobal => {
+                OP_GET_GLOBAL => {
                     let ident = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
@@ -230,14 +232,14 @@ where
                         unreachable!()
                     }
                 }
-                OpGetLocal => {
+                OP_GET_LOCAL => {
                     let index = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
                     let local = self.stack.get_mut(frame.slot_offset + index as usize).unwrap().clone();
                     self.stack.push(local)
                 }
-                OpConstant => {
+                OP_CONSTANT => {
                     let constant = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
@@ -247,7 +249,7 @@ where
                         unreachable!()
                     }
                 }
-                OpClass => {
+                OP_CLASS => {
                     let class = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
@@ -257,7 +259,7 @@ where
                         unreachable!()
                     }
                 }
-                OpAdd => {
+                OP_ADD => {
                     let rhs = self.stack.pop();
                     let lhs = self.stack.pop();
 
@@ -277,7 +279,7 @@ where
                         self.stack.push(value);
                     }
                 }
-                OpSubstract => {
+                OP_SUBSTRACT => {
                     let rhs = self.stack.pop();
                     let lhs = self.stack.pop();
 
@@ -293,7 +295,7 @@ where
                         self.stack.push(value);
                     }
                 }
-                OpMultiply => {
+                OP_MULTIPLY => {
                     let rhs = self.stack.pop();
                     let lhs = self.stack.pop();
 
@@ -309,7 +311,7 @@ where
                         self.stack.push(value);
                     }
                 }
-                OpDivide => {
+                OP_DIVIDE => {
                     let rhs = self.stack.pop();
                     let lhs = self.stack.pop();
 
@@ -325,7 +327,7 @@ where
                         self.stack.push(value);
                     }
                 }
-                OpNegate => {
+                OP_NEGATE => {
                     if let Some(value) = self.stack.pop() {
                         match value {
                             Value::Integer(i) => self.stack.push((-i).into()),
@@ -334,7 +336,7 @@ where
                         }
                     }
                 }
-                OpReturn => {
+                OP_RETURN => {
                     let result = self.stack.pop();
                     self.call_frames.pop();
                     // if self.call_frames.is_empty() {
@@ -343,10 +345,10 @@ where
 
                     return VmResult::Ok(result);
                 }
-                OpTrue => self.stack.push(true.into()),
-                OpFalse => self.stack.push(false.into()),
-                OpUnit => self.stack.push(().into()),
-                OpNot => {
+                OP_TRUE => self.stack.push(true.into()),
+                OP_FALSE => self.stack.push(false.into()),
+                OP_UNIT => self.stack.push(().into()),
+                OP_NOT => {
                     if let Some(value) = self.stack.pop() {
                         match value {
                             Value::Boolean(i) => self.stack.push((!i).into()),
@@ -355,7 +357,7 @@ where
                         }
                     }
                 }
-                OpAnd => {
+                OP_AND => {
                     let rhs = self.stack.pop();
                     let lhs = self.stack.pop();
 
@@ -368,7 +370,7 @@ where
                         self.stack.push(value);
                     }
                 }
-                OpOr => {
+                OP_OR => {
                     let rhs = self.stack.pop();
                     let lhs = self.stack.pop();
 
@@ -381,7 +383,7 @@ where
                         self.stack.push(value);
                     }
                 }
-                OpEqual => {
+                OP_EQUAL => {
                     let rhs = self.stack.pop();
                     let lhs = self.stack.pop();
 
@@ -398,7 +400,7 @@ where
                         self.stack.push(value);
                     }
                 }
-                OpGreater => {
+                OP_GREATER => {
                     let rhs = self.stack.pop();
                     let lhs = self.stack.pop();
 
@@ -414,7 +416,7 @@ where
                         self.stack.push(value);
                     }
                 }
-                OpLess => {
+                OP_LESS => {
                     let rhs = self.stack.pop();
                     let lhs = self.stack.pop();
 
@@ -430,20 +432,20 @@ where
                         self.stack.push(value);
                     }
                 }
-                OpPop => {
+                OP_POP => {
                     self.stack.pop();
                 }
-                OpLocPush => {
+                OP_LOC_PUSH => {
                     if let Some(Value::String(location)) = self.stack.pop() {
                         self.locations.push(location);
                     } else {
                         return VmResult::RuntimeError;
                     }
                 }
-                OpLocPop => {
+                OP_LOC_POP => {
                     self.locations.pop();
                 }
-                OpJumpIfFalse => {
+                OP_JUMP_IF_FALSE => {
                     let offset1 = chunk.code[frame.ip] as u16;
                     frame.ip = frame.ip + 1;
 
@@ -455,7 +457,7 @@ where
                         frame.ip = frame.ip + offset as usize;
                     }
                 }
-                OpJump => {
+                OP_JUMP => {
                     let offset1 = chunk.code[frame.ip] as u16;
                     frame.ip = frame.ip + 1;
 
@@ -465,7 +467,7 @@ where
                     let offset = (offset1 << 8) | offset2;
                     frame.ip = frame.ip + offset as usize;
                 }
-                OpJumpBack => {
+                OP_JUMP_BACK => {
                     let offset1 = chunk.code[frame.ip] as u16;
                     frame.ip = frame.ip + 1;
 
@@ -475,7 +477,7 @@ where
                     let offset = (offset1 << 8) | offset2;
                     frame.ip = frame.ip - offset as usize;
                 }
-                OpCall => {
+                OP_CALL => {
                     let arg_count = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
@@ -535,7 +537,7 @@ where
                         }
                     }
                 }
-                OpImport => {
+                OP_IMPORT => {
                     let constant = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
@@ -568,7 +570,7 @@ where
                         unreachable!()
                     }
                 }
-                OpNew => {
+                OP_NEW => {
                     let properties_n = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
@@ -591,7 +593,7 @@ where
                         panic!("Not a class.");
                     }
                 }
-                OpArray => {
+                OP_ARRAY => {
                     let entries_n = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
@@ -618,7 +620,7 @@ where
                         self.stack.push(Value::Array(Array { data_type, entries }));
                     }
                 }
-                OpDot => {
+                OP_DOT => {
                     let target = self.stack.pop();
 
                     let property = chunk.code[frame.ip];
@@ -643,7 +645,7 @@ where
                         return VmResult::RuntimeError;
                     }
                 }
-                OpIndex => {
+                OP_INDEX => {
                     let index = self.stack.pop().expect("Empty stack while expecting `index` value.");
                     let array = self.stack.pop().expect("Empty stack while expecting `array` value.");
 
@@ -660,7 +662,7 @@ where
                         }
                     }
                 }
-                OpParallel => {
+                OP_PARALLEL => {
                     let blocks_n = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
@@ -676,9 +678,7 @@ where
                             .map(|block| {
                                 let mut fork = self.clone();
                                 if let Value::Function(block) = block {
-                                    tokio::spawn(async move {
-                                        fork.run(Some(block)).await
-                                    })
+                                    tokio::spawn(async move { fork.run(Some(block)).await })
                                 } else {
                                     unreachable!()
                                 }
@@ -717,6 +717,9 @@ where
                         let data_type = format!("{}[]", data_type);
                         self.stack.push(Value::Array(Array { data_type, entries }));
                     }
+                },
+                0x00 | 0x24..=u8::MAX => {
+                    unreachable!()
                 }
             }
         }

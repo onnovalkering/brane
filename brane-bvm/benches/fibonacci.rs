@@ -1,11 +1,11 @@
+use anyhow::Result;
+use async_trait::async_trait;
+use brane_bvm::{bytecode::Function, values::Value, VmCall, VmExecutor, VmOptions, VM};
+use brane_dsl::{Compiler, CompilerOptions};
+use criterion::async_executor::FuturesExecutor;
 use criterion::Criterion;
 use criterion::{criterion_group, criterion_main};
-use anyhow::Result;
-use brane_bvm::{VM, VmCall, VmExecutor, VmOptions, bytecode::Function, values::Value};
-use criterion::async_executor::FuturesExecutor;
-use brane_dsl::{Compiler, CompilerOptions};
 use specifications::package::PackageIndex;
-use async_trait::async_trait;
 
 const FIB_CODE: &str = r#"
     func fib(n) {
@@ -20,23 +20,29 @@ const FIB_CODE: &str = r#"
 "#;
 
 #[derive(Clone)]
-struct NoOpExecutor { }
+struct NoOpExecutor {}
 
 #[async_trait]
 impl VmExecutor for NoOpExecutor {
-    async fn execute(&self, _call: VmCall) -> Result<Value> {
+    async fn execute(
+        &self,
+        _call: VmCall,
+    ) -> Result<Value> {
         Ok(Value::Unit)
     }
 }
 
 fn compile() -> Function {
-    let mut compiler = Compiler::new(CompilerOptions::new(brane_dsl::Lang::BraneScript), PackageIndex::empty());
+    let mut compiler = Compiler::new(
+        CompilerOptions::new(brane_dsl::Lang::BraneScript),
+        PackageIndex::empty(),
+    );
     compiler.compile(FIB_CODE).unwrap()
 }
 
 async fn do_something(f: Function) {
     let options = VmOptions { always_return: true };
-    let executor = NoOpExecutor { };
+    let executor = NoOpExecutor {};
     let mut vm = VM::new("bench", PackageIndex::empty(), None, Some(options), executor);
 
     vm.run(Some(f)).await;

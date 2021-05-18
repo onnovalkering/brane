@@ -3,98 +3,46 @@ use bytes::{BufMut, BytesMut};
 use specifications::common::Parameter;
 use std::fmt::{self, Write};
 
+pub mod opcodes {
+    pub const OP_ADD: u8 = 0x01;
+    pub const OP_AND: u8 = 0x02;
+    pub const OP_ARRAY: u8 = 0x03;
+    pub const OP_CALL: u8 = 0x04;
+    pub const OP_CLASS: u8 = 0x05;
+    pub const OP_CONSTANT: u8 = 0x06;
+    pub const OP_DEFINE_GLOBAL: u8 = 0x07;
+    pub const OP_DIVIDE: u8 = 0x08;
+    pub const OP_DOT: u8 = 0x09;
+    pub const OP_EQUAL: u8 = 0x0A;
+    pub const OP_FALSE: u8 = 0x0B;
+    pub const OP_GET_GLOBAL: u8 = 0x0C;
+    pub const OP_GET_LOCAL: u8 = 0x0D;
+    pub const OP_GREATER: u8 = 0x0E;
+    pub const OP_IMPORT: u8 = 0x0F;
+    pub const OP_INDEX: u8 = 0x10;
+    pub const OP_JUMP: u8 = 0x11;
+    pub const OP_JUMP_BACK: u8 = 0x12;
+    pub const OP_JUMP_IF_FALSE: u8 = 0x13;
+    pub const OP_LESS: u8 = 0x14;
+    pub const OP_LOC_POP: u8 = 0x15;
+    pub const OP_LOC_PUSH: u8 = 0x16;
+    pub const OP_MULTIPLY: u8 = 0x17;
+    pub const OP_NEGATE: u8 = 0x18;
+    pub const OP_NEW: u8 = 0x19;
+    pub const OP_NOT: u8 = 0x1A;
+    pub const OP_OR: u8 = 0x1B;
+    pub const OP_PARALLEL: u8 = 0x1C;
+    pub const OP_POP: u8 = 0x1D;
+    pub const OP_RETURN: u8 = 0x1E;
+    pub const OP_SET_GLOBAL: u8 = 0x1F;
+    pub const OP_SET_LOCAL: u8 = 0x20;
+    pub const OP_SUBSTRACT: u8 = 0x21;
+    pub const OP_TRUE: u8 = 0x22;
+    pub const OP_UNIT: u8 = 0x23;
+}
+
 use crate::values::Value;
-
-#[repr(u8)]
-#[derive(Debug, Clone, Copy)]
-pub enum OpCode {
-    OpConstant = 1,
-    OpAdd,
-    OpSubstract,
-    OpMultiply,
-    OpDivide,
-    OpNegate,
-    OpReturn,
-    OpTrue,
-    OpFalse,
-    OpUnit,
-    OpNot,
-    OpEqual,
-    OpGreater,
-    OpLess,
-    OpPop,
-    OpDefineGlobal,
-    OpGetGlobal,
-    OpGetLocal,
-    OpJumpIfFalse,
-    OpJump,
-    OpAnd,
-    OpOr,
-    OpJumpBack,
-    OpSetLocal,
-    OpSetGlobal,
-    OpCall,
-    OpClass,
-    OpImport,
-    OpNew,
-    OpDot,
-    OpArray,
-    OpIndex,
-    OpLocPush,
-    OpLocPop,
-    OpParallel,
-}
-
-impl Into<u8> for OpCode {
-    fn into(self) -> u8 {
-        self as u8
-    }
-}
-
-impl From<u8> for OpCode {
-    fn from(byte: u8) -> Self {
-        match byte {
-            0x01 => OpCode::OpConstant,
-            0x02 => OpCode::OpAdd,
-            0x03 => OpCode::OpSubstract,
-            0x04 => OpCode::OpMultiply,
-            0x05 => OpCode::OpDivide,
-            0x06 => OpCode::OpNegate,
-            0x07 => OpCode::OpReturn,
-            0x08 => OpCode::OpTrue,
-            0x09 => OpCode::OpFalse,
-            0x0A => OpCode::OpUnit,
-            0x0B => OpCode::OpNot,
-            0x0C => OpCode::OpEqual,
-            0x0D => OpCode::OpGreater,
-            0x0E => OpCode::OpLess,
-            0x0F => OpCode::OpPop,
-            0x10 => OpCode::OpDefineGlobal,
-            0x11 => OpCode::OpGetGlobal,
-            0x12 => OpCode::OpGetLocal,
-            0x13 => OpCode::OpJumpIfFalse,
-            0x14 => OpCode::OpJump,
-            0x15 => OpCode::OpAnd,
-            0x16 => OpCode::OpOr,
-            0x17 => OpCode::OpJumpBack,
-            0x18 => OpCode::OpSetLocal,
-            0x19 => OpCode::OpSetGlobal,
-            0x1A => OpCode::OpCall,
-            0x1B => OpCode::OpClass,
-            0x1C => OpCode::OpImport,
-            0x1D => OpCode::OpNew,
-            0x1E => OpCode::OpDot,
-            0x1F => OpCode::OpArray,
-            0x20 => OpCode::OpIndex,
-            0x21 => OpCode::OpLocPush,
-            0x22 => OpCode::OpLocPop,
-            0x23 => OpCode::OpParallel,
-            _ => {
-                panic!("ERROR: not a OpCode: {}", byte);
-            }
-        }
-    }
-}
+use opcodes::*;
 
 #[derive(Clone)]
 pub enum Function {
@@ -214,127 +162,130 @@ impl Chunk {
             }
 
             write!(result, "{:04} ", offset)?;
-            match OpCode::from(*instruction) {
-                OpCode::OpConstant => {
+            match *instruction {
+                OP_CONSTANT => {
                     constant_instruction("OP_CONSTANT", &self, offset, &mut result);
                     skip = 1;
                 }
-                OpCode::OpAdd => {
+                OP_ADD => {
                     writeln!(result, "OP_ADD")?;
                 }
-                OpCode::OpAnd => {
+                OP_AND => {
                     writeln!(result, "OP_AND")?;
                 }
-                OpCode::OpDivide => {
+                OP_DIVIDE => {
                     writeln!(result, "OP_DIVIDE")?;
                 }
-                OpCode::OpEqual => {
+                OP_EQUAL => {
                     writeln!(result, "OP_EQUAL")?;
                 }
-                OpCode::OpFalse => {
+                OP_FALSE => {
                     writeln!(result, "OP_FALSE")?;
                 }
-                OpCode::OpGreater => {
+                OP_GREATER => {
                     writeln!(result, "OP_GREATER")?;
                 }
-                OpCode::OpLess => {
+                OP_LESS => {
                     writeln!(result, "OP_LESS")?;
                 }
-                OpCode::OpMultiply => {
+                OP_MULTIPLY => {
                     writeln!(result, "OP_MULTIPLY")?;
                 }
-                OpCode::OpNegate => {
+                OP_NEGATE => {
                     writeln!(result, "OP_NEGATE")?;
                 }
-                OpCode::OpNot => {
+                OP_NOT => {
                     writeln!(result, "OP_NOT")?;
                 }
-                OpCode::OpOr => {
+                OP_OR => {
                     writeln!(result, "OP_OR")?;
                 }
-                OpCode::OpPop => {
+                OP_POP => {
                     writeln!(result, "OP_POP")?;
                 }
-                OpCode::OpReturn => {
+                OP_RETURN => {
                     writeln!(result, "OP_RETURN")?;
                 }
-                OpCode::OpSubstract => {
+                OP_SUBSTRACT => {
                     writeln!(result, "OP_SUBSTRACT")?;
                 }
-                OpCode::OpTrue => {
+                OP_TRUE => {
                     writeln!(result, "OP_TRUE")?;
                 }
-                OpCode::OpUnit => {
+                OP_UNIT => {
                     writeln!(result, "OP_UNIT")?;
                 }
-                OpCode::OpIndex => {
+                OP_INDEX => {
                     writeln!(result, "OP_INDEX")?;
                 }
-                OpCode::OpLocPush => {
+                OP_LOC_PUSH => {
                     writeln!(result, "OP_LOC_PUSH")?;
                 }
-                OpCode::OpLocPop => {
+                OP_LOC_POP => {
                     writeln!(result, "OP_LOC_POP")?;
                 }
-                OpCode::OpDot => {
+                OP_DOT => {
                     constant_instruction("OP_DOT", &self, offset, &mut result);
                     skip = 1;
                 }
-                OpCode::OpArray => {
+                OP_ARRAY => {
                     byte_instruction("OP_ARRAY", &self, offset, &mut result);
                     skip = 1;
                 }
-                OpCode::OpParallel => {
+                OP_PARALLEL => {
                     byte_instruction("OP_PARALLEL", &self, offset, &mut result);
                     skip = 1;
                 }
-                OpCode::OpNew => {
+                OP_NEW => {
                     byte_instruction("OP_NEW", &self, offset, &mut result);
                     skip = 1;
                 }
-                OpCode::OpCall => {
+                OP_CALL => {
                     byte_instruction("OP_CALL", &self, offset, &mut result);
                     skip = 1;
                 }
-                OpCode::OpJumpIfFalse => {
+                OP_JUMP_IF_FALSE => {
                     jump_instruction("OP_JUMP_IF_FALSE", 1, self, offset, &mut result);
                     skip = 2;
                 }
-                OpCode::OpJump => {
+                OP_JUMP => {
                     jump_instruction("OP_JUMP", 1, self, offset, &mut result);
                     skip = 2;
                 }
-                OpCode::OpJumpBack => {
+                OP_JUMP_BACK => {
                     jump_instruction("OP_JUMP_BACK", -1, self, offset, &mut result);
                     skip = 2;
                 }
-                OpCode::OpDefineGlobal => {
+                OP_DEFINE_GLOBAL => {
                     constant_instruction("OP_DEFINE_GLOBAL", &self, offset, &mut result);
                     skip = 1;
                 }
-                OpCode::OpGetGlobal => {
+                OP_GET_GLOBAL => {
                     constant_instruction("OP_GET_GLOBAL", &self, offset, &mut result);
                     skip = 1;
                 }
-                OpCode::OpGetLocal => {
+                OP_GET_LOCAL => {
                     byte_instruction("OP_GET_LOCAL", &self, offset, &mut result);
                     skip = 1;
                 }
-                OpCode::OpSetGlobal => {
+                OP_SET_GLOBAL => {
                     byte_instruction("OP_SET_GLOBAL", &self, offset, &mut result);
                     skip = 1;
                 }
-                OpCode::OpSetLocal => {
+                OP_SET_LOCAL => {
                     byte_instruction("OP_SET_LOCAL", &self, offset, &mut result);
                     skip = 1;
                 }
-                OpCode::OpClass => {
+                OP_CLASS => {
                     constant_instruction("OP_CLASS", &self, offset, &mut result);
                     skip = 1;
                 }
-                OpCode::OpImport => {
+                OP_IMPORT => {
                     constant_instruction("OP_IMPORT", &self, offset, &mut result);
                     skip = 1;
+                }
+                0x00 | 0x24..=u8::MAX => {
+                    unreachable!()
                 }
             }
         }
