@@ -106,7 +106,7 @@ impl grpc::DriverService for DriverHandler {
 
             loop {
                 match vm.run(None).await {
-                    VmResult::Ok(value) => {
+                    Ok(VmResult::Ok(value)) => {
                         let output = value.map(|v| format!("{:?}", v)).unwrap_or_default();
 
                         sessions.insert(request.uuid.clone(), vm.state.clone());
@@ -114,9 +114,10 @@ impl grpc::DriverService for DriverHandler {
                         tx.send(Ok(reply)).await.unwrap();
                         break;
                     },
-                    VmResult::RuntimeError => {
+                    Ok(VmResult::RuntimeError) => {
                         tx.send(Err(Status::invalid_argument("Runtime error."))).await.unwrap();
                     }
+                    _ => unreachable!()
                 }
             }
 

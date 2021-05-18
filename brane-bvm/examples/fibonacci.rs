@@ -2,9 +2,6 @@ use anyhow::Result;
 use async_trait::async_trait;
 use brane_bvm::{bytecode::Function, values::Value, VmCall, VmExecutor, VmOptions, VM};
 use brane_dsl::{Compiler, CompilerOptions};
-use criterion::async_executor::FuturesExecutor;
-use criterion::Criterion;
-use criterion::{criterion_group, criterion_main};
 use specifications::package::PackageIndex;
 
 const FIB_CODE: &str = r#"
@@ -40,19 +37,13 @@ fn compile() -> Function {
     compiler.compile(FIB_CODE).unwrap()
 }
 
-async fn do_something(f: Function) {
+#[tokio::main]
+async fn main() {
+    let f = compile();
+
     let options = VmOptions { always_return: true };
     let executor = NoOpExecutor {};
     let mut vm = VM::new("bench", PackageIndex::empty(), None, Some(options), executor);
 
     vm.run(Some(f)).await.unwrap();
 }
-
-fn from_elem(c: &mut Criterion) {
-    c.bench_function("fib 15", move |b| {
-        b.to_async(FuturesExecutor).iter(|| do_something(compile()));
-    });
-}
-
-criterion_group!(benches, from_elem);
-criterion_main!(benches);

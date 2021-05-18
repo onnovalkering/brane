@@ -41,6 +41,7 @@ pub fn register(state: &mut HashMap<String, Value>) {
 ///
 ///
 ///
+#[inline]
 pub fn handle(
     name: String,
     stack: &mut Vec<Value>,

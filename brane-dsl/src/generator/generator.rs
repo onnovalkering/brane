@@ -22,7 +22,7 @@ pub fn compile(program: Program) -> Result<Function> {
         stmt_to_opcodes(stmt, &mut chunk, &mut locals, 0);
     }
 
-    Ok(Function::new(String::from("main"), 0, chunk))
+    Ok(Function::new(String::from("main"), 0, chunk.freeze()))
 }
 
 ///
@@ -55,7 +55,7 @@ pub fn compile_function(
         stmt_to_opcodes(stmt, &mut chunk, &mut locals, scope);
     }
 
-    let function = Function::new(name, params.len() as u8, chunk);
+    let function = Function::new(name, params.len() as u8, chunk.freeze());
 
     Ok(function)
 }

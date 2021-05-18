@@ -1,23 +1,26 @@
 #[macro_use]
+extern crate anyhow;
+#[macro_use]
 extern crate log;
 
 pub mod builtins;
 pub mod bytecode;
+pub mod instructions;
 pub mod values;
 
 use crate::values::{Array, Value};
 use crate::{
-    bytecode::{Function, opcodes::*},
-    values::Instance,
+    bytecode::{opcodes::*, Function},
 };
 use anyhow::Result;
 use async_recursion::async_recursion;
 use async_trait::async_trait;
+use bytecode::{ReadOnlyChunk};
 use futures::{stream, StreamExt};
 use specifications::common::Value as SpecValue;
 use specifications::package::PackageIndex;
 use std::cmp;
-use std::{collections::HashMap, fmt::Write, usize};
+use std::{collections::HashMap, usize};
 
 static FRAMES_MAX: usize = 64;
 static STACK_MAX: usize = 256;
@@ -26,7 +29,7 @@ static STACK_MAX: usize = 256;
 pub struct CallFrame {
     pub slot_offset: usize,
     pub ip: usize,
-    pub function: Function,
+    pub chunk: ReadOnlyChunk,
 }
 
 pub type VmState = HashMap<String, Value>;
@@ -112,11 +115,11 @@ where
     ///
     pub fn call(
         &mut self,
-        function: Function,
+        chunk: ReadOnlyChunk,
         arg_count: u8,
     ) -> () {
         let new_frame = CallFrame {
-            function,
+            chunk,
             ip: 0,
             slot_offset: (cmp::max(0, (self.stack.len() as i16) - 1) - arg_count as i16) as usize,
         };
@@ -141,32 +144,24 @@ where
     pub async fn run(
         &mut self,
         function: Option<Function>,
-    ) -> VmResult {
-        if let Some(function) = function {
-            self.call_frames.push(CallFrame {
-                slot_offset: 0,
-                ip: 0,
-                function,
-            })
+    ) -> Result<VmResult> {
+        if let Some(Function::UserDefined { chunk, ..}) = function {
+            self.call(chunk, 0);
         }
 
-        let mut frame = self.call_frames.last().unwrap().clone();
-        let chunk = if let Function::UserDefined { chunk, .. } = frame.function.clone() {
-            chunk
-        } else {
-            return VmResult::RuntimeError;
-        };
+        let frame = self.call_frames.last().unwrap().clone();
+        let mut ip = 0;
 
         // Decodes and dispatches the instruction
         let mut counter: i32 = 0;
         loop {
             counter += 1;
 
-            let mut debug = String::from(format!("{}         ", counter));
-            self.stack.iter().for_each(|v| write!(debug, "[ {:?} ]", v).unwrap());
-            debug!("{}", debug);
+            // let mut debug = String::from(format!("{}         ", counter));
+            // self.stack.iter().for_each(|v| write!(debug, "[ {:?} ]", v).unwrap());
+            // debug!("{}", debug);
 
-            if frame.ip >= chunk.code.len() {
+            if ip >= frame.chunk.code.len() {
                 let result = if self.options.always_return {
                     self.stack.pop()
                 } else {
@@ -174,497 +169,115 @@ where
                 };
 
                 self.stack.clear(); // Desired behaviour?
-                return VmResult::Ok(result);
+                return Ok(VmResult::Ok(result));
             }
 
-            let instruction: u8 = chunk.code[frame.ip];
-            frame.ip = frame.ip + 1;
+            let instruction: u8 = frame.chunk.code[ip];
+            ip += 1;
 
             match instruction {
-                OP_SET_LOCAL => {
-                    let index = chunk.code[frame.ip];
-                    frame.ip = frame.ip + 1;
-
-                    let value = self.stack.pop().unwrap();
-                    self.stack[frame.slot_offset + index as usize] = value;
-                }
-                OP_SET_GLOBAL => {
-                    let ident = chunk.code[frame.ip];
-                    frame.ip = frame.ip + 1;
-
-                    if let Some(ident) = chunk.constants.get(ident as usize) {
-                        let value = self.stack.pop().unwrap();
-
-                        if let Value::String(ident) = ident {
-                            self.state.insert(ident.clone(), value);
-                        }
-                    } else {
-                        panic!("Tried to assign to undefined variable: {:?}", ident);
-                    }
-                }
-                OP_DEFINE_GLOBAL => {
-                    let ident = chunk.code[frame.ip];
-                    frame.ip = frame.ip + 1;
-
-                    if let Some(ident) = chunk.constants.get(ident as usize) {
-                        let value = self.stack.pop().unwrap();
-
-                        if let Value::String(ident) = ident {
-                            self.state.insert(ident.clone(), value);
-                        }
-                    } else {
-                        unreachable!()
-                    }
-                }
-                OP_GET_GLOBAL => {
-                    let ident = chunk.code[frame.ip];
-                    frame.ip = frame.ip + 1;
-
-                    if let Some(ident) = chunk.constants.get(ident as usize) {
-                        if let Value::String(ident) = ident {
-                            if let Some(value) = self.state.get(ident) {
-                                self.stack.push(value.clone());
-                            } else {
-                                panic!("Tried to access undefined variable: {:?}", ident);
-                            }
-                        }
-                    } else {
-                        unreachable!()
-                    }
-                }
-                OP_GET_LOCAL => {
-                    let index = chunk.code[frame.ip];
-                    frame.ip = frame.ip + 1;
-
-                    let local = self.stack.get_mut(frame.slot_offset + index as usize).unwrap().clone();
-                    self.stack.push(local)
-                }
-                OP_CONSTANT => {
-                    let constant = chunk.code[frame.ip];
-                    frame.ip = frame.ip + 1;
-
-                    if let Some(value) = chunk.constants.get(constant as usize) {
-                        self.stack.push(value.clone());
-                    } else {
-                        unreachable!()
-                    }
-                }
-                OP_CLASS => {
-                    let class = chunk.code[frame.ip];
-                    frame.ip = frame.ip + 1;
-
-                    if let Some(value) = chunk.constants.get(class as usize) {
-                        self.stack.push(value.clone());
-                    } else {
-                        unreachable!()
-                    }
-                }
-                OP_ADD => {
-                    let rhs = self.stack.pop();
-                    let lhs = self.stack.pop();
-
-                    if let (Some(lhs), Some(rhs)) = (lhs, rhs) {
-                        let value = match (lhs, rhs) {
-                            (Value::Integer(lhs), Value::Integer(rhs)) => (lhs + rhs).into(),
-                            (Value::Real(lhs), Value::Real(rhs)) => (lhs + rhs).into(),
-                            (Value::Real(lhs), Value::Integer(rhs)) => (lhs + rhs as f64).into(),
-                            (Value::Integer(lhs), Value::Real(rhs)) => (lhs as f64 + rhs).into(),
-                            (Value::String(lhs), Value::String(rhs)) => (format!("{}{}", lhs, rhs)).into(),
-                            (lhs, rhs) => {
-                                println!("{:?} + {:?}", lhs, rhs);
-                                unreachable!()
-                            }
-                        };
-
-                        self.stack.push(value);
-                    }
-                }
-                OP_SUBSTRACT => {
-                    let rhs = self.stack.pop();
-                    let lhs = self.stack.pop();
-
-                    if let (Some(lhs), Some(rhs)) = (lhs, rhs) {
-                        let value = match (lhs, rhs) {
-                            (Value::Integer(lhs), Value::Integer(rhs)) => (lhs - rhs).into(),
-                            (Value::Real(lhs), Value::Real(rhs)) => (lhs - rhs).into(),
-                            (Value::Real(lhs), Value::Integer(rhs)) => (lhs - rhs as f64).into(),
-                            (Value::Integer(lhs), Value::Real(rhs)) => (lhs as f64 - rhs).into(),
-                            _ => unreachable!(),
-                        };
-
-                        self.stack.push(value);
-                    }
-                }
-                OP_MULTIPLY => {
-                    let rhs = self.stack.pop();
-                    let lhs = self.stack.pop();
-
-                    if let (Some(lhs), Some(rhs)) = (lhs, rhs) {
-                        let value = match (lhs, rhs) {
-                            (Value::Integer(lhs), Value::Integer(rhs)) => (lhs * rhs).into(),
-                            (Value::Real(lhs), Value::Real(rhs)) => (lhs * rhs).into(),
-                            (Value::Real(lhs), Value::Integer(rhs)) => (lhs * rhs as f64).into(),
-                            (Value::Integer(lhs), Value::Real(rhs)) => (lhs as f64 * rhs).into(),
-                            _ => unreachable!(),
-                        };
-
-                        self.stack.push(value);
-                    }
-                }
-                OP_DIVIDE => {
-                    let rhs = self.stack.pop();
-                    let lhs = self.stack.pop();
-
-                    if let (Some(lhs), Some(rhs)) = (lhs, rhs) {
-                        let value = match (lhs, rhs) {
-                            (Value::Integer(lhs), Value::Integer(rhs)) => (lhs / rhs).into(),
-                            (Value::Real(lhs), Value::Real(rhs)) => (lhs / rhs).into(),
-                            (Value::Real(lhs), Value::Integer(rhs)) => (lhs / rhs as f64).into(),
-                            (Value::Integer(lhs), Value::Real(rhs)) => (lhs as f64 / rhs).into(),
-                            _ => unreachable!(),
-                        };
-
-                        self.stack.push(value);
-                    }
-                }
-                OP_NEGATE => {
-                    if let Some(value) = self.stack.pop() {
-                        match value {
-                            Value::Integer(i) => self.stack.push((-i).into()),
-                            Value::Real(r) => self.stack.push((-r).into()),
-                            _ => unreachable!(),
-                        }
-                    }
-                }
+                OP_CONSTANT => ip = instructions::op_constant(ip, &frame, &mut self.stack)?,
+                OP_GET_LOCAL => ip = instructions::op_get_local(ip, &frame, &mut self.stack)?,
+                OP_SET_LOCAL => ip = instructions::op_set_local(ip, &frame, &mut self.stack)?,
+                OP_DEFINE_GLOBAL => ip = instructions::op_define_global(ip, &frame, &mut self.stack, &mut self.state)?,
+                OP_GET_GLOBAL => ip = instructions::op_get_global(ip, &frame, &mut self.stack, &mut self.state)?,
+                OP_SET_GLOBAL => ip = instructions::op_set_global(ip, &frame, &mut self.stack, &mut self.state)?,
+                OP_CLASS => ip = instructions::op_class(ip, &frame, &mut self.stack)?,
+                OP_ADD => instructions::op_add(&mut self.stack)?,
+                OP_SUBSTRACT => instructions::op_substract(&mut self.stack)?,
+                OP_MULTIPLY => instructions::op_multiply(&mut self.stack)?,
+                OP_DIVIDE => instructions::op_divide(&mut self.stack)?,
+                OP_NEGATE => instructions::op_negate(&mut self.stack)?,
+                OP_TRUE => instructions::op_true(&mut self.stack)?,
+                OP_FALSE => instructions::op_false(&mut self.stack)?,
+                OP_UNIT => instructions::op_unit(&mut self.stack)?,
+                OP_NOT => instructions::op_not(&mut self.stack)?,
+                OP_AND => instructions::op_and(&mut self.stack)?,
+                OP_OR => instructions::op_or(&mut self.stack)?,
+                OP_EQUAL => instructions::op_equal(&mut self.stack)?,
+                OP_GREATER => instructions::op_greater(&mut self.stack)?,
+                OP_LESS => instructions::op_less(&mut self.stack)?,
+                OP_POP => instructions::op_pop(&mut self.stack)?,
                 OP_RETURN => {
-                    let result = self.stack.pop();
-                    self.call_frames.pop();
-                    // if self.call_frames.is_empty() {
-                    //     return VmResult::Ok(None);
-                    // }
-
-                    return VmResult::Ok(result);
+                    let value = instructions::op_return(&mut self.stack, &mut self.call_frames)?;
+                    return Ok(VmResult::Ok(Some(value)));
                 }
-                OP_TRUE => self.stack.push(true.into()),
-                OP_FALSE => self.stack.push(false.into()),
-                OP_UNIT => self.stack.push(().into()),
-                OP_NOT => {
-                    if let Some(value) = self.stack.pop() {
-                        match value {
-                            Value::Boolean(i) => self.stack.push((!i).into()),
-                            Value::Unit => self.stack.push(true.into()),
-                            _ => unreachable!(),
-                        }
-                    }
-                }
-                OP_AND => {
-                    let rhs = self.stack.pop();
-                    let lhs = self.stack.pop();
-
-                    if let (Some(lhs), Some(rhs)) = (lhs, rhs) {
-                        let value = match (lhs, rhs) {
-                            (Value::Boolean(lhs), Value::Boolean(rhs)) => (lhs & rhs).into(),
-                            _ => false.into(),
-                        };
-
-                        self.stack.push(value);
-                    }
-                }
-                OP_OR => {
-                    let rhs = self.stack.pop();
-                    let lhs = self.stack.pop();
-
-                    if let (Some(lhs), Some(rhs)) = (lhs, rhs) {
-                        let value = match (lhs, rhs) {
-                            (Value::Boolean(lhs), Value::Boolean(rhs)) => (lhs | rhs).into(),
-                            _ => false.into(),
-                        };
-
-                        self.stack.push(value);
-                    }
-                }
-                OP_EQUAL => {
-                    let rhs = self.stack.pop();
-                    let lhs = self.stack.pop();
-
-                    if let (Some(lhs), Some(rhs)) = (lhs, rhs) {
-                        let value = match (lhs, rhs) {
-                            (Value::Integer(lhs), Value::Integer(rhs)) => (lhs == rhs).into(),
-                            (Value::Real(lhs), Value::Real(rhs)) => (lhs == rhs).into(),
-                            (Value::Boolean(lhs), Value::Boolean(rhs)) => (lhs == rhs).into(),
-                            (Value::Unit, Value::Unit) => true.into(),
-                            (Value::String(lhs), Value::String(rhs)) => (lhs == rhs).into(),
-                            _ => false.into(),
-                        };
-
-                        self.stack.push(value);
-                    }
-                }
-                OP_GREATER => {
-                    let rhs = self.stack.pop();
-                    let lhs = self.stack.pop();
-
-                    if let (Some(lhs), Some(rhs)) = (lhs, rhs) {
-                        let value = match (lhs, rhs) {
-                            (Value::Integer(lhs), Value::Integer(rhs)) => (lhs > rhs).into(),
-                            (Value::Real(lhs), Value::Real(rhs)) => (lhs > rhs).into(),
-                            (Value::Real(lhs), Value::Integer(rhs)) => (lhs > rhs as f64).into(),
-                            (Value::Integer(lhs), Value::Real(rhs)) => (lhs as f64 > rhs).into(),
-                            _ => unreachable!(),
-                        };
-
-                        self.stack.push(value);
-                    }
-                }
-                OP_LESS => {
-                    let rhs = self.stack.pop();
-                    let lhs = self.stack.pop();
-
-                    if let (Some(lhs), Some(rhs)) = (lhs, rhs) {
-                        let value = match (lhs, rhs) {
-                            (Value::Integer(lhs), Value::Integer(rhs)) => (lhs < rhs).into(),
-                            (Value::Real(lhs), Value::Real(rhs)) => (lhs < rhs).into(),
-                            (Value::Real(lhs), Value::Integer(rhs)) => (lhs < rhs as f64).into(),
-                            (Value::Integer(lhs), Value::Real(rhs)) => ((lhs as f64) < rhs).into(),
-                            _ => unreachable!(),
-                        };
-
-                        self.stack.push(value);
-                    }
-                }
-                OP_POP => {
-                    self.stack.pop();
-                }
-                OP_LOC_PUSH => {
-                    if let Some(Value::String(location)) = self.stack.pop() {
-                        self.locations.push(location);
-                    } else {
-                        return VmResult::RuntimeError;
-                    }
-                }
-                OP_LOC_POP => {
-                    self.locations.pop();
-                }
-                OP_JUMP_IF_FALSE => {
-                    let offset1 = chunk.code[frame.ip] as u16;
-                    frame.ip = frame.ip + 1;
-
-                    let offset2 = chunk.code[frame.ip] as u16;
-                    frame.ip = frame.ip + 1;
-
-                    if let Some(Value::Boolean(false)) = self.stack.last() {
-                        let offset = (offset1 << 8) | offset2;
-                        frame.ip = frame.ip + offset as usize;
-                    }
-                }
-                OP_JUMP => {
-                    let offset1 = chunk.code[frame.ip] as u16;
-                    frame.ip = frame.ip + 1;
-
-                    let offset2 = chunk.code[frame.ip] as u16;
-                    frame.ip = frame.ip + 1;
-
-                    let offset = (offset1 << 8) | offset2;
-                    frame.ip = frame.ip + offset as usize;
-                }
-                OP_JUMP_BACK => {
-                    let offset1 = chunk.code[frame.ip] as u16;
-                    frame.ip = frame.ip + 1;
-
-                    let offset2 = chunk.code[frame.ip] as u16;
-                    frame.ip = frame.ip + 1;
-
-                    let offset = (offset1 << 8) | offset2;
-                    frame.ip = frame.ip - offset as usize;
-                }
+                OP_LOC_PUSH => instructions::op_loc_push(&mut self.stack, &mut self.locations)?,
+                OP_LOC_POP => instructions::op_loc_pop(&mut self.locations)?,
+                OP_JUMP => ip = instructions::op_jump(ip, &frame)?,
+                OP_JUMP_BACK => ip = instructions::op_jump_back(ip, &frame)?,
+                OP_JUMP_IF_FALSE => ip = instructions::op_jump_if_false(ip, &frame, &mut self.stack)?,
+                OP_IMPORT => ip = instructions::op_import(ip, &frame, &mut self.state, &self.package_index)?,
+                OP_NEW => ip = instructions::op_new(ip, &frame, &mut self.stack)?,
+                OP_ARRAY => ip = instructions::op_array(ip, &frame, &mut self.stack)?,
+                OP_DOT => ip = instructions::op_dot(ip, &frame, &mut self.stack)?,
+                OP_INDEX => instructions::op_index(&mut self.stack)?,
+                //
+                //
+                //
                 OP_CALL => {
-                    let arg_count = chunk.code[frame.ip];
-                    frame.ip = frame.ip + 1;
+                    if let Some(arg_count) = frame.chunk.code.get(ip) {
+                        ip += 1;
 
-                    let offset = arg_count + 1;
+                        let offset = *arg_count as usize + 1;
+                        let function = self.stack.get(self.stack.len() - offset).cloned();
 
-                    let func = self.stack[self.stack.len() - offset as usize].clone();
-                    let func = if let Value::Function(func) = func {
-                        func
-                    } else {
-                        return VmResult::RuntimeError;
-                    };
+                        match function {
+                            Some(Value::Function(Function::UserDefined { chunk, .. })) => {
+                                self.call(chunk, *arg_count);
 
-                    match func {
-                        Function::UserDefined { .. } => {
-                            self.call(func, arg_count);
-                            if let VmResult::Ok(Some(result)) = self.run(None).await {
-                                for _i in vec![0; offset as usize] {
-                                    self.stack.pop();
+                                if let Ok(VmResult::Ok(Some(result))) = self.run(None).await {
+                                    for _i in vec![0; offset as usize] {
+                                        self.stack.pop();
+                                    }
+                                    self.stack.push(result);
                                 }
-                                self.stack.push(result);
                             }
-                        }
-                        Function::Native { name, .. } => {
-                            builtins::handle(name, &mut self.stack).unwrap();
-                        }
-                        Function::External {
-                            name,
-                            package,
-                            kind,
-                            version,
-                            parameters,
-                        } => {
-                            let mut arguments: HashMap<String, SpecValue> = HashMap::new();
-                            // Reverse order because of stack
-                            for p in parameters.iter().rev() {
-                                arguments.insert(p.name.clone(), self.stack.pop().unwrap().as_spec_value());
+                            Some(Value::Function(Function::Native { name, .. })) => {
+                                builtins::handle(name, &mut self.stack).unwrap();
                             }
-
-                            // The function itself.
-                            self.stack.pop();
-                            let location = self.locations.last().cloned();
-
-                            let call = VmCall {
+                            Some(Value::Function(Function::External {
+                                name,
                                 package,
-                                version,
                                 kind,
-                                location,
-                                function: name,
-                                arguments,
-                            };
-
-                            self.call_frames.pop();
-                            self.call_frames.push(frame.clone());
-
-                            let result = self.executor.execute(call).await.unwrap();
-                            self.stack.push(result);
-                        }
-                    }
-                }
-                OP_IMPORT => {
-                    let constant = chunk.code[frame.ip];
-                    frame.ip = frame.ip + 1;
-
-                    if let Some(Value::String(package_name)) = chunk.constants.get(constant as usize) {
-                        if let Some(package) = self.package_index.get(package_name, None) {
-                            let kind = match package.kind.as_str() {
-                                "ecu" => String::from("code"),
-                                "oas" => String::from("oas"),
-                                _ => unreachable!(),
-                            };
-
-                            if let Some(functions) = &package.functions {
-                                for (name, function) in functions {
-                                    self.state.insert(
-                                        name.clone(),
-                                        Value::Function(Function::External {
-                                            package: package_name.clone(),
-                                            version: package.version.clone(),
-                                            kind: kind.clone(),
-                                            name: name.clone(),
-                                            parameters: function.parameters.clone(),
-                                        }),
-                                    );
+                                version,
+                                parameters,
+                            })) => {
+                                let mut arguments: HashMap<String, SpecValue> = HashMap::new();
+                                // Reverse order because of stack
+                                for p in parameters.iter().rev() {
+                                    arguments.insert(p.name.clone(), self.stack.pop().unwrap().as_spec_value());
                                 }
-                            }
-                        } else {
-                            unreachable!()
-                        }
-                    } else {
-                        unreachable!()
-                    }
-                }
-                OP_NEW => {
-                    let properties_n = chunk.code[frame.ip];
-                    frame.ip = frame.ip + 1;
 
-                    let class = self.stack.pop();
-                    let mut properties = HashMap::new();
+                                // The function itself.
+                                self.stack.pop();
+                                let location = self.locations.last().cloned();
 
-                    (0..properties_n).for_each(|_| {
-                        let ident = self.stack.pop().unwrap();
-                        let value = self.stack.pop().unwrap();
+                                let call = VmCall {
+                                    package: package.clone(),
+                                    version: version.clone(),
+                                    kind: kind.clone(),
+                                    location,
+                                    function: name.clone(),
+                                    arguments,
+                                };
 
-                        if let Value::String(ident) = ident {
-                            properties.insert(ident, value);
-                        }
-                    });
+                                self.call_frames.pop();
+                                self.call_frames.push(frame.clone());
 
-                    if let Some(Value::Class(class)) = class {
-                        let instance = Instance::new(class, Some(properties));
-                        self.stack.push(Value::Instance(instance));
-                    } else {
-                        panic!("Not a class.");
-                    }
-                }
-                OP_ARRAY => {
-                    let entries_n = chunk.code[frame.ip];
-                    frame.ip = frame.ip + 1;
-
-                    let entries: Vec<Value> = (0..entries_n).map(|_| self.stack.pop().unwrap()).rev().collect();
-
-                    if entries.is_empty() {
-                        self.stack.push(Value::Array(Array {
-                            data_type: String::from("unit[]"),
-                            entries,
-                        }));
-                    } else {
-                        let data_type = match entries.get(0).unwrap() {
-                            Value::String(_) => String::from("string"),
-                            Value::Real(_) => String::from("real"),
-                            Value::Integer(_) => String::from("integer"),
-                            Value::Boolean(_) => String::from("boolean"),
-                            Value::Array(array) => array.data_type.clone(),
-                            Value::Instance(instance) => instance.class.name.clone(),
-                            Value::Class(_) | Value::Function(_) => todo!(),
-                            Value::Unit => String::from("unit"),
-                        };
-
-                        let data_type = format!("{}[]", data_type);
-                        self.stack.push(Value::Array(Array { data_type, entries }));
-                    }
-                }
-                OP_DOT => {
-                    let target = self.stack.pop();
-
-                    let property = chunk.code[frame.ip];
-                    frame.ip = frame.ip + 1;
-
-                    let property = if let Some(Value::String(property)) = chunk.constants.get(property as usize) {
-                        property.clone()
-                    } else {
-                        warn!("constant not found!");
-                        return VmResult::RuntimeError;
-                    };
-
-                    if let Some(Value::Instance(instance)) = target {
-                        if let Some(property) = instance.fields.get(&property) {
-                            self.stack.push(property.clone());
-                        } else {
-                            warn!("Property not found!");
-                            return VmResult::RuntimeError;
-                        }
-                    } else {
-                        warn!("Not an instance!");
-                        return VmResult::RuntimeError;
-                    }
-                }
-                OP_INDEX => {
-                    let index = self.stack.pop().expect("Empty stack while expecting `index` value.");
-                    let array = self.stack.pop().expect("Empty stack while expecting `array` value.");
-
-                    if let Value::Integer(index) = index {
-                        if let Value::Array(array) = array {
-                            let entries = array.entries;
-                            if let Some(entry) = entries.get(index as usize) {
-                                self.stack.push(entry.clone());
-                            } else {
-                                return VmResult::RuntimeError;
-                            }
-                        } else {
-                            return VmResult::RuntimeError;
+                                let result = self.executor.execute(call).await.unwrap();
+                                self.stack.push(result);
+                            },
+                            _ => bail!("Trying to call something that's not a function."),
                         }
                     }
                 }
+                //
+                //
+                //
                 OP_PARALLEL => {
-                    let blocks_n = chunk.code[frame.ip];
-                    frame.ip = frame.ip + 1;
+                    let blocks_n = frame.chunk.code[ip];
+                    ip += 1;
 
                     let blocks: Vec<Value> = (0..blocks_n).map(|_| self.stack.pop().unwrap()).rev().collect();
 
@@ -688,17 +301,17 @@ where
                             .await;
 
                         if results.iter().any(|r| match r {
-                            Ok(VmResult::RuntimeError) => true,
+                            Ok(Ok(VmResult::RuntimeError)) => true,
                             Err(_) => true,
                             _ => false,
                         }) {
-                            return VmResult::RuntimeError;
+                            return Ok(VmResult::RuntimeError);
                         }
 
                         let entries: Vec<Value> = results
                             .into_iter()
                             .map(|r| match r {
-                                Ok(VmResult::Ok(value)) => value.unwrap_or(Value::Unit),
+                                Ok(Ok(VmResult::Ok(value))) => value.unwrap_or(Value::Unit),
                                 _ => unreachable!(),
                             })
                             .collect();
@@ -717,7 +330,7 @@ where
                         let data_type = format!("{}[]", data_type);
                         self.stack.push(Value::Array(Array { data_type, entries }));
                     }
-                },
+                }
                 0x00 | 0x24..=u8::MAX => {
                     unreachable!()
                 }

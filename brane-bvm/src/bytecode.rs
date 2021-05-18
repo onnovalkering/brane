@@ -1,5 +1,5 @@
 use anyhow::Result;
-use bytes::{BufMut, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use specifications::common::Parameter;
 use std::fmt::{self, Write};
 
@@ -60,7 +60,7 @@ pub enum Function {
     UserDefined {
         name: String,
         arity: u8,
-        chunk: Chunk,
+        chunk: ReadOnlyChunk,
     },
 }
 
@@ -68,7 +68,7 @@ impl Function {
     pub fn new(
         name: String,
         arity: u8,
-        chunk: Chunk,
+        chunk: ReadOnlyChunk,
     ) -> Self {
         Function::UserDefined { arity, name, chunk }
     }
@@ -87,67 +87,13 @@ impl fmt::Debug for Function {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Chunk {
-    pub code: BytesMut,
+#[derive(Debug, Clone)]
+pub struct ReadOnlyChunk {
+    pub code: Bytes,
     pub constants: Vec<Value>,
 }
 
-impl Chunk {
-    ///
-    ///
-    ///
-    pub fn new() -> Self {
-        Chunk {
-            code: BytesMut::new(),
-            constants: Vec::new(),
-        }
-    }
-
-    ///
-    ///
-    ///
-    pub fn write<B: Into<u8>>(
-        &mut self,
-        byte: B,
-    ) {
-        self.code.put_u8(byte.into());
-    }
-
-    ///
-    ///
-    ///
-    pub fn write_pair<B1: Into<u8>, B2: Into<u8>>(
-        &mut self,
-        byte1: B1,
-        byte2: B2,
-    ) {
-        self.code.put_u8(byte1.into());
-        self.code.put_u8(byte2.into());
-    }
-
-    ///
-    ///
-    ///
-    pub fn write_bytes(
-        &mut self,
-        bytes: &[u8],
-    ) {
-        self.code.extend(bytes);
-    }
-
-    ///
-    ///
-    ///
-    pub fn add_constant(
-        &mut self,
-        value: Value,
-    ) -> u8 {
-        self.constants.push(value);
-
-        (self.constants.len() as u8) - 1
-    }
-
+impl ReadOnlyChunk {
     ///
     ///
     ///
@@ -294,13 +240,85 @@ impl Chunk {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct Chunk {
+    pub code: BytesMut,
+    pub constants: Vec<Value>,
+}
+
+impl Chunk {
+    ///
+    ///
+    ///
+    pub fn new() -> Self {
+        Chunk {
+            code: BytesMut::new(),
+            constants: Vec::new(),
+        }
+    }
+
+    ///
+    ///
+    ///
+    pub fn freeze(self) -> ReadOnlyChunk {
+        ReadOnlyChunk {
+            code: self.code.freeze(),
+            constants: self.constants,
+        }
+    }
+
+    ///
+    ///
+    ///
+    pub fn write<B: Into<u8>>(
+        &mut self,
+        byte: B,
+    ) {
+        self.code.put_u8(byte.into());
+    }
+
+    ///
+    ///
+    ///
+    pub fn write_pair<B1: Into<u8>, B2: Into<u8>>(
+        &mut self,
+        byte1: B1,
+        byte2: B2,
+    ) {
+        self.code.put_u8(byte1.into());
+        self.code.put_u8(byte2.into());
+    }
+
+    ///
+    ///
+    ///
+    pub fn write_bytes(
+        &mut self,
+        bytes: &[u8],
+    ) {
+        self.code.extend(bytes);
+    }
+
+    ///
+    ///
+    ///
+    pub fn add_constant(
+        &mut self,
+        value: Value,
+    ) -> u8 {
+        self.constants.push(value);
+
+        (self.constants.len() as u8) - 1
+    }
+}
+
 ///
 ///
 ///
 fn jump_instruction(
     name: &str,
     sign: i16,
-    chunk: &Chunk,
+    chunk: &ReadOnlyChunk,
     offset: usize,
     result: &mut String,
 ) {
@@ -323,7 +341,7 @@ fn jump_instruction(
 ///
 fn constant_instruction(
     name: &str,
-    chunk: &Chunk,
+    chunk: &ReadOnlyChunk,
     offset: usize,
     result: &mut String,
 ) {
@@ -340,7 +358,7 @@ fn constant_instruction(
 ///
 fn byte_instruction(
     name: &str,
-    chunk: &Chunk,
+    chunk: &ReadOnlyChunk,
     offset: usize,
     result: &mut String,
 ) {

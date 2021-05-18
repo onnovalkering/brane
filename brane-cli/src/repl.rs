@@ -303,17 +303,18 @@ async fn local_repl(
                         vm.call(function, 0);
                         loop {
                             match vm.run(None).await {
-                                VmResult::Ok(value) => {
+                                Ok(VmResult::Ok(value)) => {
                                     let output = value.map(|v| format!("{:?}", v)).unwrap_or_default();
                                     if !output.is_empty() {
                                         println!("{}", output);
                                     }
                                     break;
                                 }
-                                VmResult::RuntimeError => {
+                                Ok(VmResult::RuntimeError) => {
                                     eprintln!("Runtime error!");
                                     break;
-                                }
+                                },
+                                _ => unreachable!()
                             }
                         }
                     }

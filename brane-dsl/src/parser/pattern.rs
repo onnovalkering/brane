@@ -47,7 +47,6 @@ fn pattern_to_call(
     pattern: Vec<Expr>,
     patterns: &Vec<FunctionPattern>,
 ) -> Result<Expr> {
-    dbg!(&patterns);
     let terms_pattern = build_terms_pattern(&pattern)?;
     debug!("Attempting to rewrite to call: {:?}", terms_pattern);
 

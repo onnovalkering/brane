@@ -64,8 +64,6 @@ fn expr_pratt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
     loop {
         match operator::parse::<E>(remainder) {
             Ok((r, Operator::Binary(operator))) => {
-                debug!("binary");
-
                 let (left_bp, right_bp) = operator.binding_power();
                 if left_bp < min_bp {
                     break;
