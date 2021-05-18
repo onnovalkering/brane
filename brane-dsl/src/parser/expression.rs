@@ -1,11 +1,11 @@
-use std::num::NonZeroUsize;
-use crate::tag_token;
+use super::ast::{Expr, Operator, UnOp};
+use crate::parser::{identifier, instance, literal, operator};
 use crate::scanner::{Token, Tokens};
-use crate::parser::{literal, operator, identifier, instance};
-use super::ast::{UnOp, Operator, Expr};
+use crate::tag_token;
 use nom::error::{ContextError, ParseError};
 use nom::{branch, combinator as comb, multi, sequence as seq};
 use nom::{IResult, Parser};
+use std::num::NonZeroUsize;
 
 ///
 ///
@@ -25,7 +25,10 @@ fn expr_pratt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
         Ok((r, UnOp::Idx)) => {
             let (r2, entries) = seq::terminated(
                 comb::opt(seq::terminated(
-                    seq::pair(self::parse, multi::many0(seq::preceded(tag_token!(Token::Comma), self::parse))),
+                    seq::pair(
+                        self::parse,
+                        multi::many0(seq::preceded(tag_token!(Token::Comma), self::parse)),
+                    ),
                     comb::opt(tag_token!(Token::Comma)),
                 )),
                 tag_token!(Token::RightBracket),
@@ -117,7 +120,8 @@ pub fn expr_atom<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
         call_expr,
         comb::map(literal::parse, |l| Expr::Literal(l)),
         comb::map(identifier::parse, |i| Expr::Ident(i)),
-    )).parse(input)
+    ))
+    .parse(input)
 }
 
 /// Integrate this in pratt parser? To support, e.g., f()()() ?

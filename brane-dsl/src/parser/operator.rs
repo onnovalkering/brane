@@ -1,11 +1,10 @@
-use std::num::NonZeroUsize;
-use crate::tag_token;
+use super::ast::{BinOp, Operator, UnOp};
 use crate::scanner::{Token, Tokens};
-use super::ast::{UnOp, BinOp, Operator};
+use crate::tag_token;
 use nom::error::{ContextError, ParseError};
 use nom::{branch, combinator as comb};
 use nom::{IResult, Parser};
-
+use std::num::NonZeroUsize;
 
 ///
 ///

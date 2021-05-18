@@ -19,11 +19,7 @@ pub fn parse<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'
 pub fn single_line_comment<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(
     input: Span<'a>
 ) -> IResult<Span<'a>, Token, E> {
-    comb::value(
-        Token::None,
-        seq::pair(bc::tag("//"), bc::is_not("\n\r")),
-    )
-    .parse(input)
+    comb::value(Token::None, seq::pair(bc::tag("//"), bc::is_not("\n\r"))).parse(input)
 }
 
 ///

@@ -38,6 +38,10 @@ pub enum Stmt {
         location: Expr,
         block: Block,
     },
+    Parallel {
+        let_assign: Option<Ident>,
+        blocks: Vec<Stmt>,
+    },
     Return(Option<Expr>),
     While {
         condition: Expr,
@@ -146,7 +150,7 @@ impl BinOp {
             BinOp::Le | BinOp::Ge => (5, 6),    // Comparison
             BinOp::Add | BinOp::Sub => (7, 8),  // Terms
             BinOp::Mul | BinOp::Div => (9, 10), // Factors
-            BinOp::Dot => (13, 14), // Nesting
+            BinOp::Dot => (13, 14),             // Nesting
         }
     }
 }

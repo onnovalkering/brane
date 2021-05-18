@@ -1,32 +1,37 @@
+use crate::parser::ast::{Expr, Ident, Stmt};
 use anyhow::Result;
 use itertools::interleave;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use regex::Regex;
-use crate::parser::ast::{Stmt, Expr, Ident};
-use specifications::{common::{CallPattern, Function, Parameter}, package::{PackageIndex, PackageInfo}};
+use specifications::{
+    common::{CallPattern, Function, Parameter},
+    package::{PackageIndex, PackageInfo},
+};
 
 type Map<T> = std::collections::HashMap<String, T>;
-
 
 /// !! Rudimentary support for patterns.
 ///
 ///
-pub fn resolve_patterns(program: Vec<Stmt>, package_index: &PackageIndex) -> Result<Vec<Stmt>> {
-    let mut function_patterns = vec!();
+pub fn resolve_patterns(
+    program: Vec<Stmt>,
+    package_index: &PackageIndex,
+) -> Result<Vec<Stmt>> {
+    let mut function_patterns = vec![];
     for (_, package) in &package_index.packages {
         let package_patterns = get_module_patterns(package)?;
         function_patterns.extend(package_patterns);
     }
 
-    let mut statements = vec!();
+    let mut statements = vec![];
     for stmt in program {
         let stmt = match stmt {
             Stmt::Expr(Expr::Pattern(pattern)) => {
                 let call = pattern_to_call(pattern, &function_patterns)?;
                 Stmt::Expr(call)
             }
-            stmt => stmt
+            stmt => stmt,
         };
 
         statements.push(stmt);
@@ -38,7 +43,10 @@ pub fn resolve_patterns(program: Vec<Stmt>, package_index: &PackageIndex) -> Res
 ///
 ///
 ///
-fn pattern_to_call(pattern: Vec<Expr>, patterns: &Vec<FunctionPattern>) -> Result<Expr> {
+fn pattern_to_call(
+    pattern: Vec<Expr>,
+    patterns: &Vec<FunctionPattern>,
+) -> Result<Expr> {
     dbg!(&patterns);
     let terms_pattern = build_terms_pattern(&pattern)?;
     debug!("Attempting to rewrite to call: {:?}", terms_pattern);
@@ -46,7 +54,10 @@ fn pattern_to_call(pattern: Vec<Expr>, patterns: &Vec<FunctionPattern>) -> Resul
     let (function, indexes) = match_pattern_to_function(terms_pattern, patterns)?;
     let arguments = indexes.into_iter().map(|i| pattern.get(i).unwrap()).cloned().collect();
 
-    Ok(Expr::Call { function: Ident(function.name.clone()), arguments })
+    Ok(Expr::Call {
+        function: Ident(function.name.clone()),
+        arguments,
+    })
 }
 
 #[derive(Clone, Debug)]
@@ -150,9 +161,7 @@ fn build_pattern(
 ///
 ///
 ///
-fn build_terms_pattern(
-    terms: &Vec<Expr>,
-) -> Result<String> {
+fn build_terms_pattern(terms: &Vec<Expr>) -> Result<String> {
     let mut term_pattern_segments = vec![];
     for term in terms {
         match term {
@@ -193,7 +202,10 @@ fn create_temp_var(literal: bool) -> String {
 ///
 ///
 ///
-fn match_pattern_to_function(pattern: String, functions: &Vec<FunctionPattern>) -> Result<(FunctionPattern, Vec<usize>)> {
+fn match_pattern_to_function(
+    pattern: String,
+    functions: &Vec<FunctionPattern>,
+) -> Result<(FunctionPattern, Vec<usize>)> {
     for function in functions {
         debug!("Check: {:?}", &function.pattern);
         let needle = Regex::new(&function.pattern).unwrap();
@@ -206,13 +218,7 @@ fn match_pattern_to_function(pattern: String, functions: &Vec<FunctionPattern>) 
                     .split(' ')
                     .into_iter()
                     .enumerate()
-                    .filter_map(|(i, t)| {
-                        if t.starts_with('<') {
-                            Some(i)
-                        } else {
-                            None
-                        }
-                    })
+                    .filter_map(|(i, t)| if t.starts_with('<') { Some(i) } else { None })
                     .collect();
 
                 return Ok((function.clone(), arg_indexes));

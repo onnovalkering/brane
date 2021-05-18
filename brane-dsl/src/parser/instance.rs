@@ -1,34 +1,30 @@
-use std::num::NonZeroUsize;
-use crate::tag_token;
+use super::ast::{Expr, Stmt};
 use crate::parser::{expression, identifier};
 use crate::scanner::{Token, Tokens};
-use super::ast::{Stmt, Expr};
+use crate::tag_token;
 use nom::error::{ContextError, ParseError};
 use nom::{combinator as comb, multi, sequence as seq};
 use nom::{IResult, Parser};
+use std::num::NonZeroUsize;
 
 ///
 ///
 ///
-pub fn parse<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
-    input: Tokens<'a>
-) -> IResult<Tokens, Expr, E> {
+pub fn parse<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(input: Tokens<'a>) -> IResult<Tokens, Expr, E> {
     comb::map(
         seq::preceded(
             tag_token!(Token::New),
-            comb::cut(
-                seq::pair(
-                    identifier::parse,
-                    seq::delimited(
-                        tag_token!(Token::LeftBrace),
-                        comb::opt(seq::pair(
-                            instance_property_stmt,
-                            multi::many0(seq::preceded(tag_token!(Token::Comma), instance_property_stmt)),
-                        )),
-                        tag_token!(Token::RightBrace),
-                    )
-                )
-            )
+            comb::cut(seq::pair(
+                identifier::parse,
+                seq::delimited(
+                    tag_token!(Token::LeftBrace),
+                    comb::opt(seq::pair(
+                        instance_property_stmt,
+                        multi::many0(seq::preceded(tag_token!(Token::Comma), instance_property_stmt)),
+                    )),
+                    tag_token!(Token::RightBrace),
+                ),
+            )),
         ),
         |(class, properties)| {
             let properties: Vec<Stmt> = properties

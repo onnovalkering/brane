@@ -1,6 +1,9 @@
 use crate::parser::ast::*;
 use anyhow::Result;
-use brane_bvm::{bytecode::{Chunk, Function, OpCode}, values::{Class, Value}};
+use brane_bvm::{
+    bytecode::{Chunk, Function, OpCode},
+    values::{Class, Value},
+};
 
 #[derive(Debug, Clone)]
 pub struct Local {
@@ -73,7 +76,10 @@ pub fn stmt_to_opcodes(
             let import = chunk.add_constant(ident.clone().into());
             chunk.write_pair(OpCode::OpImport, import);
         }
-        Stmt::DeclareClass { ident: Ident(ident), properties } => {
+        Stmt::DeclareClass {
+            ident: Ident(ident),
+            properties,
+        } => {
             let class = Value::Class(Class::new(ident.clone().into(), properties));
             let class = chunk.add_constant(class);
             chunk.write_pair(OpCode::OpClass, class);
@@ -258,12 +264,9 @@ pub fn stmt_to_opcodes(
 
             let ident = chunk.add_constant(ident.into());
             chunk.write_pair(OpCode::OpDefineGlobal, ident);
-        },
+        }
         // TODO: merge with block statement?
-        Stmt::On {
-            location,
-            block,
-        } => {
+        Stmt::On { location, block } => {
             // Create a new scope (shadow).
             let scope = scope + 1;
 
@@ -286,6 +289,35 @@ pub fn stmt_to_opcodes(
             }
 
             chunk.write(OpCode::OpLocPop);
+        },
+        Stmt::Parallel { let_assign, blocks } => {
+            let block_n = blocks.len() as u8;
+            for block in blocks.into_iter().rev() {
+                let function = compile_function(vec![block], scope, &vec![], String::new()).unwrap();
+                let function = chunk.add_constant(function.into());
+
+                chunk.write_pair(OpCode::OpConstant, function);
+            }
+
+            chunk.write_pair(OpCode::OpParallel, block_n);
+
+            if let Some(Ident(ident)) = let_assign {
+                // Don't put a local's name in the globals table.
+                // Instead, just note that there's a local on the stack.
+                if scope > 0 {
+                    let local = Local {
+                        name: ident,
+                        depth: scope,
+                    };
+                    locals.push(local);
+                    return;
+                }
+
+                let ident = chunk.add_constant(ident.into());
+                chunk.write_pair(OpCode::OpDefineGlobal, ident);
+            } else {
+                chunk.write(OpCode::OpPop);
+            }
         }
     }
 }
@@ -310,7 +342,7 @@ pub fn expr_to_opcodes(
             let rhs_operand = *rhs_operand;
 
             if let BinOp::Dot = operator {
-                if let Expr::Ident(Ident(ident)) = &rhs_operand   {
+                if let Expr::Ident(Ident(ident)) = &rhs_operand {
                     let constant = chunk.add_constant(ident.clone().into());
                     chunk.write_pair(OpCode::OpDot, constant);
                     return;
@@ -350,7 +382,7 @@ pub fn expr_to_opcodes(
                 BinOp::And => chunk.write(OpCode::OpAnd),
                 BinOp::Or => chunk.write(OpCode::OpOr),
 
-                _ => unreachable!()
+                _ => unreachable!(),
             }
         }
         Expr::Unary { operator, operand } => {
@@ -421,13 +453,13 @@ pub fn expr_to_opcodes(
             }
 
             chunk.write_pair(OpCode::OpArray, entries_n);
-        },
+        }
         Expr::Index { array, index } => {
             expr_to_opcodes(*array, chunk, locals, scope);
             expr_to_opcodes(*index, chunk, locals, scope);
 
             chunk.write(OpCode::OpIndex);
-        },
+        }
         Expr::Pattern(_) => {
             // Converted into one or more `Expr::Call` expressions.
             unreachable!()

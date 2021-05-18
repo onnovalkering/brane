@@ -1,9 +1,12 @@
-use crate::tag_token;
+use super::ast::{Expr, Ident, Operator, Stmt, UnOp};
+use crate::parser::{identifier, literal, operator, pattern};
 use crate::scanner::{Token, Tokens};
-use crate::parser::{operator, literal, identifier, pattern};
-use super::ast::{Ident, UnOp, Operator, Stmt, Expr};
-use nom::{Needed, error::{ContextError, ErrorKind, ParseError, VerboseError}};
+use crate::tag_token;
 use nom::{branch, combinator as comb, multi, sequence as seq};
+use nom::{
+    error::{ContextError, ErrorKind, ParseError, VerboseError},
+    Needed,
+};
 use nom::{IResult, Parser};
 use specifications::package::PackageIndex;
 use std::num::NonZeroUsize;
@@ -11,14 +14,15 @@ use std::num::NonZeroUsize;
 ///
 ///
 ///
-pub fn parse_ast(input: Tokens, package_index: PackageIndex) -> IResult<Tokens, Vec<Stmt>, VerboseError<Tokens>> {
+pub fn parse_ast(
+    input: Tokens,
+    package_index: PackageIndex,
+) -> IResult<Tokens, Vec<Stmt>, VerboseError<Tokens>> {
     comb::all_consuming(multi::many0(parse_stmt))
         .parse(input)
         .map(|(tokens, program)| {
             let program = pattern::resolve_patterns(program, &package_index)
-                .map_err(|_| {
-                    nom::Err::Incomplete(Needed::Size(NonZeroUsize::new(1).unwrap()))
-                })?;
+                .map_err(|_| nom::Err::Incomplete(Needed::Size(NonZeroUsize::new(1).unwrap())))?;
 
             Ok((tokens, program))
         })?
@@ -34,13 +38,7 @@ pub fn parse_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
         return Err(nom::Err::Error(nom::error_position!(input, ErrorKind::Tag)));
     }
 
-    branch::alt((
-        import_stmt,
-        assign_stmt,
-        return_stmt,
-        expr_stmt,
-    ))
-    .parse(input)
+    branch::alt((import_stmt, assign_stmt, return_stmt, expr_stmt)).parse(input)
 }
 
 ///
@@ -73,14 +71,7 @@ pub fn import_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
                 comb::cut(seq::terminated(
                     seq::pair(
                         identifier::parse,
-                        comb::opt(
-                            multi::many0(
-                                seq::preceded(
-                                    tag_token!(Token::Comma),
-                                    identifier::parse
-                                )
-                            ),
-                        )
+                        comb::opt(multi::many0(seq::preceded(tag_token!(Token::Comma), identifier::parse))),
                     ),
                     tag_token!(Token::Semicolon),
                 )),
@@ -88,11 +79,11 @@ pub fn import_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
             |(package, packages)| {
                 let mut packages: Vec<Ident> = packages.unwrap_or_default();
                 packages.insert(0, package);
-                packages.dedup_by(|Ident(a), Ident(b)| { a.eq_ignore_ascii_case(b) });
+                packages.dedup_by(|Ident(a), Ident(b)| a.eq_ignore_ascii_case(b));
 
                 let imports = packages
                     .into_iter()
-                    .map(|package| Stmt::Import { package, version: None})
+                    .map(|package| Stmt::Import { package, version: None })
                     .collect();
 
                 Stmt::Block(imports)
@@ -193,7 +184,7 @@ fn expr_pratt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
                         terms.push(ident);
 
                         terms
-                    },
+                    }
                     current => {
                         vec![current, ident]
                     }
@@ -248,7 +239,7 @@ fn expr_pratt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
                     }
                 };
             }
-            _ => break
+            _ => break,
         }
     }
 
@@ -263,7 +254,7 @@ pub fn expr_atom<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ) -> IResult<Tokens, Expr, E> {
     branch::alt((
         comb::map(literal::parse, |l| Expr::Literal(l)),
-        comb::map(identifier::parse, |x| Expr::Ident(x))
+        comb::map(identifier::parse, |x| Expr::Ident(x)),
     ))
     .parse(input)
 }

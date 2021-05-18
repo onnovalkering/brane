@@ -54,6 +54,7 @@ fn keyword<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>
         comb::map(bc::tag("let"), |s| Token::Let(s)),
         comb::map(bc::tag("new"), |s| Token::New(s)),
         comb::map(bc::tag("on"), |s| Token::On(s)),
+        comb::map(bc::tag("parallel"), |s| Token::Parallel(s)),
         comb::map(bc::tag("return"), |s| Token::Return(s)),
         comb::map(bc::tag("unit"), |s| Token::Unit(s)),
         comb::map(bc::tag("while"), |s| Token::While(s)),

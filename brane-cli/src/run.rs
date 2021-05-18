@@ -1,4 +1,4 @@
-use crate::{registry};
+use crate::{docker::DockerExecutor, registry};
 use anyhow::Result;
 use brane_bvm::{VmOptions};
 use brane_bvm::{VmResult, VM};
@@ -19,17 +19,15 @@ pub async fn handle(
     let mut compiler = Compiler::new(compiler_options, package_index.clone());
 
     let options = VmOptions { always_return: true };
-    let mut vm = VM::new("local-run", package_index, None, Some(options));
+    let executor = DockerExecutor::new();
+    let mut vm = VM::new("local-run", package_index, None, Some(options), executor);
 
     match compiler.compile(source_code) {
         Ok(function) => {
             vm.call(function, 0);
 
             loop {
-                match vm.run(None) {
-                    VmResult::Call(_) => {
-                        todo!();
-                    }
+                match vm.run(None).await {
                     VmResult::Ok(value) => {
                         let output = value.map(|v| format!("{:?}", v)).unwrap_or_default();
                         if !output.is_empty() {

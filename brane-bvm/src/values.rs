@@ -16,7 +16,10 @@ pub enum Value {
 }
 
 impl fmt::Debug for Value {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
         match self {
             Value::String(string) => write!(f, "\"{}\"", string),
             Value::Boolean(boolean) => write!(f, "{}", boolean),
@@ -30,7 +33,6 @@ impl fmt::Debug for Value {
         }
     }
 }
-
 
 impl Value {
     pub fn as_spec_value(&self) -> SpecValue {
@@ -47,14 +49,14 @@ impl Value {
                     properties.insert(key.clone(), value.as_spec_value());
                 }
 
-                SpecValue::Struct {
-                    data_type,
-                    properties
-                }
-            },
+                SpecValue::Struct { data_type, properties }
+            }
             Value::Array(array) => {
                 let entries = array.entries.iter().map(|e| e.as_spec_value()).collect();
-                SpecValue::Array { data_type: array.data_type.clone(), entries }
+                SpecValue::Array {
+                    data_type: array.data_type.clone(),
+                    entries,
+                }
             }
             _ => unreachable!(),
         }
@@ -68,7 +70,10 @@ pub struct Array {
 }
 
 impl fmt::Debug for Array {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
         write!(f, "{}", self.data_type)
     }
 }
@@ -80,16 +85,19 @@ pub struct Class {
 }
 
 impl Class {
-    pub fn new(name: String, properties: HashMap<String, String>) -> Self {
-        Self {
-            name,
-            properties,
-        }
+    pub fn new(
+        name: String,
+        properties: HashMap<String, String>,
+    ) -> Self {
+        Self { name, properties }
     }
 }
 
 impl fmt::Debug for Class {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
         write!(f, "class<{}>", self.name)
     }
 }
@@ -101,19 +109,22 @@ pub struct Instance {
 }
 
 impl Instance {
-    pub fn new(class: Class, fields: Option<HashMap<String, Value>>) -> Self {
+    pub fn new(
+        class: Class,
+        fields: Option<HashMap<String, Value>>,
+    ) -> Self {
         let mut fields = fields.unwrap_or_default();
         fields.insert(String::from("__class"), class.name.clone().into());
 
-        Self {
-            class,
-            fields,
-        }
+        Self { class, fields }
     }
 }
 
 impl fmt::Debug for Instance {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
         write!(f, "instance<{}>", self.class.name)
     }
 }
@@ -132,7 +143,10 @@ impl From<SpecValue> for Value {
                     fields.insert(key.clone(), Value::from(spec_value.clone()));
                 }
 
-                let class  = Class { name: data_type.clone(), properties: HashMap::new() };
+                let class = Class {
+                    name: data_type.clone(),
+                    properties: HashMap::new(),
+                };
                 Value::Instance(Instance { class, fields })
             }
             SpecValue::Array { data_type, entries } => {

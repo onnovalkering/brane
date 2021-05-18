@@ -11,6 +11,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0"
 appdirs = "0.2"
+async-trait = "0.1"
 base64 = "0.12"
 bollard = "0.10"
 brane-bvm = { path = "../brane-bvm" }

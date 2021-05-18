@@ -1,9 +1,9 @@
-use crate::docker::{self, ExecuteInfo};
-use crate::{packages, registry};
-use anyhow::{Context as _, Result};
+use crate::docker::DockerExecutor;
+use crate::registry;
+use anyhow::Result;
 use brane_bvm::bytecode::Function;
-use brane_bvm::{values::Value, VmOptions};
-use brane_bvm::{VmCall, VmResult, VM};
+use brane_bvm::VmOptions;
+use brane_bvm::{VmResult, VM};
 use brane_drv::grpc::{CreateSessionRequest, DriverServiceClient, ExecuteRequest};
 use brane_dsl::{Compiler, CompilerOptions, Lang};
 use rustyline::completion::{Completer, FilenameCompleter, Pair};
@@ -14,9 +14,6 @@ use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{self, MatchingBracketValidator, Validator};
 use rustyline::{CompletionType, Config, Context, EditMode, Editor};
 use rustyline_derive::Helper;
-use serde::de::DeserializeOwned;
-use specifications::common::Value as SpecValue;
-use specifications::package::PackageInfo;
 use std::borrow::Cow::{self, Borrowed, Owned};
 use std::fs;
 use std::path::PathBuf;
@@ -284,7 +281,8 @@ async fn local_repl(
     let package_index = registry::get_package_index().await?;
     let mut compiler = Compiler::new(compiler_options, package_index.clone());
     let options = VmOptions { always_return: true };
-    let mut vm = VM::new("local-repl", package_index, None, Some(options));
+    let executor = DockerExecutor::new();
+    let mut vm = VM::new("local-repl", package_index, None, Some(options), executor);
 
     let mut count: u32 = 1;
     loop {
@@ -304,12 +302,7 @@ async fn local_repl(
 
                         vm.call(function, 0);
                         loop {
-                            match vm.run(None) {
-                                VmResult::Call(call) => {
-                                    let result = make_function_call(call).await?;
-                                    println!("{:?}", result);
-                                    vm.result(result);
-                                }
+                            match vm.run(None).await {
                                 VmResult::Ok(value) => {
                                     let output = value.map(|v| format!("{:?}", v)).unwrap_or_default();
                                     if !output.is_empty() {
@@ -345,74 +338,4 @@ async fn local_repl(
     }
 
     Ok(())
-}
-
-///
-///
-///
-async fn make_function_call(call: VmCall) -> Result<Value> {
-    let package_dir = packages::get_package_dir(&call.package, Some("latest"))?;
-    let package_file = package_dir.join("package.yml");
-    let package_info = PackageInfo::from_path(package_file)?;
-
-    if let Some(location) = call.location {
-        warn!("Ignoring location '{}', running locally.", location);
-    }
-
-    let kind = match package_info.kind.as_str() {
-        "ecu" => String::from("code"),
-        "oas" => String::from("oas"),
-        _ => {
-            unreachable!()
-        }
-    };
-
-    let image = format!("{}:{}", package_info.name, package_info.version);
-    let image_file = Some(package_dir.join("image.tar"));
-
-    let command = vec![
-        String::from("-d"),
-        String::from("--application-id"),
-        String::from("test"),
-        String::from("--location-id"),
-        String::from("localhost"),
-        String::from("--job-id"),
-        String::from("1"),
-        kind,
-        call.function.clone(),
-        base64::encode(serde_json::to_string(&call.arguments)?),
-    ];
-
-    let exec = ExecuteInfo::new(image, image_file, None, Some(command));
-
-    let (stdout, stderr) = docker::run_and_wait(exec).await?;
-    debug!("stderr: {}", stderr);
-    debug!("stdout: {}", stdout);
-
-    let output = stdout.lines().last().unwrap_or_default().to_string();
-    let output: Result<SpecValue> = decode_b64(output);
-    match output {
-        Ok(value) => Ok(Value::from(value)),
-        Err(err) => {
-            println!("{:?}", err);
-            Ok(Value::Unit)
-        }
-    }
-}
-
-///
-///
-///
-fn decode_b64<T>(input: String) -> Result<T>
-where
-    T: DeserializeOwned,
-{
-    let input =
-        base64::decode(input).with_context(|| "Decoding failed, encoded input doesn't seem to be Base64 encoded.")?;
-
-    let input = String::from_utf8(input[..].to_vec())
-        .with_context(|| "Conversion failed, decoded input doesn't seem to be UTF-8 encoded.")?;
-
-    serde_json::from_str(&input)
-        .with_context(|| "Deserialization failed, decoded input doesn't seem to be as expected.")
 }

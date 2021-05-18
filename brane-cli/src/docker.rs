@@ -1,4 +1,8 @@
-use anyhow::Result;
+use crate::{packages};
+use anyhow::{Context as _, Result};
+use brane_bvm::VmExecutor;
+use brane_bvm::values::Value;
+use brane_bvm::VmCall;
 use bollard::container::{
     Config, CreateContainerOptions, LogOutput, LogsOptions, RemoveContainerOptions, StartContainerOptions,
     WaitContainerOptions,
@@ -17,6 +21,10 @@ use std::path::PathBuf;
 use tokio::fs::File as TFile;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use uuid::Uuid;
+use serde::de::DeserializeOwned;
+use specifications::common::Value as SpecValue;
+use specifications::package::PackageInfo;
+use async_trait::async_trait;
 
 lazy_static! {
     static ref DOCKER_NETWORK: String = env::var("DOCKER_NETWORK").unwrap_or_else(|_| String::from("host"));
@@ -25,6 +33,93 @@ lazy_static! {
     static ref DOCKER_VOLUME: String = env::var("DOCKER_VOLUME").unwrap_or_else(|_| String::from(""));
     static ref DOCKER_VOLUMES_FROM: String = env::var("DOCKER_VOLUMES_FROM").unwrap_or_else(|_| String::from(""));
 }
+
+#[derive(Clone)]
+pub struct DockerExecutor {}
+
+impl DockerExecutor {
+    pub fn new() -> Self {
+        Self { }
+    }
+}
+
+#[async_trait]
+impl VmExecutor for DockerExecutor {
+    async fn execute(&self, call: VmCall) -> Result<Value> {
+        make_function_call(call).await
+    }
+}
+
+///
+///
+///
+async fn make_function_call(call: VmCall) -> Result<Value> {
+    let package_dir = packages::get_package_dir(&call.package, Some("latest"))?;
+    let package_file = package_dir.join("package.yml");
+    let package_info = PackageInfo::from_path(package_file)?;
+
+    if let Some(location) = call.location {
+        warn!("Ignoring location '{}', running locally.", location);
+    }
+
+    let kind = match package_info.kind.as_str() {
+        "ecu" => String::from("code"),
+        "oas" => String::from("oas"),
+        _ => {
+            unreachable!()
+        }
+    };
+
+    let image = format!("{}:{}", package_info.name, package_info.version);
+    let image_file = Some(package_dir.join("image.tar"));
+
+    let command = vec![
+        String::from("-d"),
+        String::from("--application-id"),
+        String::from("test"),
+        String::from("--location-id"),
+        String::from("localhost"),
+        String::from("--job-id"),
+        String::from("1"),
+        kind,
+        call.function.clone(),
+        base64::encode(serde_json::to_string(&call.arguments)?),
+    ];
+
+    let exec = ExecuteInfo::new(image, image_file, None, Some(command));
+
+    let (stdout, stderr) = run_and_wait(exec).await?;
+    debug!("stderr: {}", stderr);
+    debug!("stdout: {}", stdout);
+
+    let output = stdout.lines().last().unwrap_or_default().to_string();
+    let output: Result<SpecValue> = decode_b64(output);
+    match output {
+        Ok(value) => Ok(Value::from(value)),
+        Err(err) => {
+            println!("{:?}", err);
+            Ok(Value::Unit)
+        }
+    }
+}
+
+///
+///
+///
+fn decode_b64<T>(input: String) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    let input =
+        base64::decode(input).with_context(|| "Decoding failed, encoded input doesn't seem to be Base64 encoded.")?;
+
+    let input = String::from_utf8(input[..].to_vec())
+        .with_context(|| "Conversion failed, decoded input doesn't seem to be UTF-8 encoded.")?;
+
+    serde_json::from_str(&input)
+        .with_context(|| "Deserialization failed, decoded input doesn't seem to be as expected.")
+}
+
 
 ///
 ///

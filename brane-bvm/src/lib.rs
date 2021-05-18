@@ -1,16 +1,23 @@
 #[macro_use]
 extern crate log;
 
-pub mod bytecode;
 pub mod builtins;
+pub mod bytecode;
 pub mod values;
 
-use crate::{bytecode::{Function, OpCode}, values::Instance};
-use crate::values::{Value, Array};
-use std::{collections::HashMap, fmt::Write, usize};
-use specifications::package::PackageIndex;
+use crate::values::{Array, Value};
+use crate::{
+    bytecode::{Function, OpCode},
+    values::Instance,
+};
+use anyhow::Result;
+use async_trait::async_trait;
+use async_recursion::async_recursion;
+use futures::{stream, StreamExt};
 use specifications::common::Value as SpecValue;
+use specifications::package::PackageIndex;
 use std::cmp;
+use std::{collections::HashMap, fmt::Write, usize};
 
 static FRAMES_MAX: usize = 64;
 static STACK_MAX: usize = 256;
@@ -24,18 +31,23 @@ pub struct CallFrame {
 
 pub type VmState = HashMap<String, Value>;
 
-pub struct VM {
+#[derive(Debug, Clone)]
+pub struct VM<E>
+where
+    E: VmExecutor + Clone + Send + Sync,
+{
     call_frames: Vec<CallFrame>,
     stack: Vec<Value>,
     locations: Vec<String>,
     package_index: PackageIndex,
     pub state: VmState,
     pub options: VmOptions,
+    executor: E,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct VmOptions {
-    pub always_return: bool
+    pub always_return: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -48,21 +60,36 @@ pub struct VmCall {
     pub arguments: HashMap<String, SpecValue>,
 }
 
+#[async_trait]
+pub trait VmExecutor {
+    async fn execute(&self, call: VmCall) -> Result<Value>;
+}
+
 #[repr(u8)]
+#[derive(Clone, Debug)]
 pub enum VmResult {
     Ok(Option<Value>),
-    Call(VmCall),
     RuntimeError,
 }
 
-impl VM {
-    pub fn new<S: Into<String>>(application: S, package_index: PackageIndex, state: Option<VmState>, options: Option<VmOptions>) -> VM {
+impl<E> VM<E>
+where
+    E: 'static + VmExecutor + Clone + Send + Sync,
+{
+    pub fn new<S>(
+        application: S,
+        package_index: PackageIndex,
+        state: Option<VmState>,
+        options: Option<VmOptions>,
+        executor: E,
+    ) -> VM<E>
+    where
+        S: Into<String>,
+        E: VmExecutor,
+    {
         let options = options.unwrap_or_default();
         let mut state = state.unwrap_or_default();
-        state.insert(
-            String::from("___application"),
-            Value::String(application.into()),
-        );
+        state.insert(String::from("___application"), Value::String(application.into()));
 
         builtins::register(&mut state);
 
@@ -73,6 +100,7 @@ impl VM {
             locations: Vec::with_capacity(STACK_MAX),
             package_index,
             options,
+            executor,
         }
     }
 
@@ -106,7 +134,8 @@ impl VM {
     ///
     ///
     ///
-    pub fn run(
+    #[async_recursion]
+    pub async fn run(
         &mut self,
         function: Option<Function>,
     ) -> VmResult {
@@ -126,7 +155,7 @@ impl VM {
         };
 
         // Decodes and dispatches the instruction
-        let mut counter = 0;
+        let mut counter: i32 = 0;
         loop {
             counter += 1;
 
@@ -462,7 +491,7 @@ impl VM {
                     match func {
                         Function::UserDefined { .. } => {
                             self.call(func, arg_count);
-                            if let VmResult::Ok(Some(result)) = self.run(None) {
+                            if let VmResult::Ok(Some(result)) = self.run(None).await {
                                 for _i in vec![0; offset as usize] {
                                     self.stack.pop();
                                 }
@@ -472,7 +501,13 @@ impl VM {
                         Function::Native { name, .. } => {
                             builtins::handle(name, &mut self.stack).unwrap();
                         }
-                        Function::External { name, package, kind, version, parameters } => {
+                        Function::External {
+                            name,
+                            package,
+                            kind,
+                            version,
+                            parameters,
+                        } => {
                             let mut arguments: HashMap<String, SpecValue> = HashMap::new();
                             // Reverse order because of stack
                             for p in parameters.iter().rev() {
@@ -495,7 +530,8 @@ impl VM {
                             self.call_frames.pop();
                             self.call_frames.push(frame.clone());
 
-                            return VmResult::Call(call);
+                            let result = self.executor.execute(call).await.unwrap();
+                            self.stack.push(result);
                         }
                     }
                 }
@@ -531,7 +567,7 @@ impl VM {
                     } else {
                         unreachable!()
                     }
-                },
+                }
                 OpNew => {
                     let properties_n = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
@@ -554,15 +590,18 @@ impl VM {
                     } else {
                         panic!("Not a class.");
                     }
-                },
+                }
                 OpArray => {
                     let entries_n = chunk.code[frame.ip];
                     frame.ip = frame.ip + 1;
 
-                    let entries: Vec<Value> = (0..entries_n).map(|_| { self.stack.pop().unwrap() }).rev().collect();
+                    let entries: Vec<Value> = (0..entries_n).map(|_| self.stack.pop().unwrap()).rev().collect();
 
                     if entries.is_empty() {
-                        self.stack.push(Value::Array(Array { data_type: String::from("unit[]"), entries }));
+                        self.stack.push(Value::Array(Array {
+                            data_type: String::from("unit[]"),
+                            entries,
+                        }));
                     } else {
                         let data_type = match entries.get(0).unwrap() {
                             Value::String(_) => String::from("string"),
@@ -603,7 +642,7 @@ impl VM {
                         warn!("Not an instance!");
                         return VmResult::RuntimeError;
                     }
-                },
+                }
                 OpIndex => {
                     let index = self.stack.pop().expect("Empty stack while expecting `index` value.");
                     let array = self.stack.pop().expect("Empty stack while expecting `array` value.");
@@ -619,6 +658,64 @@ impl VM {
                         } else {
                             return VmResult::RuntimeError;
                         }
+                    }
+                }
+                OpParallel => {
+                    let blocks_n = chunk.code[frame.ip];
+                    frame.ip = frame.ip + 1;
+
+                    let blocks: Vec<Value> = (0..blocks_n).map(|_| self.stack.pop().unwrap()).rev().collect();
+
+                    if blocks.is_empty() {
+                        self.stack.push(Value::Array(Array {
+                            data_type: String::from("unit[]"),
+                            entries: blocks,
+                        }));
+                    } else {
+                        let results = stream::iter(blocks)
+                            .map(|block| {
+                                let mut fork = self.clone();
+                                if let Value::Function(block) = block {
+                                    tokio::spawn(async move {
+                                        fork.run(Some(block)).await
+                                    })
+                                } else {
+                                    unreachable!()
+                                }
+                            })
+                            .buffer_unordered(128)
+                            .collect::<Vec<_>>()
+                            .await;
+
+                        if results.iter().any(|r| match r {
+                            Ok(VmResult::RuntimeError) => true,
+                            Err(_) => true,
+                            _ => false,
+                        }) {
+                            return VmResult::RuntimeError;
+                        }
+
+                        let entries: Vec<Value> = results
+                            .into_iter()
+                            .map(|r| match r {
+                                Ok(VmResult::Ok(value)) => value.unwrap_or(Value::Unit),
+                                _ => unreachable!(),
+                            })
+                            .collect();
+
+                        let data_type = match entries.get(0).unwrap() {
+                            Value::String(_) => String::from("string"),
+                            Value::Real(_) => String::from("real"),
+                            Value::Integer(_) => String::from("integer"),
+                            Value::Boolean(_) => String::from("boolean"),
+                            Value::Array(array) => array.data_type.clone(),
+                            Value::Instance(instance) => instance.class.name.clone(),
+                            Value::Class(_) | Value::Function(_) => todo!(),
+                            Value::Unit => String::from("unit"),
+                        };
+
+                        let data_type = format!("{}[]", data_type);
+                        self.stack.push(Value::Array(Array { data_type, entries }));
                     }
                 }
             }

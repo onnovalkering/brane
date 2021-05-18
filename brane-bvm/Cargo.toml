@@ -6,6 +6,10 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1"
+async-trait = "0.1"
+async-recursion = "0.3"
 bytes = "1"
+futures = "0.3"
 log = "0.4"
 specifications = { path = "../specifications" }
+tokio = { version = "1.6", features = ["full"] }

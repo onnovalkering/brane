@@ -1,10 +1,10 @@
-use std::num::NonZeroUsize;
-use crate::tag_token;
-use crate::scanner::{Token, Tokens};
 use super::ast::Ident;
+use crate::scanner::{Token, Tokens};
+use crate::tag_token;
+use nom::combinator as comb;
 use nom::error::{ContextError, ParseError};
-use nom::{combinator as comb};
 use nom::{IResult, Parser};
+use std::num::NonZeroUsize;
 
 ///
 ///

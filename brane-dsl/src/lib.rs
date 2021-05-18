@@ -11,8 +11,8 @@ mod parser;
 #[path = "scanner/scanner.rs"]
 mod scanner;
 
-use crate::scanner::{Span, Tokens};
 use crate::parser::{bakery, bscript};
+use crate::scanner::{Span, Tokens};
 use anyhow::Result;
 use brane_bvm::bytecode::Function;
 use specifications::package::PackageIndex;
@@ -25,7 +25,7 @@ pub enum Lang {
 
 #[derive(Clone, Debug)]
 pub struct CompilerOptions {
-    pub lang: Lang
+    pub lang: Lang,
 }
 
 impl CompilerOptions {
@@ -33,9 +33,7 @@ impl CompilerOptions {
     ///
     ///
     pub fn new(lang: Lang) -> Self {
-        CompilerOptions {
-            lang
-        }
+        CompilerOptions { lang }
     }
 }
 
@@ -92,9 +90,7 @@ impl Compiler {
                 };
 
                 match program {
-                    Ok((_, program)) => {
-                        generator::compile(program)
-                    }
+                    Ok((_, program)) => generator::compile(program),
                     Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
                         bail!("{}", errors::convert_parser_error(tokens, e));
                     }

@@ -1,7 +1,7 @@
 use crate::grpc;
 use anyhow::Result;
 use brane_dsl::{Compiler, CompilerOptions, Lang};
-use brane_bvm::{VM, VmCall, VmOptions, VmResult, VmState};
+use brane_bvm::{VM, VmCall, VmExecutor, VmOptions, VmResult, VmState};
 use brane_bvm::values::Value;
 use brane_bvm::bytecode::Function;
 use brane_job::interface::{Command, CommandKind};
@@ -61,10 +61,13 @@ impl grpc::DriverService for DriverHandler {
         let package_index = PackageIndex::from_value(packages).unwrap();
         let sessions = self.sessions.clone();
 
-        let command_topic = self.command_topic.clone();
-        let producer = self.producer.clone();
-        let states = self.states.clone();
-        let results = self.results.clone();
+        let executor = Executor {
+            command_topic: self.command_topic.clone(),
+            producer: self.producer.clone(),
+            request_uuid: request.uuid.clone(),
+            states: self.states.clone(),
+            results: self.results.clone(),
+        };
 
         let (tx, rx) = mpsc::channel::<Result<grpc::ExecuteReply, Status>>(10);
 
@@ -94,25 +97,15 @@ impl grpc::DriverService for DriverHandler {
 
             let options = VmOptions { always_return: true };
             let mut vm = if let Some(session) = sessions.get(&request.uuid) {
-                VM::new(&request.uuid, package_index.clone(), Some(session.clone()), Some(options))
+                VM::new(&request.uuid, package_index.clone(), Some(session.clone()), Some(options), executor)
             } else {
-                VM::new(&request.uuid, package_index.clone(), None, Some(options))
+                VM::new(&request.uuid, package_index.clone(), None, Some(options), executor)
             };
 
             vm.call(function, 0);
 
             loop {
-                match vm.run(None) {
-                    VmResult::Call(call) => {
-                        vm.result(make_function_call(
-                            call,
-                            &command_topic,
-                            &producer,
-                            &request.uuid,
-                            states.clone(),
-                            results.clone(),
-                        ).await.unwrap());
-                    },
+                match vm.run(None).await {
                     VmResult::Ok(value) => {
                         let output = value.map(|v| format!("{:?}", v)).unwrap_or_default();
 
@@ -134,14 +127,37 @@ impl grpc::DriverService for DriverHandler {
     }
 }
 
+#[derive(Clone)]
+struct Executor {
+    pub command_topic: String,
+    pub producer: FutureProducer,
+    pub request_uuid: String,
+    pub states: Arc<DashMap<String, String>>,
+    pub results: Arc<DashMap<String, Value>>,
+}
+
+#[async_trait::async_trait]
+impl VmExecutor for Executor {
+    async fn execute(&self, call: VmCall) -> Result<Value> {
+        make_function_call(
+            call,
+            self.command_topic.clone(),
+            self.producer.clone(),
+            self.request_uuid.clone(),
+            self.states.clone(),
+            self.results.clone(),
+        ).await
+    }
+}
+
 ///
 ///
 ///
 async fn make_function_call(
     call: VmCall,
-    command_topic: &String,
-    producer: &FutureProducer,
-    session: &String,
+    command_topic: String,
+    producer: FutureProducer,
+    session: String,
     states: Arc<DashMap<String, String>>,
     results: Arc<DashMap<String, Value>>,
 ) -> Result<Value> {
@@ -152,7 +168,7 @@ async fn make_function_call(
         base64::encode(serde_json::to_string(&call.arguments)?),
     ];
 
-    let session_uuid = Uuid::parse_str(session)?;
+    let session_uuid = Uuid::parse_str(&session)?;
     let session_uuid_simple = session_uuid.to_simple().to_string();
 
     let random_id = get_random_identifier();
