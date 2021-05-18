@@ -12,7 +12,7 @@ use rdkafka::{
     util::Timeout,
     ClientConfig,
 };
-use socksx::socks6::{self, Socks6Request, SocksReply};
+use socksx::socks6::{self, Socks6Request, Socks6Reply};
 use tokio::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -88,14 +88,14 @@ pub async fn handle_connection(
     match socks6::read_request(&mut source).await {
         Ok(request) => {
             dbg!(&request);
-            socks6::no_authentication(&mut source).await?;
+            socks6::write_no_authentication(&mut source).await?;
 
             if let Ok(mut destination) = TcpStream::connect(request.destination.to_string()).await {
                 // EVENT: connection has been established between source and destination.
                 let payload = request.destination.to_string().as_bytes().to_vec();
                 emit_event(EventKind::Connected, &producer, &event_topic, &request, &counter, Some(payload)).await?;
 
-                socks6::write_reply(&mut source, socks6::SocksReply::Success).await?;
+                socks6::write_reply(&mut source, Socks6Reply::Success).await?;
                 // socks6::write_initial_data(&mut destination, &request).await?;
 
                 // Patch together the source and destination sockets, collect number of bytes transfered.
@@ -114,12 +114,12 @@ pub async fn handle_connection(
                 .await?;
             } else {
                 warn!("host unreachable");
-                socks6::write_reply(&mut source, SocksReply::HostUnreachable).await?;
+                socks6::write_reply(&mut source, Socks6Reply::HostUnreachable).await?;
             }
         }
         Err(_) => {
             warn!("general failure");
-            socks6::write_reply(&mut source, SocksReply::GeneralFailure).await?;
+            socks6::write_reply(&mut source, Socks6Reply::GeneralFailure).await?;
         }
     }
 

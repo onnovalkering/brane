@@ -1,5 +1,4 @@
 use prost::{Enumeration, Message};
-use std::fmt;
 use time::OffsetDateTime;
 
 #[derive(Clone, PartialEq, Message)]
