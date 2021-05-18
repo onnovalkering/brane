@@ -34,6 +34,10 @@ pub enum Stmt {
         version: Option<Version>,
     },
     LetAssign(Ident, Expr),
+    On {
+        location: Expr,
+        block: Block,
+    },
     Return(Option<Expr>),
     While {
         condition: Expr,

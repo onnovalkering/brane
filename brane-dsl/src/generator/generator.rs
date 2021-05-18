@@ -258,6 +258,34 @@ pub fn stmt_to_opcodes(
 
             let ident = chunk.add_constant(ident.into());
             chunk.write_pair(OpCode::OpDefineGlobal, ident);
+        },
+        // TODO: merge with block statement?
+        Stmt::On {
+            location,
+            block,
+        } => {
+            // Create a new scope (shadow).
+            let scope = scope + 1;
+
+            expr_to_opcodes(location, chunk, locals, scope);
+            chunk.write(OpCode::OpLocPush);
+
+            for stmt in block {
+                stmt_to_opcodes(stmt, chunk, locals, scope);
+            }
+
+            // Remove any locals created in this scope.
+            while let Some(local) = locals.pop() {
+                if local.depth >= scope {
+                    chunk.write(OpCode::OpPop);
+                } else {
+                    // Oops, one to many, place it back.
+                    locals.push(local);
+                    break;
+                }
+            }
+
+            chunk.write(OpCode::OpLocPop);
         }
     }
 }

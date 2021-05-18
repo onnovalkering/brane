@@ -243,21 +243,25 @@ async fn process_cmd_message(
     let mut command = Command::decode(payload).unwrap();
     let kind = CommandKind::from_i32(command.kind).unwrap();
 
-    // Choose random location
-    if kind == CommandKind::Create {
-        let locations = infra.get_locations()?;
-        let location = locations.choose(&mut rand::thread_rng());
-        let location = location.unwrap().clone();
+    // Returns an empty string if location is None.
+    if command.location() == "" {
+        if kind == CommandKind::Create {
+            let locations = infra.get_locations()?;
 
-        info!("Assigned command '{}' to location '{}'.", command.identifier(), location);
+            // Choose a random location
+            let location = locations.choose(&mut rand::thread_rng());
+            let location = location.unwrap().clone();
 
-        let metadata = infra.get_location_metadata(&location)?;
-        command.location = Some(location);
+            info!("Assigned command '{}' to location '{}'.", command.identifier(), location);
 
-        match metadata {
-            Location::Kube { registry, .. } | Location::Slurm { registry, .. } | Location::Vm { registry, .. } | Location::Local { registry, ..} => {
-                let image = command.image.unwrap();
-                command.image = Some(format!("{}/library/{}", registry, image));
+            let metadata = infra.get_location_metadata(&location)?;
+            command.location = Some(location);
+
+            match metadata {
+                Location::Kube { registry, .. } | Location::Slurm { registry, .. } | Location::Vm { registry, .. } | Location::Local { registry, ..} => {
+                    let image = command.image.unwrap();
+                    command.image = Some(format!("{}/library/{}", registry, image));
+                }
             }
         }
     }

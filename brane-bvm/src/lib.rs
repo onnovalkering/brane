@@ -27,6 +27,7 @@ pub type VmState = HashMap<String, Value>;
 pub struct VM {
     call_frames: Vec<CallFrame>,
     stack: Vec<Value>,
+    locations: Vec<String>,
     package_index: PackageIndex,
     pub state: VmState,
     pub options: VmOptions,
@@ -43,6 +44,7 @@ pub struct VmCall {
     pub kind: String,
     pub version: String,
     pub function: String,
+    pub location: Option<String>,
     pub arguments: HashMap<String, SpecValue>,
 }
 
@@ -68,6 +70,7 @@ impl VM {
             call_frames: Vec::with_capacity(FRAMES_MAX),
             stack: Vec::with_capacity(STACK_MAX),
             state,
+            locations: Vec::with_capacity(STACK_MAX),
             package_index,
             options,
         }
@@ -401,6 +404,16 @@ impl VM {
                 OpPop => {
                     self.stack.pop();
                 }
+                OpLocPush => {
+                    if let Some(Value::String(location)) = self.stack.pop() {
+                        self.locations.push(location);
+                    } else {
+                        return VmResult::RuntimeError;
+                    }
+                }
+                OpLocPop => {
+                    self.locations.pop();
+                }
                 OpJumpIfFalse => {
                     let offset1 = chunk.code[frame.ip] as u16;
                     frame.ip = frame.ip + 1;
@@ -468,11 +481,13 @@ impl VM {
 
                             // The function itself.
                             self.stack.pop();
+                            let location = self.locations.last().cloned();
 
                             let call = VmCall {
                                 package,
                                 version,
                                 kind,
+                                location,
                                 function: name,
                                 arguments,
                             };

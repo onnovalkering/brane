@@ -40,6 +40,9 @@ pub enum Token<'a> {
     /// `new`
     New(Span<'a>),
 
+    /// `on`
+    On(Span<'a>),
+
     /// `|`
     Or(Span<'a>),
 
@@ -185,12 +188,12 @@ impl<'a> Token<'a> {
 
         match self {
             And(span) | Break(span) | Class(span) | Continue(span) | Else(span) | For(span) | Function(span)
-            | If(span) | Import(span) | Let(span) | Or(span) | Return(span) | Unit(span) | While(span) | Dot(span)
-            | Colon(span) | Comma(span) | LeftBrace(span) | LeftBracket(span) | LeftParen(span) | RightBrace(span)
-            | RightBracket(span) | RightParen(span) | Semicolon(span) | Assign(span) | Equal(span) | Greater(span)
-            | GreaterOrEqual(span) | Less(span) | LessOrEqual(span) | Minus(span) | Not(span) | NotEqual(span)
-            | Plus(span) | Slash(span) | Star(span) | Boolean(span) | Integer(span) | Real(span) | SemVer(span)
-            | String(span) | Ident(span) | New(span) => span,
+            | If(span) | Import(span) | Let(span) | On(span) | Or(span) | Return(span) | Unit(span) | While(span)
+            | Dot(span) | Colon(span) | Comma(span) | LeftBrace(span) | LeftBracket(span) | LeftParen(span)
+            | RightBrace(span) | RightBracket(span) | RightParen(span) | Semicolon(span) | Assign(span) | Equal(span)
+            | Greater(span) | GreaterOrEqual(span) | Less(span) | LessOrEqual(span) | Minus(span) | Not(span)
+            | NotEqual(span) | Plus(span) | Slash(span) | Star(span) | Boolean(span) | Integer(span) | Real(span)
+            | SemVer(span) | String(span) | Ident(span) | New(span) => span,
             // None should have been filtered out already.
             None => unreachable!(),
         }

@@ -162,7 +162,7 @@ async fn make_function_call(
         CommandKind::Create,
         Some(correlation_id.clone()),
         Some(session.clone()),
-        Some(String::from("local")),
+        call.location,
         Some(image),
         command,
         None,

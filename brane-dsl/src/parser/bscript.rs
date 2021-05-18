@@ -28,6 +28,7 @@ pub fn parse_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
     branch::alt((
         for_stmt,
         assign_stmt,
+        on_stmt,
         block_stmt,
         declare_class_stmt,
         declare_func_stmt,
@@ -74,6 +75,31 @@ pub fn assign_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
             comb::cut(tag_token!(Token::Semicolon)),
         ),
         |(ident, expr)| Stmt::Assign(ident, expr),
+    )
+    .parse(input)
+}
+
+///
+///
+///
+pub fn on_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
+    input: Tokens<'a>
+) -> IResult<Tokens, Stmt, E> {
+    comb::map(
+        seq::pair(
+            seq::preceded(
+                tag_token!(Token::On),
+                comb::cut(expression::parse),
+            ),
+            comb::cut(
+                seq::delimited(
+                    tag_token!(Token::LeftBrace),
+                    multi::many0(parse_stmt),
+                    tag_token!(Token::RightBrace),
+                )
+            ),
+        ),
+        |(location, block)| Stmt::On { location, block },
     )
     .parse(input)
 }

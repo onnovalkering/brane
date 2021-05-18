@@ -355,6 +355,10 @@ async fn make_function_call(call: VmCall) -> Result<Value> {
     let package_file = package_dir.join("package.yml");
     let package_info = PackageInfo::from_path(package_file)?;
 
+    if let Some(location) = call.location {
+        warn!("Ignoring location '{}', running locally.", location);
+    }
+
     let kind = match package_info.kind.as_str() {
         "ecu" => String::from("code"),
         "oas" => String::from("oas"),
@@ -365,7 +369,6 @@ async fn make_function_call(call: VmCall) -> Result<Value> {
 
     let image = format!("{}:{}", package_info.name, package_info.version);
     let image_file = Some(package_dir.join("image.tar"));
-
 
     let command = vec![
         String::from("-d"),
