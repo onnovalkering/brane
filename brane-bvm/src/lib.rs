@@ -1,29 +1,36 @@
 #[macro_use]
 extern crate anyhow;
 #[macro_use]
-extern crate log;
-#[macro_use]
 extern crate firestorm;
+
+#[path = "./machine/frames.rs"]
+pub mod frames;
+
+#[path = "./machine/objects.rs"]
+pub mod objects;
+
+#[path = "./machine/stack.rs"]
+pub mod stack;
+
+#[path = "./machine/vm.rs"]
+pub mod vm;
 
 pub mod builtins;
 pub mod bytecode;
 pub mod instructions;
 pub mod values;
 
-use crate::values::{Array, Value};
-use crate::{
-    bytecode::{opcodes::*, Function},
-};
+use crate::bytecode::{opcodes::*, Function};
+use crate::values::Value;
 use anyhow::Result;
 use async_recursion::async_recursion;
 use async_trait::async_trait;
-use bytecode::{ReadOnlyChunk};
-use futures::{stream, StreamExt};
+use bytecode::ReadOnlyChunk;
+use smallvec::SmallVec;
 use specifications::common::Value as SpecValue;
 use specifications::package::PackageIndex;
 use std::{cmp, ops::Deref};
 use std::{collections::HashMap, usize};
-use smallvec::SmallVec;
 
 static FRAMES_MAX: usize = 64;
 static STACK_MAX: usize = 64;
@@ -148,7 +155,7 @@ where
         &mut self,
         function: Option<std::sync::Arc<Function>>,
     ) -> Result<VmResult> {
-        if let Some(Function::UserDefined { chunk, ..}) = function.as_deref() {
+        if let Some(Function::UserDefined { chunk, .. }) = function.as_deref() {
             self.call(chunk.clone(), 0);
         }
 
@@ -156,14 +163,7 @@ where
         let mut ip = 0;
 
         // Decodes and dispatches the instruction
-        // let mut counter: i32 = 0;
         loop {
-            // counter += 1;
-
-            // let mut debug = String::from(format!("{}         ", counter));
-            // self.stack.iter().for_each(|v| write!(debug, "[ {:?} ]", v).unwrap());
-            // debug!("{}", debug);
-
             if ip >= frame.chunk.code.len() {
                 let result = if self.options.always_return {
                     self.stack.pop()
@@ -241,16 +241,16 @@ where
 
                                             self.stack.push(result);
                                         }
-                                    },
+                                    }
                                     Function::Native { name, .. } => {
                                         builtins::handle(name, &mut self.stack).unwrap();
-                                    },
+                                    }
                                     Function::External {
                                         name,
                                         package,
                                         kind,
                                         version,
-                                        parameters
+                                        parameters,
                                     } => {
                                         let mut arguments: HashMap<String, SpecValue> = HashMap::new();
                                         // Reverse order because of stack
@@ -280,67 +280,14 @@ where
                                 }
                             }
                         }
-
                     }
                 }
                 //
                 //
                 //
                 OP_PARALLEL => {
-                    let blocks_n = frame.chunk.code[ip];
-                    ip += 1;
-
-                    let blocks: Vec<Value> = (0..blocks_n).map(|_| self.stack.pop().unwrap()).rev().collect();
-
-                    if blocks.is_empty() {
-                        self.stack.push(Value::Array(Array {
-                            data_type: String::from("unit[]"),
-                            entries: blocks,
-                        }));
-                    } else {
-                        let results = stream::iter(blocks)
-                            .map(|block| {
-                                let mut fork = self.clone();
-                                if let Value::Function(block) = block {
-                                    tokio::spawn(async move { fork.run(Some(block)).await })
-                                } else {
-                                    unreachable!()
-                                }
-                            })
-                            .buffer_unordered(128)
-                            .collect::<Vec<_>>()
-                            .await;
-
-                        if results.iter().any(|r| match r {
-                            Ok(Ok(VmResult::RuntimeError)) => true,
-                            Err(_) => true,
-                            _ => false,
-                        }) {
-                            return Ok(VmResult::RuntimeError);
-                        }
-
-                        let entries: Vec<Value> = results
-                            .into_iter()
-                            .map(|r| match r {
-                                Ok(Ok(VmResult::Ok(value))) => value.unwrap_or(Value::Unit),
-                                _ => unreachable!(),
-                            })
-                            .collect();
-
-                        let data_type = match entries.get(0).unwrap() {
-                            Value::String(_) => String::from("string"),
-                            Value::Real(_) => String::from("real"),
-                            Value::Integer(_) => String::from("integer"),
-                            Value::Boolean(_) => String::from("boolean"),
-                            Value::Array(array) => array.data_type.clone(),
-                            Value::Instance(instance) => instance.class.name.clone(),
-                            Value::Class(_) | Value::Function(_) => todo!(),
-                            Value::Unit => String::from("unit"),
-                        };
-
-                        let data_type = format!("{}[]", data_type);
-                        self.stack.push(Value::Array(Array { data_type, entries }));
-                    }
+                    let fork = self.clone();
+                    ip = instructions::op_parallel(ip, &frame, &mut self.stack, fork).await?;
                 }
                 0x00 | 0x24..=u8::MAX => {
                     unreachable!()

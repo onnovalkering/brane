@@ -1,7 +1,7 @@
 use crate::bytecode::Function;
 use specifications::common::Value as SpecValue;
-use std::{collections::HashMap, fmt};
 use std::sync::Arc;
+use std::{collections::HashMap, fmt};
 
 #[derive(Clone)]
 pub enum Value {

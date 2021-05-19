@@ -1,8 +1,8 @@
 use crate::bytecode::Function;
 use crate::values::{Array, Value};
 use anyhow::Result;
-use std::collections::HashMap;
 use smallvec::SmallVec;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 static BUILTIN_FN_PRINT: &str = "print";

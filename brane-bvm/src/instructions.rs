@@ -1,9 +1,15 @@
-use std::{collections::HashMap, usize};
+use crate::{
+    bytecode::Function,
+    values::{Array, Instance, Value},
+    CallFrame, VmExecutor, VmResult, VM,
+};
 use anyhow::Result;
-use specifications::package::PackageIndex;
-use crate::{CallFrame, bytecode::Function, values::{Array, Instance, Value}};
+use async_recursion::async_recursion;
+use futures::{stream, StreamExt};
 use smallvec::SmallVec;
+use specifications::package::PackageIndex;
 use std::sync::Arc;
+use std::{collections::HashMap, usize};
 
 ///
 ///
@@ -26,7 +32,6 @@ pub fn op_constant(
 
     bail!("unreachable");
 }
-
 
 ///
 ///
@@ -127,7 +132,6 @@ pub fn op_get_global(
     bail!("unreachable");
 }
 
-
 ///
 ///
 ///
@@ -183,9 +187,7 @@ pub fn op_class(
 ///
 ///
 #[inline]
-pub fn op_add(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_add(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_add);
 
     let rhs = stack.pop();
@@ -213,9 +215,7 @@ pub fn op_add(
 ///
 ///
 #[inline]
-pub fn op_substract(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_substract(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_substract);
 
     let rhs = stack.pop();
@@ -240,9 +240,7 @@ pub fn op_substract(
 ///
 ///
 #[inline]
-pub fn op_multiply(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_multiply(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_multiply);
 
     let rhs = stack.pop();
@@ -267,9 +265,7 @@ pub fn op_multiply(
 ///
 ///
 #[inline]
-pub fn op_divide(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_divide(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_divide);
 
     let rhs = stack.pop();
@@ -294,9 +290,7 @@ pub fn op_divide(
 ///
 ///
 #[inline]
-pub fn op_negate(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_negate(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_negate);
 
     if let Some(value) = stack.pop() {
@@ -314,9 +308,7 @@ pub fn op_negate(
 ///
 ///
 #[inline]
-pub fn op_true(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_true(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_true);
 
     stack.push(Value::Boolean(true));
@@ -328,9 +320,7 @@ pub fn op_true(
 ///
 ///
 #[inline]
-pub fn op_false(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_false(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_false);
 
     stack.push(Value::Boolean(false));
@@ -342,9 +332,7 @@ pub fn op_false(
 ///
 ///
 #[inline]
-pub fn op_unit(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_unit(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     stack.push(Value::Unit);
 
     Ok(())
@@ -354,9 +342,7 @@ pub fn op_unit(
 ///
 ///
 #[inline]
-pub fn op_not(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_not(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_not);
 
     if let Some(value) = stack.pop() {
@@ -374,9 +360,7 @@ pub fn op_not(
 ///
 ///
 #[inline]
-pub fn op_and(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_and(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_and);
 
     let rhs = stack.pop();
@@ -398,9 +382,7 @@ pub fn op_and(
 ///
 ///
 #[inline]
-pub fn op_or(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_or(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_or);
 
     let rhs = stack.pop();
@@ -422,9 +404,7 @@ pub fn op_or(
 ///
 ///
 #[inline]
-pub fn op_equal(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_equal(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_equal);
 
     let rhs = stack.pop();
@@ -450,9 +430,7 @@ pub fn op_equal(
 ///
 ///
 #[inline]
-pub fn op_greater(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_greater(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_greater);
 
     let rhs = stack.pop();
@@ -477,9 +455,7 @@ pub fn op_greater(
 ///
 ///
 #[inline]
-pub fn op_less(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_less(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_less);
 
     let rhs = stack.pop();
@@ -504,9 +480,7 @@ pub fn op_less(
 ///
 ///
 #[inline]
-pub fn op_pop(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_pop(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_pop);
 
     stack.pop();
@@ -551,9 +525,7 @@ pub fn op_loc_push(
 ///
 ///
 #[inline]
-pub fn op_loc_pop(
-    locations: &mut Vec<String>,
-) -> Result<()> {
+pub fn op_loc_pop(locations: &mut Vec<String>) -> Result<()> {
     profile_fn!(op_loc_pop);
 
     locations.pop();
@@ -576,7 +548,7 @@ pub fn op_jump(
             let offset = (((*offset1 as u16) << 8) | (*offset2 as u16)) as usize;
 
             Ok(ip + 2usize + offset)
-        },
+        }
         _ => {
             bail!("unreachable!");
         }
@@ -598,7 +570,7 @@ pub fn op_jump_back(
             let offset = (((*offset1 as u16) << 8) | (*offset2 as u16)) as usize;
 
             Ok((ip + 2usize) - offset)
-        },
+        }
         _ => {
             bail!("unreachable!");
         }
@@ -783,9 +755,7 @@ pub fn op_dot(
 ///
 ///
 #[inline]
-pub fn op_index(
-    stack: &mut SmallVec<[Value; 64]>,
-) -> Result<()> {
+pub fn op_index(stack: &mut SmallVec<[Value; 64]>) -> Result<()> {
     profile_fn!(op_index);
 
     let index = stack.pop().expect("Empty stack while expecting `index` value.");
@@ -803,4 +773,76 @@ pub fn op_index(
     }
 
     bail!("unreachable");
+}
+
+#[inline]
+#[async_recursion]
+pub async fn op_parallel<E>(
+    ip: usize,
+    frame: &CallFrame,
+    stack: &mut SmallVec<[Value; 64]>,
+    fork: VM<E>,
+) -> Result<usize>
+where
+    E: 'static + VmExecutor + Clone + Send + Sync,
+{
+    profile_fn!(op_index);
+
+    let blocks_n = frame.chunk.code[ip];
+
+    let blocks: Vec<Value> = (0..blocks_n).map(|_| stack.pop().unwrap()).rev().collect();
+
+    if blocks.is_empty() {
+        stack.push(Value::Array(Array {
+            data_type: String::from("unit[]"),
+            entries: blocks,
+        }));
+    } else {
+        let results = stream::iter(blocks)
+            .map(|block| {
+                if let Value::Function(block) = block {
+                    {
+                        let vm = fork.clone();
+                        tokio::spawn(async move { vm.clone().run(Some(block)).await })
+                    }
+                } else {
+                    unreachable!()
+                }
+            })
+            .buffer_unordered(128)
+            .collect::<Vec<_>>()
+            .await;
+
+        if results.iter().any(|r| match r {
+            Ok(Ok(VmResult::RuntimeError)) => true,
+            Err(_) => true,
+            _ => false,
+        }) {
+            bail!("runtime error");
+        }
+
+        let entries: Vec<Value> = results
+            .into_iter()
+            .map(|r| match r {
+                Ok(Ok(VmResult::Ok(value))) => value.unwrap_or(Value::Unit),
+                _ => unreachable!(),
+            })
+            .collect();
+
+        let data_type = match entries.get(0).unwrap() {
+            Value::String(_) => String::from("string"),
+            Value::Real(_) => String::from("real"),
+            Value::Integer(_) => String::from("integer"),
+            Value::Boolean(_) => String::from("boolean"),
+            Value::Array(array) => array.data_type.clone(),
+            Value::Instance(instance) => instance.class.name.clone(),
+            Value::Class(_) | Value::Function(_) => todo!(),
+            Value::Unit => String::from("unit"),
+        };
+
+        let data_type = format!("{}[]", data_type);
+        stack.push(Value::Array(Array { data_type, entries }));
+    }
+
+    Ok(ip + 1)
 }
