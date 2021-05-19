@@ -39,11 +39,19 @@ fn compile() -> Function {
 
 #[tokio::main]
 async fn main() {
-    let f = compile();
+    let run = || {
+        let f = compile();
 
-    let options = VmOptions { always_return: true };
-    let executor = NoOpExecutor {};
-    let mut vm = VM::new("bench", PackageIndex::empty(), None, Some(options), executor);
+        let options = VmOptions { always_return: true };
+        let executor = NoOpExecutor {};
+        let mut vm = VM::new("bench", PackageIndex::empty(), None, Some(options), executor);
 
-    vm.run(Some(f)).await.unwrap();
+        let value = futures::executor::block_on(vm.run(Some(f))).unwrap();
+        println!("{:?}", value);
+    };
+
+    if firestorm::enabled() {
+        firestorm::bench("./flames/", run).unwrap();
+    }
+
 }

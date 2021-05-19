@@ -2,6 +2,8 @@
 extern crate anyhow;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate firestorm;
 
 pub mod builtins;
 pub mod bytecode;
@@ -21,9 +23,10 @@ use specifications::common::Value as SpecValue;
 use specifications::package::PackageIndex;
 use std::cmp;
 use std::{collections::HashMap, usize};
+use smallvec::SmallVec;
 
 static FRAMES_MAX: usize = 64;
-static STACK_MAX: usize = 256;
+static STACK_MAX: usize = 64;
 
 #[derive(Debug, Clone)]
 pub struct CallFrame {
@@ -40,7 +43,7 @@ where
     E: VmExecutor + Clone + Send + Sync,
 {
     call_frames: Vec<CallFrame>,
-    stack: Vec<Value>,
+    stack: SmallVec<[Value; 64]>,
     locations: Vec<String>,
     package_index: PackageIndex,
     pub state: VmState,
@@ -101,7 +104,7 @@ where
 
         VM {
             call_frames: Vec::with_capacity(FRAMES_MAX),
-            stack: Vec::with_capacity(STACK_MAX),
+            stack: SmallVec::new(),
             state,
             locations: Vec::with_capacity(STACK_MAX),
             package_index,
@@ -153,9 +156,9 @@ where
         let mut ip = 0;
 
         // Decodes and dispatches the instruction
-        let mut counter: i32 = 0;
+        // let mut counter: i32 = 0;
         loop {
-            counter += 1;
+            // counter += 1;
 
             // let mut debug = String::from(format!("{}         ", counter));
             // self.stack.iter().for_each(|v| write!(debug, "[ {:?} ]", v).unwrap());
@@ -216,24 +219,29 @@ where
                 //
                 //
                 OP_CALL => {
+                    profile_section!(op_call);
+
                     if let Some(arg_count) = frame.chunk.code.get(ip) {
                         ip += 1;
 
                         let offset = *arg_count as usize + 1;
-                        let function = self.stack.get(self.stack.len() - offset).cloned();
+                        let function = self.stack.get(self.stack.len() - offset);
 
                         match function {
-                            Some(Value::Function(Function::UserDefined { chunk, .. })) => {
+                            Some(Value::Function(Function::UserDefined { ref chunk, .. })) => {
+                                let chunk = chunk.clone();
                                 self.call(chunk, *arg_count);
 
                                 if let Ok(VmResult::Ok(Some(result))) = self.run(None).await {
                                     for _i in vec![0; offset as usize] {
                                         self.stack.pop();
                                     }
+
                                     self.stack.push(result);
                                 }
                             }
-                            Some(Value::Function(Function::Native { name, .. })) => {
+                            Some(Value::Function(Function::Native { ref name, .. })) => {
+                                let name = name.clone();
                                 builtins::handle(name, &mut self.stack).unwrap();
                             }
                             Some(Value::Function(Function::External {
@@ -243,9 +251,15 @@ where
                                 version,
                                 parameters,
                             })) => {
+                                let name = name.clone();
+                                let package = package.clone();
+                                let kind = kind.clone();
+                                let version = version.clone();
+                                let parameters = parameters.clone();
+
                                 let mut arguments: HashMap<String, SpecValue> = HashMap::new();
                                 // Reverse order because of stack
-                                for p in parameters.iter().rev() {
+                                for p in parameters.into_iter().rev() {
                                     arguments.insert(p.name.clone(), self.stack.pop().unwrap().as_spec_value());
                                 }
 

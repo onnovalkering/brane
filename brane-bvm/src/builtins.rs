@@ -2,6 +2,7 @@ use crate::bytecode::Function;
 use crate::values::{Array, Value};
 use anyhow::Result;
 use std::collections::HashMap;
+use smallvec::SmallVec;
 
 static BUILTIN_FN_PRINT: &str = "print";
 static BUILTIN_FN_LENGTH: &str = "length";
@@ -44,7 +45,7 @@ pub fn register(state: &mut HashMap<String, Value>) {
 #[inline]
 pub fn handle(
     name: String,
-    stack: &mut Vec<Value>,
+    stack: &mut SmallVec<[Value; 64]>,
 ) -> Result<()> {
     match name.as_str() {
         "print" => {
