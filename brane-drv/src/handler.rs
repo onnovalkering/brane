@@ -102,7 +102,9 @@ impl grpc::DriverService for DriverHandler {
                 VM::new(&request.uuid, package_index.clone(), None, Some(options), executor)
             };
 
-            vm.call(function, 0);
+            if let Function::UserDefined { chunk, .. } = function {
+                vm.call(chunk, 0);
+            }
 
             loop {
                 match vm.run(None).await {

@@ -296,11 +296,11 @@ async fn local_repl(
                 rl.add_history_entry(line.as_str());
                 match compiler.compile(line) {
                     Ok(function) => {
-                        if let Function::UserDefined { chunk, ..} = &function {
+                        if let Function::UserDefined { chunk, ..} = function {
                             debug!("\n{}", chunk.disassemble()?);
+                            vm.call(chunk, 0);
                         }
 
-                        vm.call(function, 0);
                         loop {
                             match vm.run(None).await {
                                 Ok(VmResult::Ok(value)) => {

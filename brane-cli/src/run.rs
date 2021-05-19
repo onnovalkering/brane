@@ -1,6 +1,6 @@
 use crate::{docker::DockerExecutor, registry};
 use anyhow::Result;
-use brane_bvm::{VmOptions, bytecode::Function, values::Value};
+use brane_bvm::{VmOptions, bytecode::Function};
 use brane_bvm::{VmResult, VM};
 use brane_dsl::{Compiler, CompilerOptions, Lang};
 use std::fs;
@@ -24,17 +24,20 @@ pub async fn handle(
 
     match compiler.compile(source_code) {
         Ok(function) => {
-            if let Function::UserDefined { chunk, ..} = &function {
-                chunk.constants.iter().for_each(|c|
-                    if let Value::Function(Function::UserDefined { chunk, .. }) = c {
-                        debug!("\n{}\n", chunk.disassemble().unwrap());
-                    }
-                );
+            // if let Function::UserDefined { chunk, ..} = &function {
+            //     chunk.constants.iter().for_each(|c|
+            //         if let Value::Function(Function::UserDefined { chunk, .. }) = c {
+            //             debug!("\n{}\n", chunk.disassemble().unwrap());
+            //         }
+            //     );
 
-                debug!("\n{}", chunk.disassemble()?);
+            //     debug!("\n{}", chunk.disassemble()?);
+            // }
+
+            if let Function::UserDefined { chunk, ..} = function {
+                // debug!("\n{}", chunk.disassemble()?);
+                vm.call(chunk, 0);
             }
-
-            vm.call(function, 0);
 
             loop {
                 match vm.run(None).await {

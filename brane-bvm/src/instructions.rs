@@ -3,6 +3,7 @@ use anyhow::Result;
 use specifications::package::PackageIndex;
 use crate::{CallFrame, bytecode::Function, values::{Array, Instance, Value}};
 use smallvec::SmallVec;
+use std::sync::Arc;
 
 ///
 ///
@@ -647,13 +648,13 @@ pub fn op_import(
                     for (name, function) in functions {
                         state.insert(
                             name.clone(),
-                            Value::Function(Function::External {
+                            Value::Function(Arc::new(Function::External {
                                 package: package_name.clone(),
                                 version: package.version.clone(),
                                 kind: kind.clone(),
                                 name: name.clone(),
                                 parameters: function.parameters.clone(),
-                            }),
+                            })),
                         );
                     }
 

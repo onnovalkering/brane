@@ -21,7 +21,7 @@ use bytecode::{ReadOnlyChunk};
 use futures::{stream, StreamExt};
 use specifications::common::Value as SpecValue;
 use specifications::package::PackageIndex;
-use std::cmp;
+use std::{cmp, ops::Deref};
 use std::{collections::HashMap, usize};
 use smallvec::SmallVec;
 
@@ -146,10 +146,10 @@ where
     #[async_recursion]
     pub async fn run(
         &mut self,
-        function: Option<Function>,
+        function: Option<std::sync::Arc<Function>>,
     ) -> Result<VmResult> {
-        if let Some(Function::UserDefined { chunk, ..}) = function {
-            self.call(chunk, 0);
+        if let Some(Function::UserDefined { chunk, ..}) = function.as_deref() {
+            self.call(chunk.clone(), 0);
         }
 
         let frame = self.call_frames.last().unwrap().clone();
@@ -224,66 +224,63 @@ where
                     if let Some(arg_count) = frame.chunk.code.get(ip) {
                         ip += 1;
 
+                        // let function = self.stack.get(self.stack.len() - offset).as_deref();
+
                         let offset = *arg_count as usize + 1;
-                        let function = self.stack.get(self.stack.len() - offset);
+                        if let Some(function) = self.stack.get(self.stack.len() - offset) {
+                            if let Value::Function(function) = function {
+                                match function.clone().deref() {
+                                    Function::UserDefined { chunk, .. } => {
+                                        let chunk = chunk.clone();
+                                        self.call(chunk, *arg_count);
 
-                        match function {
-                            Some(Value::Function(Function::UserDefined { ref chunk, .. })) => {
-                                let chunk = chunk.clone();
-                                self.call(chunk, *arg_count);
+                                        if let Ok(VmResult::Ok(Some(result))) = self.run(None).await {
+                                            for _i in vec![0; offset as usize] {
+                                                self.stack.pop();
+                                            }
 
-                                if let Ok(VmResult::Ok(Some(result))) = self.run(None).await {
-                                    for _i in vec![0; offset as usize] {
+                                            self.stack.push(result);
+                                        }
+                                    },
+                                    Function::Native { name, .. } => {
+                                        builtins::handle(name, &mut self.stack).unwrap();
+                                    },
+                                    Function::External {
+                                        name,
+                                        package,
+                                        kind,
+                                        version,
+                                        parameters
+                                    } => {
+                                        let mut arguments: HashMap<String, SpecValue> = HashMap::new();
+                                        // Reverse order because of stack
+                                        for p in parameters.into_iter().rev() {
+                                            arguments.insert(p.name.clone(), self.stack.pop().unwrap().as_spec_value());
+                                        }
+
+                                        // The function itself.
                                         self.stack.pop();
+                                        let location = self.locations.last().cloned();
+
+                                        let call = VmCall {
+                                            package: package.clone(),
+                                            version: version.clone(),
+                                            kind: kind.clone(),
+                                            location,
+                                            function: name.clone(),
+                                            arguments,
+                                        };
+
+                                        self.call_frames.pop();
+                                        self.call_frames.push(frame.clone());
+
+                                        let result = self.executor.execute(call).await.unwrap();
+                                        self.stack.push(result);
                                     }
-
-                                    self.stack.push(result);
                                 }
                             }
-                            Some(Value::Function(Function::Native { ref name, .. })) => {
-                                let name = name.clone();
-                                builtins::handle(name, &mut self.stack).unwrap();
-                            }
-                            Some(Value::Function(Function::External {
-                                name,
-                                package,
-                                kind,
-                                version,
-                                parameters,
-                            })) => {
-                                let name = name.clone();
-                                let package = package.clone();
-                                let kind = kind.clone();
-                                let version = version.clone();
-                                let parameters = parameters.clone();
-
-                                let mut arguments: HashMap<String, SpecValue> = HashMap::new();
-                                // Reverse order because of stack
-                                for p in parameters.into_iter().rev() {
-                                    arguments.insert(p.name.clone(), self.stack.pop().unwrap().as_spec_value());
-                                }
-
-                                // The function itself.
-                                self.stack.pop();
-                                let location = self.locations.last().cloned();
-
-                                let call = VmCall {
-                                    package: package.clone(),
-                                    version: version.clone(),
-                                    kind: kind.clone(),
-                                    location,
-                                    function: name.clone(),
-                                    arguments,
-                                };
-
-                                self.call_frames.pop();
-                                self.call_frames.push(frame.clone());
-
-                                let result = self.executor.execute(call).await.unwrap();
-                                self.stack.push(result);
-                            },
-                            _ => bail!("Trying to call something that's not a function."),
                         }
+
                     }
                 }
                 //

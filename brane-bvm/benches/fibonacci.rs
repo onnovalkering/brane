@@ -6,6 +6,7 @@ use criterion::async_executor::FuturesExecutor;
 use criterion::Criterion;
 use criterion::{criterion_group, criterion_main};
 use specifications::package::PackageIndex;
+use std::sync::Arc;
 
 const FIB_CODE: &str = r#"
     func fib(n) {
@@ -45,7 +46,7 @@ async fn do_something(f: Function) {
     let executor = NoOpExecutor {};
     let mut vm = VM::new("bench", PackageIndex::empty(), None, Some(options), executor);
 
-    vm.run(Some(f)).await.unwrap();
+    vm.run(Some(Arc::new(f))).await.unwrap();
 }
 
 fn from_elem(c: &mut Criterion) {

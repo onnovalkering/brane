@@ -3,6 +3,7 @@ use crate::values::{Array, Value};
 use anyhow::Result;
 use std::collections::HashMap;
 use smallvec::SmallVec;
+use std::sync::Arc;
 
 static BUILTIN_FN_PRINT: &str = "print";
 static BUILTIN_FN_LENGTH: &str = "length";
@@ -16,26 +17,26 @@ pub fn register(state: &mut HashMap<String, Value>) {
 
     state.insert(
         BUILTIN_FN_PRINT.to_string(),
-        Value::Function(Function::Native {
+        Value::Function(Arc::new(Function::Native {
             name: BUILTIN_FN_PRINT.to_string(),
             arity: 1,
-        }),
+        })),
     );
 
     state.insert(
         BUILTIN_FN_LENGTH.to_string(),
-        Value::Function(Function::Native {
+        Value::Function(Arc::new(Function::Native {
             name: BUILTIN_FN_LENGTH.to_string(),
             arity: 1,
-        }),
+        })),
     );
 
     state.insert(
         BUILTIN_FN_SPLIT.to_string(),
-        Value::Function(Function::Native {
+        Value::Function(Arc::new(Function::Native {
             name: BUILTIN_FN_SPLIT.to_string(),
             arity: 2,
-        }),
+        })),
     );
 }
 
@@ -44,7 +45,7 @@ pub fn register(state: &mut HashMap<String, Value>) {
 ///
 #[inline]
 pub fn handle(
-    name: String,
+    name: &String,
     stack: &mut SmallVec<[Value; 64]>,
 ) -> Result<()> {
     match name.as_str() {

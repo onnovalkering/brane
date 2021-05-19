@@ -1,6 +1,7 @@
 use crate::bytecode::Function;
 use specifications::common::Value as SpecValue;
 use std::{collections::HashMap, fmt};
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub enum Value {
@@ -9,7 +10,7 @@ pub enum Value {
     Integer(i64),
     Real(f64),
     Unit,
-    Function(Function),
+    Function(Arc<Function>),
     Class(Class),
     Instance(Instance),
     Array(Array),
@@ -161,7 +162,7 @@ impl From<SpecValue> for Value {
 
 impl From<Function> for Value {
     fn from(function: Function) -> Self {
-        Value::Function(function)
+        Value::Function(Arc::new(function))
     }
 }
 
