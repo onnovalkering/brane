@@ -409,22 +409,27 @@ fn preprocess_stdout(
             let mut capture = false;
 
             for line in stdout {
-                if !capture && line.trim_start().starts_with(MARK_START) {
+                if line.trim_start().starts_with(MARK_START) {
                     capture = true;
                     continue;
                 }
 
+                // Stop capturing after observing MARK_END after MARK_START
                 if capture && line.trim_start().starts_with(MARK_END) {
                     break;
                 }
 
-                captured.push(line);
+                if capture {
+                    debug!("captured: {}", line);
+                    captured.push(line);
+                }
             }
         }
         "prefixed" => {
             for line in stdout {
                 if line.starts_with(PREFIX) {
                     let trimmed = line.trim_start_matches(PREFIX);
+                    debug!("captured: {}", trimmed);
                     captured.push(trimmed.to_string());
                 }
             }
