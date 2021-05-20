@@ -1,34 +1,37 @@
-use brane_bvm::{objects::Function, vm::Vm};
-use brane_bvm::bytecode::Function as BFunction;
+use brane_bvm::bytecode;
+use brane_bvm::vm::Vm;
 use brane_dsl::{Compiler, CompilerOptions};
 use specifications::package::PackageIndex;
 
 
 const SIMPLE: &str = r#"
-    return 1 + 1;
+    func test(n) {
+        if (n <= 1) {
+            return 1;
+        } else {
+            return test(n - 1);
+        }
+    }
+
+    let a := test(5);
+    print(a);
 "#;
 
-fn compile() -> Function {
+fn compile() -> bytecode::Function {
     let mut compiler = Compiler::new(
         CompilerOptions::new(brane_dsl::Lang::BraneScript),
         PackageIndex::empty(),
     );
 
-    if let BFunction::UserDefined { chunk, name, arity } = compiler.compile(SIMPLE).unwrap() {
-        dbg!(&chunk);
-
-        return Function {
-            arity,
-            name,
-            chunk,
-        };
-    }
-
-    unreachable!()
+    compiler.compile(SIMPLE).unwrap()
 }
 
 fn main() {
     let function = compile();
+
+    dbg!(&function.chunk);
+    println!();
+
     let mut vm = Vm::default();
 
     vm.main(function);

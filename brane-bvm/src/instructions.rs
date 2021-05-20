@@ -786,63 +786,65 @@ pub async fn op_parallel<E>(
 where
     E: 'static + VmExecutor + Clone + Send + Sync,
 {
-    profile_fn!(op_index);
+    todo!()
 
-    let blocks_n = frame.chunk.code[ip];
+    // profile_fn!(op_index);
 
-    let blocks: Vec<Value> = (0..blocks_n).map(|_| stack.pop().unwrap()).rev().collect();
+    // let blocks_n = frame.chunk.code[ip];
 
-    if blocks.is_empty() {
-        stack.push(Value::Array(Array {
-            data_type: String::from("unit[]"),
-            entries: blocks,
-        }));
-    } else {
-        let results = stream::iter(blocks)
-            .map(|block| {
-                if let Value::Function(block) = block {
-                    {
-                        let vm = fork.clone();
-                        tokio::spawn(async move { vm.clone().run(Some(block)).await })
-                    }
-                } else {
-                    unreachable!()
-                }
-            })
-            .buffer_unordered(128)
-            .collect::<Vec<_>>()
-            .await;
+    // let blocks: Vec<Value> = (0..blocks_n).map(|_| stack.pop().unwrap()).rev().collect();
 
-        if results.iter().any(|r| match r {
-            Ok(Ok(VmResult::RuntimeError)) => true,
-            Err(_) => true,
-            _ => false,
-        }) {
-            bail!("runtime error");
-        }
+    // if blocks.is_empty() {
+    //     stack.push(Value::Array(Array {
+    //         data_type: String::from("unit[]"),
+    //         entries: blocks,
+    //     }));
+    // } else {
+    //     let results = stream::iter(blocks)
+    //         .map(|block| {
+    //             if let Value::Function(block) = block {
+    //                 {
+    //                     let vm = fork.clone();
+    //                     tokio::spawn(async move { vm.clone().run(Some(block)).await })
+    //                 }
+    //             } else {
+    //                 unreachable!()
+    //             }
+    //         })
+    //         .buffer_unordered(128)
+    //         .collect::<Vec<_>>()
+    //         .await;
 
-        let entries: Vec<Value> = results
-            .into_iter()
-            .map(|r| match r {
-                Ok(Ok(VmResult::Ok(value))) => value.unwrap_or(Value::Unit),
-                _ => unreachable!(),
-            })
-            .collect();
+    //     if results.iter().any(|r| match r {
+    //         Ok(Ok(VmResult::RuntimeError)) => true,
+    //         Err(_) => true,
+    //         _ => false,
+    //     }) {
+    //         bail!("runtime error");
+    //     }
 
-        let data_type = match entries.get(0).unwrap() {
-            Value::String(_) => String::from("string"),
-            Value::Real(_) => String::from("real"),
-            Value::Integer(_) => String::from("integer"),
-            Value::Boolean(_) => String::from("boolean"),
-            Value::Array(array) => array.data_type.clone(),
-            Value::Instance(instance) => instance.class.name.clone(),
-            Value::Class(_) | Value::Function(_) => todo!(),
-            Value::Unit => String::from("unit"),
-        };
+    //     let entries: Vec<Value> = results
+    //         .into_iter()
+    //         .map(|r| match r {
+    //             Ok(Ok(VmResult::Ok(value))) => value.unwrap_or(Value::Unit),
+    //             _ => unreachable!(),
+    //         })
+    //         .collect();
 
-        let data_type = format!("{}[]", data_type);
-        stack.push(Value::Array(Array { data_type, entries }));
-    }
+    //     let data_type = match entries.get(0).unwrap() {
+    //         Value::String(_) => String::from("string"),
+    //         Value::Real(_) => String::from("real"),
+    //         Value::Integer(_) => String::from("integer"),
+    //         Value::Boolean(_) => String::from("boolean"),
+    //         Value::Array(array) => array.data_type.clone(),
+    //         Value::Instance(instance) => instance.class.name.clone(),
+    //         Value::Class(_) | Value::Function(_) => todo!(),
+    //         Value::Unit => String::from("unit"),
+    //     };
 
-    Ok(ip + 1)
+    //     let data_type = format!("{}[]", data_type);
+    //     stack.push(Value::Array(Array { data_type, entries }));
+    // }
+
+    // Ok(ip + 1)
 }

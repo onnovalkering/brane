@@ -1,6 +1,6 @@
 use broom::prelude::*;
 
-use crate::bytecode::ReadOnlyChunk;
+use crate::chunk::FrozenChunk;
 
 #[derive(Debug)]
 pub enum Object {
@@ -39,7 +39,9 @@ impl Trace<Self> for Object {
 }
 
 #[derive(Debug)]
-pub struct Class {}
+pub struct Class {
+    pub name: String,
+}
 
 impl Trace<Object> for Class {
     fn trace(
@@ -49,10 +51,10 @@ impl Trace<Object> for Class {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Function {
     pub arity: u8,
-    pub chunk: ReadOnlyChunk,
+    pub chunk: FrozenChunk,
     pub name: String,
 }
 

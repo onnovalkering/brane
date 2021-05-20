@@ -1,4 +1,5 @@
 use anyhow::Result;
+use broom::Heap;
 use bytes::{BufMut, Bytes, BytesMut};
 use specifications::common::Parameter;
 use std::fmt::{self, Write};
@@ -41,59 +42,46 @@ pub mod opcodes {
     pub const OP_UNIT: u8 = 0x23;
 }
 
-use crate::values::Value;
-use opcodes::*;
-
+use crate::{chunk::{Chunk, FrozenChunk}, objects::{self, Object}};
 #[derive(Clone)]
-pub enum Function {
-    External {
-        package: String,
-        version: String,
-        kind: String,
-        name: String,
-        parameters: Vec<Parameter>,
-    },
-    Native {
-        name: String,
-        arity: u8,
-    },
-    UserDefined {
-        name: String,
-        arity: u8,
-        chunk: ReadOnlyChunk,
-    },
+pub struct Function {
+    pub arity: u8,
+    pub chunk: Chunk,
+    pub name: String,
 }
 
 impl Function {
     pub fn new(
         name: String,
         arity: u8,
-        chunk: ReadOnlyChunk,
+        chunk: Chunk,
     ) -> Self {
-        Function::UserDefined { arity, name, chunk }
+        Self {
+            arity,
+            chunk,
+            name,
+        }
     }
-}
 
-impl fmt::Debug for Function {
-    fn fmt(
-        &self,
-        f: &mut fmt::Formatter<'_>,
-    ) -> fmt::Result {
-        match self {
-            Function::UserDefined { name, .. } | Function::External { name, .. } | Function::Native { name, .. } => {
-                write!(f, "{}(..)", name)
-            }
+    pub fn freeze(
+        self,
+        heap: &mut Heap<Object>,
+    ) -> objects::Function {
+        objects::Function {
+            arity: self.arity,
+            name: self.name,
+            chunk: self.chunk.freeze(heap),
         }
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ReadOnlyChunk {
-    pub code: Bytes,
-    pub constants: Vec<Value>,
-}
+// #[derive(Debug, Clone)]
+// pub struct ReadOnlyChunk2 {
+//     pub code: Bytes,
+//     pub constants: Vec<Value>,
+// }
 
-impl ReadOnlyChunk {
+impl FrozenChunk {
     ///
     ///
     ///
@@ -107,6 +95,7 @@ impl ReadOnlyChunk {
                 continue;
             }
 
+            use opcodes::*;
             write!(result, "{:04} ", offset)?;
             match *instruction {
                 OP_CONSTANT => {
@@ -240,85 +229,13 @@ impl ReadOnlyChunk {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Chunk {
-    pub code: BytesMut,
-    pub constants: Vec<Value>,
-}
-
-impl Chunk {
-    ///
-    ///
-    ///
-    pub fn new() -> Self {
-        Chunk {
-            code: BytesMut::new(),
-            constants: Vec::new(),
-        }
-    }
-
-    ///
-    ///
-    ///
-    pub fn freeze(self) -> ReadOnlyChunk {
-        ReadOnlyChunk {
-            code: self.code.freeze(),
-            constants: self.constants,
-        }
-    }
-
-    ///
-    ///
-    ///
-    pub fn write<B: Into<u8>>(
-        &mut self,
-        byte: B,
-    ) {
-        self.code.put_u8(byte.into());
-    }
-
-    ///
-    ///
-    ///
-    pub fn write_pair<B1: Into<u8>, B2: Into<u8>>(
-        &mut self,
-        byte1: B1,
-        byte2: B2,
-    ) {
-        self.code.put_u8(byte1.into());
-        self.code.put_u8(byte2.into());
-    }
-
-    ///
-    ///
-    ///
-    pub fn write_bytes(
-        &mut self,
-        bytes: &[u8],
-    ) {
-        self.code.extend(bytes);
-    }
-
-    ///
-    ///
-    ///
-    pub fn add_constant(
-        &mut self,
-        value: Value,
-    ) -> u8 {
-        self.constants.push(value);
-
-        (self.constants.len() as u8) - 1
-    }
-}
-
 ///
 ///
 ///
 fn jump_instruction(
     name: &str,
     sign: i16,
-    chunk: &ReadOnlyChunk,
+    chunk: &FrozenChunk,
     offset: usize,
     result: &mut String,
 ) {
@@ -341,7 +258,7 @@ fn jump_instruction(
 ///
 fn constant_instruction(
     name: &str,
-    chunk: &ReadOnlyChunk,
+    chunk: &FrozenChunk,
     offset: usize,
     result: &mut String,
 ) {
@@ -358,7 +275,7 @@ fn constant_instruction(
 ///
 fn byte_instruction(
     name: &str,
-    chunk: &ReadOnlyChunk,
+    chunk: &FrozenChunk,
     offset: usize,
     result: &mut String,
 ) {
