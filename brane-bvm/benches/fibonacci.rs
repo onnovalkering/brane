@@ -1,4 +1,4 @@
-use brane_bvm::{bytecode::Function, vm::Vm};
+use brane_bvm::{bytecode::FunctionMut, executor::NoOpExecutor, vm::Vm};
 use brane_dsl::{Compiler, CompilerOptions};
 use criterion::async_executor::FuturesExecutor;
 use criterion::Criterion;
@@ -17,10 +17,7 @@ const FIB_CODE: &str = r#"
     fib(xyz);
 "#;
 
-#[derive(Clone)]
-struct NoOpExecutor {}
-
-fn compile(n: u8) -> Function {
+fn compile(n: u8) -> FunctionMut {
     let mut compiler = Compiler::new(
         CompilerOptions::new(brane_dsl::Lang::BraneScript),
         PackageIndex::empty(),
@@ -29,13 +26,13 @@ fn compile(n: u8) -> Function {
     compiler.compile(FIB_CODE.replace("xyz", &format!("{}", n))).unwrap()
 }
 
-async fn run(f: Function) {
-    let mut vm = Vm::default();
-    vm.main(f);
+async fn run(f: FunctionMut) {
+    let mut vm = Vm::<NoOpExecutor>::default();
+    vm.main(f).await;
 }
 
 fn from_elem(c: &mut Criterion) {
-    c.bench_function("fib 5", move |b| {
+    c.bench_function("fib 5", |b| {
         b.to_async(FuturesExecutor).iter(|| run(compile(5)));
     });
     c.bench_function("fib 10", move |b| {
@@ -43,6 +40,15 @@ fn from_elem(c: &mut Criterion) {
     });
     c.bench_function("fib 15", move |b| {
         b.to_async(FuturesExecutor).iter(|| run(compile(15)));
+    });
+    c.bench_function("fib 20", move |b| {
+        b.to_async(FuturesExecutor).iter(|| run(compile(20)));
+    });
+    c.bench_function("fib 25", move |b| {
+        b.to_async(FuturesExecutor).iter(|| run(compile(25)));
+    });
+    c.bench_function("fib 30", move |b| {
+        b.to_async(FuturesExecutor).iter(|| run(compile(30)));
     });
 }
 

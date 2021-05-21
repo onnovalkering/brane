@@ -1,5 +1,5 @@
 use anyhow::Result;
-use socksx::options::SocksOption;
+use socksx::socks6::options::SocksOption;
 use socksx::{self, Socks6Client};
 use std::net::IpAddr;
 use std::process::Command;

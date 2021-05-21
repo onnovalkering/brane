@@ -7,7 +7,8 @@ use clap::Clap;
 use dotenv::dotenv;
 use log::LevelFilter;
 use serde::de::DeserializeOwned;
-use socksx::options::MetadataOption;
+use socksx::socks6::options::MetadataOption;
+use socksx::socks6::options::SocksOption;
 use specifications::common::Value;
 use std::path::PathBuf;
 use std::process::Command;
@@ -102,15 +103,12 @@ async fn main() -> Result<()> {
             MetadataOption::new(3, job_id.clone()),
         ];
 
+        let options = options.into_iter().map(SocksOption::Metadata).collect();
         redirector::start(proxy_address, options).await?;
     }
 
     // Callbacks may be called at any time of the execution.
-    let callback = if let Some(callback_to) = callback_to {
-        Some(Callback::new(application_id, location_id, job_id, callback_to))
-    } else {
-        None
-    };
+    let callback = callback_to.map(|callback_to| Callback::new(application_id, location_id, job_id, callback_to));
 
     // Wrap actual execution, so we can always log errors.
     match run(opts.sub_command, callback).compat().await {

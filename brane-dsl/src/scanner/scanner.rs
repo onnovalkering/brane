@@ -43,21 +43,21 @@ fn scan_token<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<
 ///
 fn keyword<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>) -> IResult<Span<'a>, Token, E> {
     ws0(branch::alt((
-        comb::map(bc::tag("break"), |s| Token::Break(s)),
-        comb::map(bc::tag("class"), |s| Token::Class(s)),
-        comb::map(bc::tag("continue"), |s| Token::Continue(s)),
-        comb::map(bc::tag("else"), |s| Token::Else(s)),
-        comb::map(bc::tag("for"), |s| Token::For(s)),
-        comb::map(bc::tag("func"), |s| Token::Function(s)),
-        comb::map(bc::tag("if"), |s| Token::If(s)),
-        comb::map(bc::tag("import"), |s| Token::Import(s)),
-        comb::map(bc::tag("let"), |s| Token::Let(s)),
-        comb::map(bc::tag("new"), |s| Token::New(s)),
-        comb::map(bc::tag("on"), |s| Token::On(s)),
-        comb::map(bc::tag("parallel"), |s| Token::Parallel(s)),
-        comb::map(bc::tag("return"), |s| Token::Return(s)),
-        comb::map(bc::tag("unit"), |s| Token::Unit(s)),
-        comb::map(bc::tag("while"), |s| Token::While(s)),
+        comb::map(bc::tag("break"), Token::Break),
+        comb::map(bc::tag("class"), Token::Class),
+        comb::map(bc::tag("continue"), Token::Continue),
+        comb::map(bc::tag("else"), Token::Else),
+        comb::map(bc::tag("for"), Token::For),
+        comb::map(bc::tag("func"), Token::Function),
+        comb::map(bc::tag("if"), Token::If),
+        comb::map(bc::tag("import"), Token::Import),
+        comb::map(bc::tag("let"), Token::Let),
+        comb::map(bc::tag("new"), Token::New),
+        comb::map(bc::tag("on"), Token::On),
+        comb::map(bc::tag("parallel"), Token::Parallel),
+        comb::map(bc::tag("return"), Token::Return),
+        comb::map(bc::tag("unit"), Token::Unit),
+        comb::map(bc::tag("while"), Token::While),
     )))
     .parse(input)
 }
@@ -68,21 +68,21 @@ fn keyword<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>
 fn operator<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>) -> IResult<Span<'a>, Token, E> {
     ws0(branch::alt((
         // Two character tokens
-        comb::map(bc::tag(":="), |s| Token::Assign(s)),
-        comb::map(bc::tag("=="), |s| Token::Equal(s)),
-        comb::map(bc::tag(">="), |s| Token::GreaterOrEqual(s)),
-        comb::map(bc::tag("<="), |s| Token::LessOrEqual(s)),
-        comb::map(bc::tag("!="), |s| Token::NotEqual(s)),
+        comb::map(bc::tag(":="), Token::Assign),
+        comb::map(bc::tag("=="), Token::Equal),
+        comb::map(bc::tag(">="), Token::GreaterOrEqual),
+        comb::map(bc::tag("<="), Token::LessOrEqual),
+        comb::map(bc::tag("!="), Token::NotEqual),
         // One character token
-        comb::map(bc::tag("!"), |s| Token::Not(s)),
-        comb::map(bc::tag("&"), |s| Token::And(s)),
-        comb::map(bc::tag("*"), |s| Token::Star(s)),
-        comb::map(bc::tag("+"), |s| Token::Plus(s)),
-        comb::map(bc::tag("-"), |s| Token::Minus(s)),
-        comb::map(bc::tag("/"), |s| Token::Slash(s)),
-        comb::map(bc::tag("<"), |s| Token::Less(s)),
-        comb::map(bc::tag(">"), |s| Token::Greater(s)),
-        comb::map(bc::tag("|"), |s| Token::Or(s)),
+        comb::map(bc::tag("!"), Token::Not),
+        comb::map(bc::tag("&"), Token::And),
+        comb::map(bc::tag("*"), Token::Star),
+        comb::map(bc::tag("+"), Token::Plus),
+        comb::map(bc::tag("-"), Token::Minus),
+        comb::map(bc::tag("/"), Token::Slash),
+        comb::map(bc::tag("<"), Token::Less),
+        comb::map(bc::tag(">"), Token::Greater),
+        comb::map(bc::tag("|"), Token::Or),
     )))
     .parse(input)
 }
@@ -92,16 +92,16 @@ fn operator<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a
 ///
 fn punctuation<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>) -> IResult<Span<'a>, Token, E> {
     ws0(branch::alt((
-        comb::map(bc::tag("("), |s| Token::LeftParen(s)),
-        comb::map(bc::tag(")"), |s| Token::RightParen(s)),
-        comb::map(bc::tag(","), |s| Token::Comma(s)),
-        comb::map(bc::tag("."), |s| Token::Dot(s)),
-        comb::map(bc::tag(":"), |s| Token::Colon(s)),
-        comb::map(bc::tag(";"), |s| Token::Semicolon(s)),
-        comb::map(bc::tag("["), |s| Token::LeftBracket(s)),
-        comb::map(bc::tag("]"), |s| Token::RightBracket(s)),
-        comb::map(bc::tag("{"), |s| Token::LeftBrace(s)),
-        comb::map(bc::tag("}"), |s| Token::RightBrace(s)),
+        comb::map(bc::tag("("), Token::LeftParen),
+        comb::map(bc::tag(")"), Token::RightParen),
+        comb::map(bc::tag(","), Token::Comma),
+        comb::map(bc::tag("."), Token::Dot),
+        comb::map(bc::tag(":"), Token::Colon),
+        comb::map(bc::tag(";"), Token::Semicolon),
+        comb::map(bc::tag("["), Token::LeftBracket),
+        comb::map(bc::tag("]"), Token::RightBracket),
+        comb::map(bc::tag("{"), Token::LeftBrace),
+        comb::map(bc::tag("}"), Token::RightBrace),
     )))
     .parse(input)
 }
@@ -115,7 +115,7 @@ fn identifier<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<
             branch::alt((cc::alpha1, bc::tag("_"))),
             multi::many0(branch::alt((cc::alphanumeric1, bc::tag("_")))),
         )),
-        |s| Token::Ident(s),
+        Token::Ident,
     ))
     .parse(input)
 }

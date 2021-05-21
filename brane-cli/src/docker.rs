@@ -1,8 +1,6 @@
-use crate::{packages};
+use crate::packages;
 use anyhow::{Context as _, Result};
-use brane_bvm::VmExecutor;
-use brane_bvm::values::Value;
-use brane_bvm::VmCall;
+use async_trait::async_trait;
 use bollard::container::{
     Config, CreateContainerOptions, LogOutput, LogsOptions, RemoveContainerOptions, StartContainerOptions,
     WaitContainerOptions,
@@ -11,20 +9,22 @@ use bollard::errors::Error;
 use bollard::image::{CreateImageOptions, ImportImageOptions, RemoveImageOptions};
 use bollard::models::{DeviceRequest, HostConfig};
 use bollard::Docker;
+use brane_bvm::values::Value;
+use brane_bvm::VmCall;
+use brane_bvm::VmExecutor;
 use futures_util::stream::TryStreamExt;
 use futures_util::StreamExt;
 use hyper::Body;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use specifications::common::Value as SpecValue;
+use specifications::package::PackageInfo;
 use std::default::Default;
 use std::env;
 use std::path::PathBuf;
 use tokio::fs::File as TFile;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use uuid::Uuid;
-use serde::de::DeserializeOwned;
-use specifications::common::Value as SpecValue;
-use specifications::package::PackageInfo;
-use async_trait::async_trait;
 
 lazy_static! {
     static ref DOCKER_NETWORK: String = env::var("DOCKER_NETWORK").unwrap_or_else(|_| String::from("host"));
@@ -39,13 +39,16 @@ pub struct DockerExecutor {}
 
 impl DockerExecutor {
     pub fn new() -> Self {
-        Self { }
+        Self {}
     }
 }
 
 #[async_trait]
 impl VmExecutor for DockerExecutor {
-    async fn execute(&self, call: VmCall) -> Result<Value> {
+    async fn execute(
+        &self,
+        call: VmCall,
+    ) -> Result<Value> {
         make_function_call(call).await
     }
 }
@@ -119,7 +122,6 @@ where
     serde_json::from_str(&input)
         .with_context(|| "Deserialization failed, decoded input doesn't seem to be as expected.")
 }
-
 
 ///
 ///

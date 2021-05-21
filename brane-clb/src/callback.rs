@@ -1,5 +1,5 @@
-use crate::interface::{Callback, CallbackKind};
 use crate::grpc;
+use crate::interface::{Callback, CallbackKind};
 use anyhow::Result;
 use bytes::BytesMut;
 use prost::Message;

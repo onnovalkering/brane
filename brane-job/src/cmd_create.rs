@@ -1,15 +1,13 @@
+use crate::interface::{Command, Event, EventKind};
 use anyhow::{Context, Result};
-use base64;
-use bollard::Docker;
 use bollard::container::{Config, CreateContainerOptions, StartContainerOptions};
-use bollard::models::HostConfig;
 use bollard::image::CreateImageOptions;
+use bollard::models::HostConfig;
+use bollard::Docker;
 use brane_cfg::infrastructure::{Location, LocationCredentials};
 use brane_cfg::{Infrastructure, Secrets};
-use crate::interface::{Command, Event, EventKind};
-use grpcio::Channel;
 use futures_util::stream::TryStreamExt;
-use futures_util::StreamExt;
+use grpcio::Channel;
 use k8s_openapi::api::batch::v1::Job;
 use k8s_openapi::api::core::v1::Namespace;
 use kube::api::{Api, PostParams};
@@ -36,7 +34,7 @@ const BRANE_MOUNT_DFS: &str = "BRANE_MOUNT_DFS";
 ///
 ///
 pub async fn handle(
-    key: &String,
+    key: &str,
     command: Command,
     infra: Infrastructure,
     secrets: Secrets,
@@ -67,7 +65,14 @@ pub async fn handle(
             mount_dfs,
             ..
         } => {
-            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address, &mount_dfs)?;
+            let environment = construct_environment(
+                &application,
+                &location_id,
+                &job_id,
+                &callback_to,
+                &proxy_address,
+                &mount_dfs,
+            )?;
             let credentials = credentials.resolve_secrets(&secrets);
 
             handle_k8s(command, &job_id, environment, address, namespace, credentials).await?
@@ -79,7 +84,14 @@ pub async fn handle(
             mount_dfs,
             ..
         } => {
-            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address, &mount_dfs)?;
+            let environment = construct_environment(
+                &application,
+                &location_id,
+                &job_id,
+                &callback_to,
+                &proxy_address,
+                &mount_dfs,
+            )?;
             handle_local(command, &correlation_id, environment, network).await?
         }
         Location::Slurm {
@@ -91,15 +103,21 @@ pub async fn handle(
             mount_dfs,
             ..
         } => {
-            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address, &mount_dfs)?;
+            let environment = construct_environment(
+                &application,
+                &location_id,
+                &job_id,
+                &callback_to,
+                &proxy_address,
+                &mount_dfs,
+            )?;
             let credentials = credentials.resolve_secrets(&secrets);
 
-            handle_xenon(
+            handle_slurm(
                 command,
                 &job_id,
                 environment,
                 address,
-                "slurm",
                 runtime,
                 credentials,
                 xenon_channel,
@@ -114,15 +132,21 @@ pub async fn handle(
             mount_dfs,
             ..
         } => {
-            let environment = construct_environment(&application, &location_id, &job_id, &callback_to, &proxy_address, &mount_dfs)?;
+            let environment = construct_environment(
+                &application,
+                &location_id,
+                &job_id,
+                &callback_to,
+                &proxy_address,
+                &mount_dfs,
+            )?;
             let credentials = credentials.resolve_secrets(&secrets);
 
-            handle_xenon(
+            handle_vm(
                 command,
                 &job_id,
                 environment,
                 address,
-                "ssh",
                 runtime,
                 credentials,
                 xenon_channel,
@@ -139,7 +163,16 @@ pub async fn handle(
     let key = format!("{}#{}", job_id, order);
     let category = String::from("job");
     let payload = image.into_bytes();
-    let event = Event::new(EventKind::Created, job_id, application, location_id, category, order, Some(payload), None);
+    let event = Event::new(
+        EventKind::Created,
+        job_id,
+        application,
+        location_id,
+        category,
+        order,
+        Some(payload),
+        None,
+    );
 
     Ok(vec![(key, event)])
 }
@@ -190,7 +223,7 @@ fn construct_environment<S: Into<String>>(
 ///
 async fn handle_k8s(
     command: Command,
-    job_id: &String,
+    job_id: &str,
     environment: HashMap<String, String>,
     _address: String,
     namespace: String,
@@ -263,12 +296,15 @@ async fn construct_k8s_config(config_file: String) -> Result<KubeConfig> {
 ///
 ///
 fn create_k8s_job_description(
-    job_id: &String,
+    job_id: &str,
     command: &Command,
     environment: HashMap<String, String>,
 ) -> Result<Job> {
     let command = command.clone();
-    let environment: Vec<JValue> = environment.iter().map(|(k, v)| json!({ "name": k, "value": v })).collect();
+    let environment: Vec<JValue> = environment
+        .iter()
+        .map(|(k, v)| json!({ "name": k, "value": v }))
+        .collect();
 
     // Kubernetes jobs require lowercase names
     let job_id = job_id.to_lowercase();
@@ -309,7 +345,7 @@ fn create_k8s_job_description(
 ///
 ///
 ///
-fn create_k8s_namespace(namespace: &String) -> Result<Namespace> {
+fn create_k8s_namespace(namespace: &str) -> Result<Namespace> {
     let namespace = serde_json::from_value(json!({
         "apiVersion": "v1",
         "kind": "Namespace",
@@ -326,17 +362,16 @@ fn create_k8s_namespace(namespace: &String) -> Result<Namespace> {
 ///
 async fn handle_local(
     command: Command,
-    job_id: &String,
+    job_id: &str,
     environment: HashMap<String, String>,
-    network: String
+    network: String,
 ) -> Result<()> {
     let docker = Docker::connect_with_local_defaults()?;
 
     let image = command.image.expect("Empty `image` field on CREATE command.");
     ensure_image(&docker, &image).await?;
 
-    let name = job_id.clone();
-    let create_options = CreateContainerOptions { name: &name };
+    let create_options = CreateContainerOptions { name: job_id };
 
     let host_config = HostConfig {
         auto_remove: Some(true),
@@ -361,7 +396,7 @@ async fn handle_local(
     // Create and start container
     docker.create_container(Some(create_options), create_config).await?;
     docker
-        .start_container(&name, None::<StartContainerOptions<String>>)
+        .start_container(job_id, None::<StartContainerOptions<String>>)
         .await?;
 
     Ok(())
@@ -372,7 +407,7 @@ async fn handle_local(
 ///
 async fn ensure_image(
     docker: &Docker,
-    image: &String,
+    image: &str,
 ) -> Result<()> {
     // Abort, if image is already loaded
     if docker.inspect_image(image).await.is_ok() {
@@ -381,7 +416,7 @@ async fn ensure_image(
     }
 
     let options = Some(CreateImageOptions {
-        from_image: image.clone(),
+        from_image: image,
         ..Default::default()
     });
 
@@ -393,12 +428,11 @@ async fn ensure_image(
 ///
 ///
 ///
-fn handle_xenon(
+fn handle_slurm(
     command: Command,
-    job_id: &String,
+    job_id: &str,
     environment: HashMap<String, String>,
     address: String,
-    adaptor: &str,
     runtime: String,
     credentials: LocationCredentials,
     xenon_channel: Channel,
@@ -413,8 +447,46 @@ fn handle_xenon(
         LocationCredentials::Config { .. } => unreachable!(),
     };
 
-    let mut scheduler = create_xenon_scheduler(address, adaptor, credentials, xenon_channel)?;
+    let scheduler = create_xenon_scheduler(address, "slurm", credentials, xenon_channel)?;
+    handle_xenon(command, job_id, environment, runtime, scheduler)
+}
 
+///
+///
+///
+fn handle_vm(
+    command: Command,
+    job_id: &str,
+    environment: HashMap<String, String>,
+    address: String,
+    runtime: String,
+    credentials: LocationCredentials,
+    xenon_channel: Channel,
+) -> Result<()> {
+    let credentials = match credentials {
+        LocationCredentials::SshCertificate {
+            username,
+            certificate,
+            passphrase,
+        } => Credential::new_certificate(certificate, username, passphrase),
+        LocationCredentials::SshPassword { username, password } => Credential::new_password(username, password),
+        LocationCredentials::Config { .. } => unreachable!(),
+    };
+
+    let scheduler = create_xenon_scheduler(address, "ssh", credentials, xenon_channel)?;
+    handle_xenon(command, job_id, environment, runtime, scheduler)
+}
+
+///
+///
+///
+fn handle_xenon(
+    command: Command,
+    job_id: &str,
+    environment: HashMap<String, String>,
+    runtime: String,
+    mut scheduler: Scheduler,
+) -> Result<()> {
     let job_description = match runtime.to_lowercase().as_str() {
         "singularity" => create_singularity_job_description(&command, &job_id, environment)?,
         "docker" => create_docker_job_description(&command, &job_id, environment, None)?,
@@ -444,7 +516,7 @@ fn create_xenon_scheduler<S1: Into<String>, S2: Into<String>>(
     };
 
     // A SLURM scheduler requires the protocol scheme in the address.
-    let address = if adaptor == String::from("slurm") {
+    let address = if adaptor == *"slurm" {
         format!("ssh://{}", address)
     } else {
         address
@@ -460,7 +532,7 @@ fn create_xenon_scheduler<S1: Into<String>, S2: Into<String>>(
 ///
 fn create_docker_job_description(
     command: &Command,
-    job_id: &String,
+    job_id: &str,
     environment: HashMap<String, String>,
     network: Option<String>,
 ) -> Result<JobDescription> {
@@ -472,7 +544,7 @@ fn create_docker_job_description(
         String::from("run"),
         String::from("--rm"),
         String::from("--name"),
-        String::from(job_id.clone()),
+        job_id.to_string(),
         String::from("--cap-drop"),
         String::from("ALL"),
         String::from("--cap-add"),
@@ -496,7 +568,7 @@ fn create_docker_job_description(
         arguments.push(String::from("--network"));
         arguments.push(network);
         arguments.push(String::from("--hostname"));
-        arguments.push(job_id.clone());
+        arguments.push(job_id.to_string());
     }
 
     // Add environment variables
@@ -533,7 +605,7 @@ fn create_docker_job_description(
 ///
 fn create_singularity_job_description(
     command: &Command,
-    job_id: &String,
+    job_id: &str,
     environment: HashMap<String, String>,
 ) -> Result<JobDescription> {
     let command = command.clone();
@@ -583,8 +655,6 @@ fn create_singularity_job_description(
 
     Ok(job_description)
 }
-
-
 
 ///
 ///

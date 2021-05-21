@@ -9,8 +9,8 @@ use std::path::PathBuf;
 type Map<T> = std::collections::HashMap<String, T>;
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ContainerInfo {
     pub actions: Map<Action>,
     pub base: Option<String>,
@@ -48,8 +48,8 @@ impl ContainerInfo {
 }
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Action {
     pub command: Option<ActionCommand>,
     pub description: Option<String>,
@@ -60,24 +60,24 @@ pub struct Action {
 }
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ActionCommand {
     pub args: Vec<String>,
     pub capture: Option<String>,
 }
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ActionEndpoint {
     pub method: Option<String>,
     pub path: String,
 }
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Entrypoint {
     pub kind: String,
     pub exec: String,

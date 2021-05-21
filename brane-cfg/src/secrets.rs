@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use std::collections::HashMap;
-use std::io::BufReader;
 use std::fs::{self, File};
+use std::io::BufReader;
 use std::path::PathBuf;
 use url::Url;
 
@@ -25,8 +25,8 @@ impl Secrets {
     pub fn validate(&self) -> Result<()> {
         if let Store::File(store_file) = &self.store {
             let infra_reader = BufReader::new(File::open(store_file)?);
-            let _: HashMap<String, String> = serde_yaml::from_reader(infra_reader)
-                .context("Secrets file is not valid.")?;
+            let _: HashMap<String, String> =
+                serde_yaml::from_reader(infra_reader).context("Secrets file is not valid.")?;
 
             Ok(())
         } else {
@@ -37,7 +37,10 @@ impl Secrets {
     ///
     ///
     ///
-    pub fn get<S: Into<String>>(&self, secret_key: S) -> Result<String> {
+    pub fn get<S: Into<String>>(
+        &self,
+        secret_key: S,
+    ) -> Result<String> {
         let secret_key = secret_key.into();
 
         if let Store::File(store_file) = &self.store {
@@ -45,11 +48,9 @@ impl Secrets {
             let secrets_document: HashMap<String, String> = serde_yaml::from_reader(secrets_reader)
                 .with_context(|| format!("Error while deserializing file: {:?}", store_file))?;
 
-            let secret = secrets_document
-                .get(&secret_key)
-                .map(String::clone);
+            let secret = secrets_document.get(&secret_key).map(String::clone);
 
-            secret.ok_or(anyhow!("Secret '{}' not in secrets store.", secret_key))
+            secret.ok_or_else(|| anyhow!("Secret '{}' not in secrets store.", secret_key))
         } else {
             unreachable!()
         }

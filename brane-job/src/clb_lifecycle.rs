@@ -1,4 +1,4 @@
-use crate::interface::{Callback, Event, EventKind, CallbackKind};
+use crate::interface::{Callback, CallbackKind, Event, EventKind};
 use anyhow::Result;
 
 pub fn handle(callback: Callback) -> Result<Vec<(String, Event)>> {
@@ -11,7 +11,7 @@ pub fn handle(callback: Callback) -> Result<Vec<(String, Event)>> {
         CallbackKind::Unknown => {
             debug!("Received Unkown callback: {:?}", callback);
             return Ok(vec![]);
-        },
+        }
         CallbackKind::Ready => EventKind::Ready,
         CallbackKind::Initialized => EventKind::Initialized,
         CallbackKind::Started => EventKind::Started,
@@ -24,7 +24,16 @@ pub fn handle(callback: Callback) -> Result<Vec<(String, Event)>> {
     let key = format!("{}#{}", job_id, order);
     let payload = callback.payload;
     let category = String::from("job");
-    let event = Event::new(kind, job_id, application, location_id, category, order as u32, Some(payload), None);
+    let event = Event::new(
+        kind,
+        job_id,
+        application,
+        location_id,
+        category,
+        order as u32,
+        Some(payload),
+        None,
+    );
 
     Ok(vec![(key, event)])
 }

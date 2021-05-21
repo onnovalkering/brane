@@ -28,10 +28,8 @@ pub fn resolve_security_scheme(
             if let Some(components) = components {
                 if let Some(reference) = reference.strip_prefix("#/components/") {
                     if let Some((_, name)) = reference.split_once('/') {
-                        if let Some(schema) = components.security_schemes.get(name) {
-                            if let ReferenceOr::Item(item) = schema {
-                                return Ok(item.clone());
-                            }
+                        if let Some(ReferenceOr::Item(item)) = components.security_schemes.get(name) {
+                            return Ok(item.clone());
                         }
                     }
                 }
@@ -55,10 +53,8 @@ pub fn resolve_response(
             if let Some(components) = components {
                 if let Some(reference) = reference.strip_prefix("#/components/") {
                     if let Some((_, name)) = reference.split_once('/') {
-                        if let Some(schema) = components.responses.get(name) {
-                            if let ReferenceOr::Item(item) = schema {
-                                return Ok(item.clone());
-                            }
+                        if let Some(ReferenceOr::Item(item)) = components.responses.get(name) {
+                            return Ok(item.clone());
                         }
                     }
                 }
@@ -82,10 +78,8 @@ pub fn resolve_parameter(
             if let Some(components) = components {
                 if let Some(reference) = reference.strip_prefix("#/components/") {
                     if let Some((_, name)) = reference.split_once('/') {
-                        if let Some(schema) = components.parameters.get(name) {
-                            if let ReferenceOr::Item(item) = schema {
-                                return Ok(item.clone());
-                            }
+                        if let Some(ReferenceOr::Item(item)) = components.parameters.get(name) {
+                            return Ok(item.clone());
                         }
                     }
                 }
@@ -109,10 +103,8 @@ pub fn resolve_example(
             if let Some(components) = components {
                 if let Some(reference) = reference.strip_prefix("#/components/") {
                     if let Some((_, name)) = reference.split_once('/') {
-                        if let Some(schema) = components.examples.get(name) {
-                            if let ReferenceOr::Item(item) = schema {
-                                return Ok(item.clone());
-                            }
+                        if let Some(ReferenceOr::Item(item)) = components.examples.get(name) {
+                            return Ok(item.clone());
                         }
                     }
                 }
@@ -136,10 +128,8 @@ pub fn resolve_request_body(
             if let Some(components) = components {
                 if let Some(reference) = reference.strip_prefix("#/components/") {
                     if let Some((_, name)) = reference.split_once('/') {
-                        if let Some(schema) = components.request_bodies.get(name) {
-                            if let ReferenceOr::Item(item) = schema {
-                                return Ok(item.clone());
-                            }
+                        if let Some(ReferenceOr::Item(item)) = components.request_bodies.get(name) {
+                            return Ok(item.clone());
                         }
                     }
                 }
@@ -163,10 +153,8 @@ pub fn resolve_headers(
             if let Some(components) = components {
                 if let Some(reference) = reference.strip_prefix("#/components/") {
                     if let Some((_, name)) = reference.split_once('/') {
-                        if let Some(schema) = components.headers.get(name) {
-                            if let ReferenceOr::Item(item) = schema {
-                                return Ok(item.clone());
-                            }
+                        if let Some(ReferenceOr::Item(item)) = components.headers.get(name) {
+                            return Ok(item.clone());
                         }
                     }
                 }
@@ -190,10 +178,8 @@ pub fn resolve_schema(
             if let Some(components) = components {
                 if let Some(reference) = reference.strip_prefix("#/components/") {
                     if let Some((_, name)) = reference.split_once('/') {
-                        if let Some(schema) = components.schemas.get(name) {
-                            if let ReferenceOr::Item(item) = schema {
-                                return Ok((Some(name.to_string()), item.clone()));
-                            }
+                        if let Some(ReferenceOr::Item(item)) = components.schemas.get(name) {
+                            return Ok((Some(name.to_string()), item.clone()));
                         }
                     }
                 }
@@ -217,10 +203,8 @@ pub fn resolve_links(
             if let Some(components) = components {
                 if let Some(reference) = reference.strip_prefix("#/components/") {
                     if let Some((_, name)) = reference.split_once('/') {
-                        if let Some(schema) = components.links.get(name) {
-                            if let ReferenceOr::Item(item) = schema {
-                                return Ok(item.clone());
-                            }
+                        if let Some(ReferenceOr::Item(item)) = components.links.get(name) {
+                            return Ok(item.clone());
                         }
                     }
                 }
@@ -244,10 +228,8 @@ pub fn resolve_callback(
             if let Some(components) = components {
                 if let Some(reference) = reference.strip_prefix("#/components/") {
                     if let Some((_, name)) = reference.split_once('/') {
-                        if let Some(schema) = components.callbacks.get(name) {
-                            if let ReferenceOr::Item(item) = schema {
-                                return Ok(item.clone());
-                            }
+                        if let Some(ReferenceOr::Item(item)) = components.callbacks.get(name) {
+                            return Ok(item.clone());
                         }
                     }
                 }

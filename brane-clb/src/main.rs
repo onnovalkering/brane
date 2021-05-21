@@ -5,8 +5,8 @@ use dotenv::dotenv;
 use log::LevelFilter;
 use rdkafka::{
     admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
-    producer::FutureProducer,
     error::RDKafkaErrorCode,
+    producer::FutureProducer,
     ClientConfig,
 };
 use tonic::transport::Server;

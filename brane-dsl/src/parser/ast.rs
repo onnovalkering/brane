@@ -76,7 +76,6 @@ pub enum Expr {
         operator: UnOp,
         operand: Box<Expr>,
     },
-    Unit,
 }
 
 #[derive(Clone, Debug)]
@@ -88,6 +87,7 @@ pub enum Lit {
     Integer(i64),
     Real(f64),
     String(String),
+    Unit,
 }
 
 impl Lit {
@@ -97,6 +97,7 @@ impl Lit {
             Lit::Integer(_) => String::from("integer"),
             Lit::Real(_) => String::from("real"),
             Lit::String(_) => String::from("string"),
+            Lit::Unit => String::from("unit"),
         }
     }
 }

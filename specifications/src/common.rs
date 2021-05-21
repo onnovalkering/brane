@@ -8,8 +8,8 @@ use std::fmt::{self, Display, Formatter};
 type Map<T> = std::collections::HashMap<String, T>;
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Parameter {
     #[serde(rename = "type")]
     pub data_type: String,
@@ -41,8 +41,8 @@ impl Parameter {
 }
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Function {
     pub parameters: Vec<Parameter>,
     pub pattern: Option<CallPattern>,
@@ -67,8 +67,8 @@ impl Function {
 }
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CallPattern {
     pub infix: Option<Vec<String>>,
     pub postfix: Option<String>,
@@ -89,8 +89,8 @@ impl CallPattern {
 }
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Type {
     pub name: String,
     pub properties: Vec<Property>,
@@ -109,8 +109,8 @@ impl Type {
 }
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Property {
     #[serde(rename = "type")]
     pub data_type: String,
@@ -168,8 +168,8 @@ impl Property {
     }
 }
 
-#[serde(tag = "v", content = "c", rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "v", content = "c", rename_all = "camelCase")]
 pub enum Value {
     Array {
         #[serde(rename = "type")]
@@ -405,8 +405,8 @@ impl PartialOrd for Value {
 }
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Variable {
     #[serde(rename = "type")]
     pub data_type: String,

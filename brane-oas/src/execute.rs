@@ -1,3 +1,4 @@
+use crate::{build, resolver};
 use anyhow::Result;
 use cookie::Cookie as RawCookie;
 use cookie_store::{Cookie, CookieStore, CookieStoreRwLock};
@@ -5,7 +6,6 @@ use openapiv3::{OpenAPI, Operation, Parameter as OParameter, ReferenceOr, Securi
 use reqwest::Url;
 use specifications::common::Value;
 use std::{collections::HashMap, sync::Arc};
-use crate::{build, resolver};
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -13,7 +13,7 @@ type Map<T> = std::collections::HashMap<String, T>;
 ///
 ///
 pub async fn execute(
-    operation_id: &String,
+    operation_id: &str,
     arguments: &Map<Value>,
     oas_document: &OpenAPI,
 ) -> Result<String> {
@@ -65,10 +65,10 @@ pub async fn execute(
     }
 
     // Determine input from security schemes.
-    if let Some(security_scheme) = &operation.security.iter().next() {
+    if let Some(security_scheme) = &operation.security.first() {
         if let Some(security_scheme) = security_scheme.keys().next() {
             let item = ReferenceOr::Reference::<SecurityScheme> {
-                reference: format!("#/components/schemas/{}", security_scheme)
+                reference: format!("#/components/schemas/{}", security_scheme),
             };
 
             let security_scheme = resolver::resolve_security_scheme(&item, &components)?;
@@ -78,25 +78,25 @@ pub async fn execute(
                     match location {
                         openapiv3::APIKeyLocation::Query => {
                             query.push((name.clone(), value.to_string()));
-                        },
+                        }
                         openapiv3::APIKeyLocation::Header => {
                             headers.push((name.clone(), value.to_string()));
-                        },
+                        }
                         openapiv3::APIKeyLocation::Cookie => {
                             let cookie = RawCookie::new(name.clone(), value.to_string());
                             let cookie = Cookie::try_from_raw_cookie(&cookie, &base_url)?;
                             cookies.insert(cookie, &base_url)?;
-                        },
+                        }
                     }
-                },
+                }
                 SecurityScheme::HTTP { scheme, .. } => {
-                    if scheme.to_lowercase() != String::from("bearer") {
+                    if scheme.to_lowercase() != *"bearer" {
                         todo!();
                     }
 
                     let value = arguments.get("token").expect("Missing argument.");
                     headers.push((String::from("Authorization"), format!("Bearer {}", value)));
-                },
+                }
                 _ => todo!(),
             }
         }
@@ -158,7 +158,7 @@ pub async fn execute(
 ///
 ///
 pub fn get_operation(
-    operation_id: &String,
+    operation_id: &str,
     oas_document: &OpenAPI,
 ) -> Result<(String, String, Operation)> {
     let (path, method, operation) = oas_document

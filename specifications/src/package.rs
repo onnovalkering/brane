@@ -1,21 +1,21 @@
 use crate::common::{Function, Type};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use semver::Version;
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JValue;
 use serde_with::skip_serializing_none;
 use std::fs;
-use std::path::PathBuf;
-use uuid::Uuid;
-use semver::Version;
-use serde_json::Value as JValue;
 use std::fs::File;
 use std::io::{BufReader, Read};
+use std::path::{Path, PathBuf};
+use uuid::Uuid;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PackageInfo {
     pub created: DateTime<Utc>,
     pub description: Option<String>,
@@ -107,7 +107,7 @@ impl PackageIndex {
     ///
     ///
     ///
-    pub fn from_path(path: &PathBuf) -> Result<Self> {
+    pub fn from_path(path: &Path) -> Result<Self> {
         let file = File::open(path)?;
         let buf_reader = BufReader::new(file);
 

@@ -105,7 +105,7 @@ pub fn return_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
             comb::opt(expr),
             comb::cut(tag_token!(Token::Semicolon)),
         ),
-        |expr| Stmt::Return(expr),
+        Stmt::Return,
     )
     .parse(input)
 }
@@ -176,26 +176,23 @@ fn expr_pratt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
     loop {
         // Append any subsequent atoms to LHS.
         // The LHS will be turned into a pattern expression.
-        match expr_atom::<E>(remainder) {
-            Ok((r, ident)) => {
-                let terms = match lhs {
-                    Expr::Pattern(terms) => {
-                        let mut terms = terms;
-                        terms.push(ident);
+        if let Ok((r, ident)) = expr_atom::<E>(remainder) {
+            let terms = match lhs {
+                Expr::Pattern(terms) => {
+                    let mut terms = terms;
+                    terms.push(ident);
 
-                        terms
-                    }
-                    current => {
-                        vec![current, ident]
-                    }
-                };
+                    terms
+                }
+                current => {
+                    vec![current, ident]
+                }
+            };
 
-                lhs = Expr::Pattern(terms);
+            lhs = Expr::Pattern(terms);
 
-                remainder = r;
-                continue;
-            }
-            _ => {}
+            remainder = r;
+            continue;
         }
 
         //
@@ -253,8 +250,8 @@ pub fn expr_atom<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
     input: Tokens<'a>
 ) -> IResult<Tokens, Expr, E> {
     branch::alt((
-        comb::map(literal::parse, |l| Expr::Literal(l)),
-        comb::map(identifier::parse, |x| Expr::Ident(x)),
+        comb::map(literal::parse, Expr::Literal),
+        comb::map(identifier::parse, Expr::Ident),
     ))
     .parse(input)
 }

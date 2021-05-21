@@ -1,7 +1,6 @@
-use crate::schema::{invocations, packages, sessions, variables};
+use crate::schema::{packages, sessions, variables};
 use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
-use specifications::instructions::Instruction;
 use specifications::package::PackageInfo;
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -13,58 +12,6 @@ pub struct Config {
     pub packages_dir: PathBuf,
     pub registry_host: String,
     pub temporary_dir: PathBuf,
-}
-
-#[derive(Associations, Serialize, Queryable, Identifiable)]
-#[belongs_to(Session, foreign_key = "session")]
-pub struct Invocation {
-    pub id: i32,
-    pub session: i32,
-    // Metadata
-    pub created: NaiveDateTime,
-    pub name: Option<String>,
-    pub started: Option<NaiveDateTime>,
-    pub stopped: Option<NaiveDateTime>,
-    pub uuid: String,
-    // Content
-    pub instructions_json: String,
-    pub status: String,
-    pub return_json: Option<String>,
-}
-
-#[derive(Insertable)]
-#[table_name = "invocations"]
-pub struct NewInvocation {
-    pub session: i32,
-    // Metadata
-    pub created: NaiveDateTime,
-    pub name: Option<String>,
-    pub uuid: String,
-    // Content
-    pub instructions_json: String,
-    pub status: String,
-}
-
-impl NewInvocation {
-    pub fn new(
-        session: i32,
-        name: Option<String>,
-        instructions: &[Instruction],
-    ) -> FResult<Self> {
-        let created = Utc::now().naive_utc();
-        let uuid = Uuid::new_v4().to_string();
-        let instructions_json = serde_json::to_string(instructions)?;
-        let status = String::from("created");
-
-        Ok(NewInvocation {
-            session,
-            created,
-            name,
-            uuid,
-            instructions_json,
-            status,
-        })
-    }
 }
 
 #[derive(Serialize, Queryable, Identifiable)]

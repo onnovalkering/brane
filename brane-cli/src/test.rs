@@ -8,12 +8,12 @@ use dialoguer::{Input as Prompt, Select};
 use serde::de::DeserializeOwned;
 use specifications::common::{Function, Parameter, Type, Value};
 use specifications::package::PackageInfo;
+use std::fs;
 use std::path::PathBuf;
 use std::{
     fmt::{Debug, Display},
     str::FromStr,
 };
-use std::fs;
 
 type Map<T> = std::collections::HashMap<String, T>;
 

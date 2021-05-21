@@ -1,5 +1,4 @@
 use super::tokens::Token;
-use nom;
 use nom::error::{ContextError, ParseError};
 use nom::{branch, character::complete as cc, combinator as comb, multi, sequence as seq};
 use nom::{bytes::complete as bc, IResult, Parser};
@@ -11,11 +10,11 @@ type Span<'a> = nom_locate::LocatedSpan<&'a str>;
 ///
 pub fn parse<'a, E: ParseError<Span<'a>> + ContextError<Span<'a>>>(input: Span<'a>) -> IResult<Span<'a>, Token, E> {
     branch::alt((
-        comb::map(semver, |s| Token::SemVer(s)),
-        comb::map(real, |s| Token::Real(s)),
-        comb::map(integer, |s| Token::Integer(s)),
-        comb::map(boolean, |s| Token::Boolean(s)),
-        comb::map(string, |s| Token::String(s)),
+        comb::map(semver, Token::SemVer),
+        comb::map(real, Token::Real),
+        comb::map(integer, Token::Integer),
+        comb::map(boolean, Token::Boolean),
+        comb::map(string, Token::String),
     ))
     .parse(input)
 }

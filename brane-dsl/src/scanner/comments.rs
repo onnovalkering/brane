@@ -1,5 +1,4 @@
 use super::tokens::Token;
-use nom;
 use nom::error::{ContextError, ParseError};
 use nom::{branch, combinator as comb, sequence as seq};
 use nom::{bytes::complete as bc, IResult, Parser};

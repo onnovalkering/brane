@@ -18,11 +18,11 @@ pub fn resolve_patterns(
     program: Vec<Stmt>,
     package_index: &PackageIndex,
 ) -> Result<Vec<Stmt>> {
-    let mut function_patterns = vec![];
-    for (_, package) in &package_index.packages {
-        let package_patterns = get_module_patterns(package)?;
-        function_patterns.extend(package_patterns);
-    }
+    let function_patterns: Vec<FunctionPattern> = package_index
+        .packages
+        .values()
+        .flat_map(|p| get_module_patterns(p).unwrap())
+        .collect();
 
     let mut statements = vec![];
     for stmt in program {
@@ -45,7 +45,7 @@ pub fn resolve_patterns(
 ///
 fn pattern_to_call(
     pattern: Vec<Expr>,
-    patterns: &Vec<FunctionPattern>,
+    patterns: &[FunctionPattern],
 ) -> Result<Expr> {
     let terms_pattern = build_terms_pattern(&pattern)?;
     debug!("Attempting to rewrite to call: {:?}", terms_pattern);
@@ -54,7 +54,7 @@ fn pattern_to_call(
     let arguments = indexes.into_iter().map(|i| pattern.get(i).unwrap()).cloned().collect();
 
     Ok(Expr::Call {
-        function: Ident(function.name.clone()),
+        function: Ident(function.name),
         arguments,
     })
 }
@@ -106,7 +106,7 @@ pub fn get_module_patterns(module: &PackageInfo) -> Result<Vec<FunctionPattern>>
 ///
 ///
 fn build_pattern(
-    name: &String,
+    name: &str,
     function: &Function,
 ) -> Result<String> {
     let mut pattern = vec![];
@@ -160,7 +160,7 @@ fn build_pattern(
 ///
 ///
 ///
-fn build_terms_pattern(terms: &Vec<Expr>) -> Result<String> {
+fn build_terms_pattern(terms: &[Expr]) -> Result<String> {
     let mut term_pattern_segments = vec![];
     for term in terms {
         match term {
@@ -203,7 +203,7 @@ fn create_temp_var(literal: bool) -> String {
 ///
 fn match_pattern_to_function(
     pattern: String,
-    functions: &Vec<FunctionPattern>,
+    functions: &[FunctionPattern],
 ) -> Result<(FunctionPattern, Vec<usize>)> {
     for function in functions {
         debug!("Check: {:?}", &function.pattern);

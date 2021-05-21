@@ -179,11 +179,7 @@ impl<'a> Token<'a> {
     }
 
     pub fn is_none(&self) -> bool {
-        if let Token::None = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Token::None)
     }
 
     pub fn inner(&self) -> &Span {

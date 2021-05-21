@@ -4,7 +4,7 @@ use broom::Handle;
 ///
 ///
 ///
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct CallFrame {
     pub function: Handle<Object>,
     pub ip: usize,

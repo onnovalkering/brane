@@ -110,7 +110,7 @@ pub fn block_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
             multi::many0(parse_stmt),
             tag_token!(Token::RightBrace),
         ),
-        |stmts| Stmt::Block(stmts),
+        Stmt::Block,
     )
     .parse(input)
 }
@@ -125,30 +125,23 @@ pub fn parallel_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 
     comb::map(
         seq::pair(
-            comb::opt(
-                seq::preceded(
-                    tag_token!(Token::Let),
-                    comb::cut(seq::terminated(
-                        identifier::parse,
-                        tag_token!(Token::Assign),
-                    )),
-                ),
-            ),
+            comb::opt(seq::preceded(
+                tag_token!(Token::Let),
+                comb::cut(seq::terminated(identifier::parse, tag_token!(Token::Assign))),
+            )),
             seq::preceded(
                 tag_token!(Token::Parallel),
-                comb::cut(
-                    seq::terminated(
-                        seq::delimited(
-                            tag_token!(Token::LeftBracket),
-                            comb::opt(seq::pair(
-                                block_or_on,
-                                multi::many0(seq::preceded(tag_token!(Token::Comma), block_or_on)),
-                            )),
-                            tag_token!(Token::RightBracket),
-                        ),
-                        tag_token!(Token::Semicolon),
-                    )
-                )
+                comb::cut(seq::terminated(
+                    seq::delimited(
+                        tag_token!(Token::LeftBracket),
+                        comb::opt(seq::pair(
+                            block_or_on,
+                            multi::many0(seq::preceded(tag_token!(Token::Comma), block_or_on)),
+                        )),
+                        tag_token!(Token::RightBracket),
+                    ),
+                    tag_token!(Token::Semicolon),
+                )),
             ),
         ),
         |(let_assign, blocks)| {
@@ -401,7 +394,7 @@ pub fn return_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
             comb::opt(expression::parse),
             comb::cut(tag_token!(Token::Semicolon)),
         ),
-        |expr| Stmt::Return(expr),
+        Stmt::Return,
     )
     .parse(input)
 }
@@ -414,7 +407,7 @@ pub fn expr_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
 ) -> IResult<Tokens, Stmt, E> {
     comb::map(
         seq::terminated(expression::parse, comb::cut(tag_token!(Token::Semicolon))),
-        |e| Stmt::Expr(e),
+        Stmt::Expr,
     )
     .parse(input)
 }

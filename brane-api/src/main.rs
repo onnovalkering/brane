@@ -6,9 +6,6 @@ extern crate diesel;
 extern crate diesel_migrations;
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
-extern crate log;
-
 
 use actix_cors::Cors;
 use actix_web::middleware;
@@ -27,11 +24,9 @@ use structopt::StructOpt;
 
 mod callback;
 mod health;
-mod invocations;
 mod models;
 mod packages;
 mod schema;
-mod sessions;
 mod vault;
 
 embed_migrations!();
@@ -43,10 +38,9 @@ const DEF_REDIS_URL: &str = "redis://redis";
 const DEF_REGISTRY_HOST: &str = "registry:5000";
 const DEF_TEMPORARY_DIR: &str = "./temporary";
 
-
 #[derive(StructOpt)]
 #[structopt(name = "brane-api", about = "The Brane API service.")]
-struct CLI {
+struct Cli {
     #[structopt(short, long, help = "Enable debug mode", env = "DEBUG")]
     debug: bool,
     #[structopt(short = "o", long, help = "Host to bind", default_value = "127.0.0.1", env = "HOST")]
@@ -62,7 +56,7 @@ async fn main() -> std::io::Result<()> {
     let mut logger = env_logger::builder();
     logger.format_module_path(false);
 
-    let options = CLI::from_args();
+    let options = Cli::from_args();
     if options.debug {
         logger.filter_level(LevelFilter::Debug).init();
     } else {
@@ -127,9 +121,7 @@ async fn main() -> std::io::Result<()> {
             .data(producer.clone())
             .service(callback::scope())
             .service(health::scope())
-            .service(invocations::scope())
             .service(packages::scope())
-            .service(sessions::scope())
             .service(vault::scope())
     });
 

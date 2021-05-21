@@ -1,11 +1,16 @@
-use crate::{frames::CallFrame, objects::{Function, FunctionExt}};
-use crate::objects::Object;
-use crate::stack::{Slot, Stack};
 use crate::{
     builtins,
-    bytecode::{self, opcodes::*},
+    bytecode::{opcodes::*, FunctionMut},
+    executor::VmExecutor,
+    objects::Object,
     objects::{Array, Instance},
 };
+use crate::{frames::CallFrame, objects::FunctionExt};
+use crate::{
+    stack::{Slot, Stack},
+    values::Value,
+};
+use smallvec::SmallVec;
 use broom::{Handle, Heap};
 use specifications::package::PackageIndex;
 use std::collections::HashMap;
@@ -13,8 +18,12 @@ use std::collections::HashMap;
 ///
 ///
 ///
-pub struct Vm {
-    frames: Vec<CallFrame>,
+pub struct Vm<E>
+where
+    E: VmExecutor + Clone + Send + Sync,
+{
+    executor: E,
+    frames: SmallVec<[CallFrame; 64]>,
     globals: HashMap<String, Slot>,
     heap: Heap<Object>,
     locations: Vec<Handle<Object>>,
@@ -22,25 +31,33 @@ pub struct Vm {
     stack: Stack,
 }
 
-impl Default for Vm {
+impl<E> Default for Vm<E>
+where
+    E: VmExecutor + Clone + Send + Sync + Default,
+{
     fn default() -> Self {
-        let frames = Vec::default();
+        let executor = E::default();
+        let frames = SmallVec::with_capacity(64);
         let globals = HashMap::default();
         let heap = Heap::default();
         let locations = Vec::default();
         let package_index = PackageIndex::empty();
         let stack = Stack::default();
 
-        Self::new(frames, globals, heap, locations, package_index, stack)
+        Self::new(executor, frames, globals, heap, locations, package_index, stack)
     }
 }
 
-impl Vm {
+impl<E> Vm<E>
+where
+    E: VmExecutor + Clone + Send + Sync,
+{
     ///
     ///
     ///
     pub fn new(
-        frames: Vec<CallFrame>,
+        executor: E,
+        frames: SmallVec<[CallFrame; 64]>,
         globals: HashMap<String, Slot>,
         heap: Heap<Object>,
         locations: Vec<Handle<Object>>,
@@ -48,6 +65,7 @@ impl Vm {
         stack: Stack,
     ) -> Self {
         let mut vm = Self {
+            executor,
             frames,
             globals,
             heap,
@@ -64,11 +82,11 @@ impl Vm {
     ///
     ///
     ///
-    pub fn main(
+    pub async fn main(
         &mut self,
-        function: bytecode::Function,
+        function: FunctionMut,
     ) {
-        if self.frames.len() != 0 || self.stack.len() != 0 {
+        if !self.frames.is_empty() || !self.stack.is_empty() {
             panic!("VM not in a state to accept main function.");
         }
 
@@ -77,7 +95,7 @@ impl Vm {
 
         self.stack.push_object(handle);
         self.call(0);
-        self.run();
+        self.run().await;
     }
 
     ///
@@ -90,34 +108,39 @@ impl Vm {
         let frame_last = self.stack.len();
         let frame_first = frame_last - (arity + 1) as usize;
 
-        let function = self.stack.get(frame_first);
-        match function {
-            Slot::BuiltIn(code) => builtins::call(*code, &mut self.stack),
-            Slot::Object(handle) => {
-                match self.heap.get(handle) {
-                    Some(Object::Function(_f)) => {
-                        // println!("{}", _f.chunk.disassemble().unwrap());
+        let function = self.stack.get(frame_first).as_object().expect("");
+        if let Some(Object::Function(_f)) = self.heap.get(function) {
+            // println!("{}", _f.chunk.disassemble().unwrap());
 
-                        let frame = CallFrame::new(*handle, frame_first);
-                        self.frames.push(frame);
-                    }
-                    _ => panic!("Expecting a function."),
-                }
-            }
-            _ => panic!("Not a callable object"),
+            let frame = CallFrame::new(function, frame_first);
+            self.frames.push(frame);
+
+            return;
         }
+
+        panic!("illegal");
     }
 
     ///
     ///
     ///
-    fn run(&mut self) -> Option<Slot> {
+    fn arguments(
+        &mut self,
+        arity: u8,
+    ) -> Vec<Value> {
+        (0..arity).map(|_| self.stack.pop().into_value(&self.heap)).collect()
+    }
+
+    ///
+    ///
+    ///
+    async fn run(&mut self) -> Option<Slot> {
         while let Some(instruction) = self.next() {
             match *instruction {
                 OP_ADD => self.op_add(),
                 OP_AND => self.op_and(),
                 OP_ARRAY => self.op_array(),
-                OP_CALL => self.op_call(),
+                OP_CALL => self.op_call().await,
                 OP_CLASS => self.op_class(),
                 OP_CONSTANT => self.op_constant(),
                 OP_DEFINE_GLOBAL => self.op_define_global(),
@@ -151,7 +174,7 @@ impl Vm {
                 OP_UNIT => self.op_unit(),
                 x => {
                     println!("Unkown opcode: {}", x);
-                    todo!();
+                    unreachable!();
                 }
             }
 
@@ -223,9 +246,45 @@ impl Vm {
     ///
     ///
     #[inline]
-    pub fn op_call(&mut self) {
+    pub async fn op_call(&mut self) {
         let arity = *self.frame().read_u8().expect("");
-        self.call(arity);
+        let frame_last = self.stack.len();
+        let frame_first = frame_last - (arity + 1) as usize;
+
+        let function = self.stack.get(frame_first);
+        let value = match function {
+            Slot::BuiltIn(code) => {
+                let function = *code;
+                let arguments = self.arguments(arity);
+
+                builtins::call(function, arguments, &self.executor).await
+            }
+            Slot::Object(handle) => match self.heap.get(handle).expect("") {
+                Object::Function(_) => {
+                    // Execution is handled through call frames.
+                    self.call(arity);
+                    return;
+                }
+                Object::FunctionExt(f) => {
+                    let function = f.clone();
+                    let arguments = self.arguments(arity);
+
+                    match self.executor.call(function, arguments).await {
+                        Ok(value) => value,
+                        Err(_) => panic!("External function failed"),
+                    }
+                }
+                _ => panic!("Not a callable object"),
+            },
+            _ => panic!("Not a callable object"),
+        };
+
+        // Remove (built-in or external) function from the stack.
+        self.stack.pop();
+
+        // Store return value on the stack.
+        let slot = Slot::from_value(value, &mut self.heap);
+        self.stack.push(slot);
     }
 
     ///
@@ -361,11 +420,7 @@ impl Vm {
     ///
     #[inline]
     pub fn op_import(&mut self) {
-        let p_name = self.frame()
-            .read_constant()
-            .expect("")
-            .as_object()
-            .expect("");
+        let p_name = self.frame().read_constant().expect("").as_object().expect("");
 
         if let Some(Object::String(p_name_str)) = self.heap.get(p_name) {
             let package = self.package_index.get(p_name_str, None).expect("");
@@ -460,7 +515,7 @@ impl Vm {
     ///
     #[inline]
     pub fn op_loc(&mut self) {
-        let location = self.locations.pop().map(|l| Slot::Object(l)).unwrap_or(Slot::Unit);
+        let location = self.locations.pop().map(Slot::Object).unwrap_or(Slot::Unit);
 
         self.stack.push(location);
     }

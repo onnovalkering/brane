@@ -1,26 +1,25 @@
 use crate::grpc;
 use anyhow::Result;
-use brane_dsl::{Compiler, CompilerOptions, Lang};
-use brane_bvm::{VM, VmCall, VmExecutor, VmOptions, VmResult, VmState};
+use brane_bvm::bytecode::FunctionMut;
 use brane_bvm::values::Value;
-use brane_bvm::bytecode::Function;
+use brane_dsl::{Compiler, CompilerOptions, Lang};
 use brane_job::interface::{Command, CommandKind};
-use rdkafka::producer::{FutureRecord, FutureProducer};
-use tonic::{Request, Response, Status};
-use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
-use specifications::package::PackageIndex;
-use uuid::Uuid;
-use prost::Message as _;
 use bytes::BytesMut;
-use rdkafka::util::Timeout;
-use std::time::Duration;
+use dashmap::DashMap;
+use prost::Message as _;
 use rand::distributions::Alphanumeric;
 use rand::{self, Rng};
 use rdkafka::message::ToBytes;
+use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::util::Timeout;
+use specifications::package::PackageIndex;
 use std::iter;
 use std::sync::Arc;
-use dashmap::DashMap;
+use std::time::Duration;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
+use tonic::{Request, Response, Status};
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct DriverHandler {
@@ -57,7 +56,12 @@ impl grpc::DriverService for DriverHandler {
         request: Request<grpc::ExecuteRequest>,
     ) -> Result<Response<Self::ExecuteStream>, Status> {
         let request = request.into_inner();
-        let packages = reqwest::get(&self.package_index_url).await.unwrap().json().await.unwrap();
+        let packages = reqwest::get(&self.package_index_url)
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
         let package_index = PackageIndex::from_value(packages).unwrap();
         let sessions = self.sessions.clone();
 
@@ -75,7 +79,8 @@ impl grpc::DriverService for DriverHandler {
             let options = CompilerOptions::new(Lang::BraneScript);
             let mut compiler = Compiler::new(options, package_index.clone());
 
-            let function = compiler.compile(request.input)
+            let function = compiler
+                .compile(request.input)
                 .map_err(|e| Status::invalid_argument(e.to_string()));
 
             if function.is_err() {
@@ -86,23 +91,33 @@ impl grpc::DriverService for DriverHandler {
             let function = function.unwrap();
 
             // Disassemble bytecode to representative format
-            let bytecode = if let Function::UserDefined { chunk, .. } = &function {
+            let bytecode = if let FunctionMut::UserDefined { chunk, .. } = &function {
                 chunk.disassemble().unwrap() // Infallible
             } else {
                 unreachable!()
             };
 
-            let reply = grpc::ExecuteReply { output: String::new(), bytecode: bytecode.clone(), close: false };
+            let reply = grpc::ExecuteReply {
+                output: String::new(),
+                bytecode: bytecode.clone(),
+                close: false,
+            };
             tx.send(Ok(reply)).await.unwrap();
 
             let options = VmOptions { always_return: true };
             let mut vm = if let Some(session) = sessions.get(&request.uuid) {
-                VM::new(&request.uuid, package_index.clone(), Some(session.clone()), Some(options), executor)
+                VM::new(
+                    &request.uuid,
+                    package_index.clone(),
+                    Some(session.clone()),
+                    Some(options),
+                    executor,
+                )
             } else {
                 VM::new(&request.uuid, package_index.clone(), None, Some(options), executor)
             };
 
-            if let Function::UserDefined { chunk, .. } = function {
+            if let FunctionMut::UserDefined { chunk, .. } = function {
                 vm.call(chunk, 0);
             }
 
@@ -112,14 +127,18 @@ impl grpc::DriverService for DriverHandler {
                         let output = value.map(|v| format!("{:?}", v)).unwrap_or_default();
 
                         sessions.insert(request.uuid.clone(), vm.state.clone());
-                        let reply = grpc::ExecuteReply { output, bytecode: String::new(), close: true };
+                        let reply = grpc::ExecuteReply {
+                            output,
+                            bytecode: String::new(),
+                            close: true,
+                        };
                         tx.send(Ok(reply)).await.unwrap();
                         break;
-                    },
+                    }
                     Ok(VmResult::RuntimeError) => {
                         tx.send(Err(Status::invalid_argument("Runtime error."))).await.unwrap();
                     }
-                    _ => unreachable!()
+                    _ => unreachable!(),
                 }
             }
 
@@ -141,7 +160,10 @@ struct Executor {
 
 #[async_trait::async_trait]
 impl VmExecutor for Executor {
-    async fn execute(&self, call: VmCall) -> Result<Value> {
+    async fn execute(
+        &self,
+        call: VmCall,
+    ) -> Result<Value> {
         make_function_call(
             call,
             self.command_topic.clone(),
@@ -149,7 +171,8 @@ impl VmExecutor for Executor {
             self.request_uuid.clone(),
             self.states.clone(),
             self.results.clone(),
-        ).await
+        )
+        .await
     }
 }
 
@@ -201,7 +224,11 @@ async fn make_function_call(
     }
 
     // TODO: await value to be in states & results.
-    let call = Call { correlation_id: correlation_id.clone(), states: states.clone(), results: results.clone() };
+    let call = Call {
+        correlation_id: correlation_id.clone(),
+        states: states.clone(),
+        results: results.clone(),
+    };
     Ok(call.await)
 }
 
@@ -235,7 +262,7 @@ impl Future for Call {
 
     fn poll(
         self: Pin<&mut Self>,
-        cx: &mut Context<'_>
+        cx: &mut Context<'_>,
     ) -> Poll<Self::Output> {
         let state = self.states.get(&self.correlation_id);
         if state.is_none() {

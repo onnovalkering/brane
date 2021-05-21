@@ -18,9 +18,9 @@ use rdkafka::{
     admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
     config::ClientConfig,
     consumer::{stream_consumer::StreamConsumer, CommitMode, Consumer},
+    error::RDKafkaErrorCode,
     message::ToBytes,
     producer::{FutureProducer, FutureRecord},
-    error::RDKafkaErrorCode,
     util::Timeout,
     Message as KafkaMesage, Offset, TopicPartitionList,
 };
@@ -211,7 +211,7 @@ async fn start_worker(
     if let Some(offset) = committed_offsets.get(&(cmd_topic.clone(), 0)) {
         match offset {
             Offset::Invalid => tpl.set_partition_offset(&cmd_topic, 0, Offset::Beginning)?,
-            offset => tpl.set_partition_offset(&cmd_topic, 0, offset.clone())?,
+            offset => tpl.set_partition_offset(&cmd_topic, 0, *offset)?,
         };
     }
 
@@ -222,7 +222,7 @@ async fn start_worker(
 
     // Create the outer pipeline on the message stream.
     let stream_processor = consumer.stream().try_for_each(|borrowed_message| {
-        &consumer.commit_message(&borrowed_message, CommitMode::Sync).unwrap();
+        consumer.commit_message(&borrowed_message, CommitMode::Sync).unwrap();
 
         let owned_message = borrowed_message.detach();
         let owned_producer = producer.clone();
@@ -251,9 +251,9 @@ async fn start_worker(
             }
 
             let topic = owned_message.topic();
-            let events = if topic == &clb_topic {
+            let events = if topic == clb_topic {
                 handle_clb_message(msg_key, msg_payload)
-            } else if topic == &cmd_topic {
+            } else if topic == cmd_topic {
                 handle_cmd_message(msg_key, msg_payload, owned_infra, owned_secrets, owned_xenon_channel).await
             } else {
                 unreachable!()

@@ -1,5 +1,8 @@
+use crate::objects::{self, Object};
+use crate::{stack::Slot, values::Value};
 use anyhow::Result;
 use broom::Heap;
+use bytes::{BufMut, Bytes, BytesMut};
 use std::fmt::Write;
 
 pub mod opcodes {
@@ -42,26 +45,39 @@ pub mod opcodes {
     pub const OP_UNIT: u8 = 0x24;
 }
 
-use crate::{
-    chunk::{Chunk, FrozenChunk},
-    objects::{self, Object},
-};
 #[derive(Clone)]
-pub struct Function {
+pub struct FunctionMut {
     pub arity: u8,
-    pub chunk: Chunk,
+    pub chunk: ChunkMut,
     pub name: String,
 }
 
-impl Function {
+impl FunctionMut {
+    ///
+    ///
+    ///
+    pub fn main(chunk: ChunkMut) -> Self {
+        Self {
+            arity: 0,
+            chunk,
+            name: String::from("main"),
+        }
+    }
+
+    ///
+    ///
+    ///
     pub fn new(
         name: String,
         arity: u8,
-        chunk: Chunk,
+        chunk: ChunkMut,
     ) -> Self {
         Self { arity, chunk, name }
     }
 
+    ///
+    ///
+    ///
     pub fn freeze(
         self,
         heap: &mut Heap<Object>,
@@ -74,7 +90,13 @@ impl Function {
     }
 }
 
-impl FrozenChunk {
+#[derive(Debug, Clone)]
+pub struct Chunk {
+    pub code: Bytes,
+    pub constants: Vec<Slot>,
+}
+
+impl Chunk {
     ///
     ///
     ///
@@ -84,7 +106,7 @@ impl FrozenChunk {
 
         for (offset, instruction) in self.code.iter().enumerate() {
             if skip > 0 {
-                skip = skip - 1;
+                skip -= 1;
                 continue;
             }
 
@@ -235,7 +257,7 @@ impl FrozenChunk {
 fn jump_instruction(
     name: &str,
     sign: i16,
-    chunk: &FrozenChunk,
+    chunk: &Chunk,
     offset: usize,
     result: &mut String,
 ) {
@@ -258,7 +280,7 @@ fn jump_instruction(
 ///
 fn constant_instruction(
     name: &str,
-    chunk: &FrozenChunk,
+    chunk: &Chunk,
     offset: usize,
     result: &mut String,
 ) {
@@ -275,10 +297,123 @@ fn constant_instruction(
 ///
 fn byte_instruction(
     name: &str,
-    chunk: &FrozenChunk,
+    chunk: &Chunk,
     offset: usize,
     result: &mut String,
 ) {
     let slot = chunk.code[offset + 1];
     writeln!(result, "{:<16} {:4} | ", name, slot).unwrap();
+}
+
+#[derive(Clone, Debug)]
+pub struct ChunkMut {
+    pub code: BytesMut,
+    pub constants: Vec<Value>,
+}
+
+impl Default for ChunkMut {
+    fn default() -> Self {
+        Self {
+            code: BytesMut::default(),
+            constants: Vec::default(),
+        }
+    }
+}
+
+impl ChunkMut {
+    ///
+    ///
+    ///
+    pub fn new(
+        code: BytesMut,
+        constants: Vec<Value>,
+    ) -> Self {
+        ChunkMut { code, constants }
+    }
+
+    ///
+    ///
+    ///
+    pub fn freeze(
+        self,
+        heap: &mut Heap<Object>,
+    ) -> Chunk {
+        let constants = self
+            .constants
+            .into_iter()
+            .map(|c| match c {
+                Value::Boolean(b) => match b {
+                    true => Slot::True,
+                    false => Slot::False,
+                },
+                Value::Integer(i) => Slot::Integer(i),
+                Value::Real(r) => Slot::Real(r),
+                Value::Function(f) => {
+                    let function = Object::Function(f.freeze(heap));
+                    let handle = heap.insert(function).into_handle();
+
+                    Slot::Object(handle)
+                }
+                Value::String(s) => {
+                    let string = Object::String(s);
+                    let handle = heap.insert(string).into_handle();
+
+                    Slot::Object(handle)
+                }
+                a => {
+                    dbg!(&a);
+                    todo!();
+                }
+            })
+            .collect();
+
+        Chunk {
+            code: self.code.freeze(),
+            constants,
+        }
+    }
+
+    ///
+    ///
+    ///
+    pub fn write<B: Into<u8>>(
+        &mut self,
+        byte: B,
+    ) {
+        self.code.put_u8(byte.into());
+    }
+
+    ///
+    ///
+    ///
+    pub fn write_pair<B1: Into<u8>, B2: Into<u8>>(
+        &mut self,
+        byte1: B1,
+        byte2: B2,
+    ) {
+        self.code.put_u8(byte1.into());
+        self.code.put_u8(byte2.into());
+    }
+
+    ///
+    ///
+    ///
+    pub fn write_bytes(
+        &mut self,
+        bytes: &[u8],
+    ) {
+        self.code.extend(bytes);
+    }
+
+    ///
+    ///
+    ///
+    pub fn add_constant(
+        &mut self,
+        value: Value,
+    ) -> u8 {
+        self.constants.push(value);
+
+        (self.constants.len() as u8) - 1
+    }
 }

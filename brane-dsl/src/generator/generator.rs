@@ -1,9 +1,7 @@
 use crate::parser::ast::*;
 use anyhow::Result;
-use brane_bvm::{
-    bytecode::{Chunk, Function, opcodes::*},
-    values::{Class, Value},
-};
+use brane_bvm::bytecode::{opcodes::*, FunctionMut, ChunkMut};
+use brane_bvm::values::{Class, Value};
 
 #[derive(Debug, Clone)]
 pub struct Local {
@@ -14,15 +12,15 @@ pub struct Local {
 ///
 ///
 ///
-pub fn compile(program: Program) -> Result<Function> {
-    let mut chunk = Chunk::new();
+pub fn compile(program: Program) -> Result<FunctionMut> {
+    let mut chunk = ChunkMut::default();
     let mut locals = Vec::new();
 
     for stmt in program {
         stmt_to_opcodes(stmt, &mut chunk, &mut locals, 0);
     }
 
-    Ok(Function::new(String::from("main"), 0, chunk.freeze()))
+    Ok(FunctionMut::main(chunk))
 }
 
 ///
@@ -31,11 +29,11 @@ pub fn compile(program: Program) -> Result<Function> {
 pub fn compile_function(
     block: Block,
     scope: i32,
-    params: &Vec<Ident>,
+    params: &[Ident],
     name: String,
-) -> Result<Function> {
+) -> Result<FunctionMut> {
     let mut locals = Vec::new();
-    let mut chunk = Chunk::new();
+    let mut chunk = ChunkMut::default();
 
     let local = Local {
         name: String::from("func"),
@@ -54,9 +52,9 @@ pub fn compile_function(
     for stmt in block {
         stmt_to_opcodes(stmt, &mut chunk, &mut locals, scope);
     }
+    chunk.write_pair(OP_UNIT, OP_RETURN);
 
-    let function = Function::new(name, params.len() as u8, chunk.freeze());
-
+    let function = FunctionMut::new(name, params.len() as u8, chunk);
     Ok(function)
 }
 
@@ -65,7 +63,7 @@ pub fn compile_function(
 ///
 pub fn stmt_to_opcodes(
     stmt: Stmt,
-    chunk: &mut Chunk,
+    chunk: &mut ChunkMut,
     locals: &mut Vec<Local>,
     scope: i32,
 ) {
@@ -73,14 +71,14 @@ pub fn stmt_to_opcodes(
         Stmt::Import {
             package: Ident(ident), ..
         } => {
-            let import = chunk.add_constant(ident.clone().into());
+            let import = chunk.add_constant(ident.into());
             chunk.write_pair(OP_IMPORT, import);
         }
         Stmt::DeclareClass {
             ident: Ident(ident),
             properties,
         } => {
-            let class = Value::Class(Class::new(ident.clone().into(), properties));
+            let class = Value::Class(Class::new(ident.clone(), properties));
             let class = chunk.add_constant(class);
             chunk.write_pair(OP_CLASS, class);
 
@@ -124,14 +122,21 @@ pub fn stmt_to_opcodes(
             }
 
             // Remove any locals created in this scope.
+            let mut n = 0;
             while let Some(local) = locals.pop() {
                 if local.depth >= scope {
-                    chunk.write(OP_POP);
+                    n += 1;
                 } else {
                     // Oops, one to many, place it back.
                     locals.push(local);
                     break;
                 }
+            }
+
+            match n {
+                0 => {}
+                1 => chunk.write(OP_POP),
+                n => chunk.write_pair(OP_POP_N, n),
             }
         }
         Stmt::For {
@@ -243,13 +248,15 @@ pub fn stmt_to_opcodes(
         }
         Stmt::Expr(expr) => {
             expr_to_opcodes(expr, chunk, locals, scope);
-            // chunk.write(OpCode::OpPop);
+            chunk.write(OP_POP);
         }
-        Stmt::Return(Some(expr)) => {
-            expr_to_opcodes(expr, chunk, locals, scope);
-            chunk.write(OP_RETURN);
-        }
-        Stmt::Return(None) => {
+        Stmt::Return(expr) => {
+            if let Some(expr) = expr {
+                expr_to_opcodes(expr, chunk, locals, scope);
+            } else {
+                chunk.write(OP_UNIT)
+            }
+
             chunk.write(OP_RETURN);
         }
         Stmt::DeclareFunc {
@@ -278,9 +285,10 @@ pub fn stmt_to_opcodes(
             }
 
             // Remove any locals created in this scope.
+            let mut n = 0;
             while let Some(local) = locals.pop() {
                 if local.depth >= scope {
-                    chunk.write(OP_POP);
+                    n += 1;
                 } else {
                     // Oops, one to many, place it back.
                     locals.push(local);
@@ -288,12 +296,18 @@ pub fn stmt_to_opcodes(
                 }
             }
 
+            match n {
+                0 => {}
+                1 => chunk.write(OP_POP),
+                n => chunk.write_pair(OP_POP_N, n),
+            }
+
             chunk.write(OP_LOC_POP);
-        },
+        }
         Stmt::Parallel { let_assign, blocks } => {
             let block_n = blocks.len() as u8;
             for block in blocks.into_iter().rev() {
-                let function = compile_function(vec![block], scope, &vec![], String::new()).unwrap();
+                let function = compile_function(vec![block], scope, &[], String::new()).unwrap();
                 let function = chunk.add_constant(function.into());
 
                 chunk.write_pair(OP_CONSTANT, function);
@@ -327,7 +341,7 @@ pub fn stmt_to_opcodes(
 ///
 pub fn expr_to_opcodes(
     expr: Expr,
-    chunk: &mut Chunk,
+    chunk: &mut ChunkMut,
     locals: &mut Vec<Local>,
     scope: i32,
 ) {
@@ -411,9 +425,11 @@ pub fn expr_to_opcodes(
                     let constant = chunk.add_constant(string.into());
                     chunk.write_pair(OP_CONSTANT, constant);
                 }
+                Lit::Unit => {
+                    chunk.write(OP_UNIT);
+                }
             };
         }
-        Expr::Unit => chunk.write(OP_UNIT),
         Expr::Ident(Ident(ident)) => {
             if let Some(index) = locals.iter().position(|l| l.name == ident) {
                 chunk.write_pair(OP_GET_LOCAL, index as u8);

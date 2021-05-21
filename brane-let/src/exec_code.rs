@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use specifications::common::{Parameter, Type, Value};
 use specifications::container::{ActionCommand, ContainerInfo};
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use subprocess::{Exec, Redirection};
 use yaml_rust::{Yaml, YamlLoader};
@@ -25,7 +25,7 @@ pub async fn handle(
     let functions = container_info.actions;
     let function = functions
         .get(&function)
-        .expect(&format!("Function '{}' not found", function));
+        .unwrap_or_else(|| panic!("Function '{}' not found", function));
 
     assert_input(&function.input, &arguments)?;
 
@@ -98,7 +98,7 @@ fn assert_input(
 ///
 ///
 ///
-fn initialize(working_dir: &PathBuf) -> Result<()> {
+fn initialize(working_dir: &Path) -> Result<()> {
     debug!("Initializing working directory");
 
     let init_sh = working_dir.join("init.sh");
@@ -120,7 +120,7 @@ fn execute(
     entrypoint: &str,
     command_args: &[String],
     arguments: &Map<Value>,
-    working_dir: &PathBuf,
+    working_dir: &Path,
 ) -> Result<Vec<String>> {
     let entrypoint_path = working_dir.join(entrypoint).canonicalize()?;
     let command = if entrypoint_path.is_file() {
@@ -147,11 +147,9 @@ fn execute(
     let br = BufReader::new(process);
     let mut lines = Vec::new();
 
-    for line in br.lines() {
-        if let Ok(line) = line {
-            println!("{}", &line);
-            lines.push(line);
-        }
+    for line in br.lines().flatten() {
+        println!("{}", &line);
+        lines.push(line);
     }
 
     // TODO: is this possible with subprocess crate?
@@ -219,11 +217,11 @@ fn construct_envs(variables: &Map<Value>) -> Result<Map<String>> {
 ///
 ///
 fn construct_struct_envs(
-    name: &String,
+    name: &str,
     index: Option<usize>,
     properties: &Map<Value>,
     envs: &mut Map<String>,
-) -> () {
+) {
     for (key, entry) in properties.iter() {
         let value = match entry {
             Value::Array { entries: _, .. } => unimplemented!(),
@@ -314,7 +312,9 @@ fn unwrap_yaml_struct(
     data_type: &str,
     types: &Map<Type>,
 ) -> Result<Value> {
-    let arch_type = types.get(data_type).expect(&format!("Missing type `{}`", data_type));
+    let arch_type = types
+        .get(data_type)
+        .unwrap_or_else(|| panic!("Missing type `{}`", data_type));
     let mut properties = Map::<Value>::new();
 
     for p in &arch_type.properties {

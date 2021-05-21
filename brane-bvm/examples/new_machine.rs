@@ -12,7 +12,7 @@ const SIMPLE: &str = r#"
     let a := test(5);
 "#;
 
-fn compile() -> bytecode::Function {
+fn compile() -> bytecode::FunctionMut {
     let mut compiler = Compiler::new(
         CompilerOptions::new(brane_dsl::Lang::BraneScript),
         PackageIndex::empty(),
@@ -29,5 +29,5 @@ fn main() {
 
     let mut vm = Vm::default();
 
-    vm.main(function);
+    futures::executor::block_on(vm.main(function));
 }

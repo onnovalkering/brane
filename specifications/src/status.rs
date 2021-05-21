@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StatusInfo {
     pub created: DateTime<Utc>,
     pub instruction_id: i32,
@@ -30,15 +30,15 @@ impl StatusInfo {
 }
 
 #[skip_serializing_none]
-#[serde(tag = "variant", rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "variant", rename_all = "camelCase")]
 pub enum Status {
     Transfer(TransferStatus),
 }
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TransferStatus {
     pub geo_source: Option<(f32, f32)>,
     pub geo_destination: Option<(f32, f32)>,

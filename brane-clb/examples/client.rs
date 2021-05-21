@@ -1,5 +1,5 @@
 use anyhow::Result;
-use brane_clb::grpc::{CallbackServiceClient, CallbackRequest, CallbackKind};
+use brane_clb::grpc::{CallbackKind, CallbackRequest, CallbackServiceClient};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -11,7 +11,7 @@ async fn main() -> Result<()> {
         application: String::from("app"),
         location: String::from("loc"),
         order: 1,
-        payload: vec![]
+        payload: vec![],
     };
 
     let response = client.callback(request).await?;

@@ -2,7 +2,7 @@ use crate::callback::Callback;
 use anyhow::{Context, Result};
 use specifications::common::{Parameter, Type, Value};
 use specifications::package::PackageInfo;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -24,7 +24,7 @@ pub async fn handle(
 
     let function_info = functions
         .get(&function)
-        .expect(&format!("Function '{}' not found", function));
+        .unwrap_or_else(|| panic!("Function '{}' not found", function));
 
     assert_input(&function_info.parameters, &arguments)?;
 
@@ -86,7 +86,7 @@ fn assert_input(
 ///
 fn initialize(
     _arguments: &Map<Value>,
-    _working_dir: &PathBuf,
+    _working_dir: &Path,
 ) -> Result<()> {
     // unimplemented
 
@@ -97,8 +97,8 @@ fn initialize(
 ///
 ///
 fn capture_output(
-    stdout: &String,
-    return_type: &String,
+    stdout: &str,
+    return_type: &str,
     c_types: &Option<Map<Type>>,
 ) -> Result<Option<Value>> {
     let json = serde_json::from_str(stdout)?;
@@ -117,7 +117,10 @@ fn capture_output(
                 filtered.insert(p.name.to_string(), property.clone());
             }
 
-            return Value::Struct { data_type: c_type.name.clone(), properties: filtered };
+            return Value::Struct {
+                data_type: c_type.name.clone(),
+                properties: filtered,
+            };
         }
 
         object.clone()
@@ -130,11 +133,14 @@ fn capture_output(
 
                 if let Some(c_type) = c_types.get(c_type) {
                     let entries = entries.iter().map(|e| filter(e, c_type)).collect();
-                    return Ok(Some(Value::Array { entries, data_type: return_type.clone() }));
+                    return Ok(Some(Value::Array {
+                        entries,
+                        data_type: return_type.to_string(),
+                    }));
                 }
             }
 
-            return Ok(Some(output));
+            Ok(Some(output))
         }
         Value::Struct { properties, .. } => {
             let properties = if let Some(c_types) = c_types {
@@ -157,8 +163,8 @@ fn capture_output(
             };
 
             Ok(Some(Value::Struct {
-                data_type: return_type.clone(),
-                properties: properties,
+                data_type: return_type.to_string(),
+                properties,
             }))
         }
         Value::Unit => Ok(None),

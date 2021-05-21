@@ -1,7 +1,7 @@
 use crate::docker::DockerExecutor;
 use crate::registry;
 use anyhow::Result;
-use brane_bvm::bytecode::Function;
+use brane_bvm::bytecode::FunctionMut;
 use brane_bvm::VmOptions;
 use brane_bvm::{VmResult, VM};
 use brane_drv::grpc::{CreateSessionRequest, DriverServiceClient, ExecuteRequest};
@@ -237,7 +237,7 @@ async fn remote_repl(
                             if reply.close {
                                 break;
                             }
-                        },
+                        }
                         Err(status) => {
                             eprintln!("\n{}", status.message());
                             break;
@@ -296,7 +296,7 @@ async fn local_repl(
                 rl.add_history_entry(line.as_str());
                 match compiler.compile(line) {
                     Ok(function) => {
-                        if let Function::UserDefined { chunk, ..} = function {
+                        if let FunctionMut::UserDefined { chunk, .. } = function {
                             debug!("\n{}", chunk.disassemble()?);
                             vm.call(chunk, 0);
                         }
@@ -313,8 +313,8 @@ async fn local_repl(
                                 Ok(VmResult::RuntimeError) => {
                                     eprintln!("Runtime error!");
                                     break;
-                                },
-                                _ => unreachable!()
+                                }
+                                _ => unreachable!(),
                             }
                         }
                     }

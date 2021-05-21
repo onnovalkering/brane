@@ -1,4 +1,4 @@
-use crate::bytecode::Function;
+use crate::bytecode::FunctionMut;
 use specifications::common::Value as SpecValue;
 use std::{collections::HashMap, fmt};
 
@@ -9,7 +9,7 @@ pub enum Value {
     Integer(i64),
     Real(f64),
     Unit,
-    Function(Function),
+    Function(FunctionMut),
     Class(Class),
     Instance(Instance),
     Array(Array),
@@ -38,9 +38,9 @@ impl Value {
     pub fn as_spec_value(&self) -> SpecValue {
         match self {
             Value::String(value) => SpecValue::Unicode(value.clone()),
-            Value::Boolean(value) => SpecValue::Boolean(value.clone()),
-            Value::Integer(value) => SpecValue::Integer(value.clone()),
-            Value::Real(value) => SpecValue::Real(value.clone()),
+            Value::Boolean(value) => SpecValue::Boolean(*value),
+            Value::Integer(value) => SpecValue::Integer(*value),
+            Value::Real(value) => SpecValue::Real(*value),
             Value::Unit => SpecValue::Unit,
             Value::Instance(instance) => {
                 let data_type = instance.class.name.clone();
@@ -132,10 +132,10 @@ impl fmt::Debug for Instance {
 impl From<SpecValue> for Value {
     fn from(value: SpecValue) -> Self {
         match value {
-            SpecValue::Unicode(value) => Value::String(value.clone()),
-            SpecValue::Boolean(value) => Value::Boolean(value.clone()),
-            SpecValue::Integer(value) => Value::Integer(value.clone()),
-            SpecValue::Real(value) => Value::Real(value.clone()),
+            SpecValue::Unicode(value) => Value::String(value),
+            SpecValue::Boolean(value) => Value::Boolean(value),
+            SpecValue::Integer(value) => Value::Integer(value),
+            SpecValue::Real(value) => Value::Real(value),
             SpecValue::Unit => Value::Unit,
             SpecValue::Struct { data_type, properties } => {
                 let mut fields: HashMap<String, Value> = HashMap::new();
@@ -144,7 +144,7 @@ impl From<SpecValue> for Value {
                 }
 
                 let class = Class {
-                    name: data_type.clone(),
+                    name: data_type,
                     properties: HashMap::new(),
                 };
                 Value::Instance(Instance { class, fields })
@@ -152,15 +152,15 @@ impl From<SpecValue> for Value {
             SpecValue::Array { data_type, entries } => {
                 let entries = entries.iter().map(|e| Value::from(e.clone())).collect();
 
-                Value::Array(Array { entries, data_type })
+                Value::Array(Array { data_type, entries })
             }
             _ => unreachable!(),
         }
     }
 }
 
-impl From<Function> for Value {
-    fn from(function: Function) -> Self {
+impl From<FunctionMut> for Value {
+    fn from(function: FunctionMut) -> Self {
         Value::Function(function)
     }
 }

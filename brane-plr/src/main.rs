@@ -169,7 +169,7 @@ async fn start_worker(
     if let Some(offset) = committed_offsets.get(&(cmd_from_topic.clone(), 0)) {
         match offset {
             Offset::Invalid => tpl.set_partition_offset(&cmd_from_topic, 0, Offset::Beginning)?,
-            offset => tpl.set_partition_offset(&cmd_from_topic, 0, offset.clone())?,
+            offset => tpl.set_partition_offset(&cmd_from_topic, 0, *offset)?,
         };
     }
 
@@ -180,7 +180,7 @@ async fn start_worker(
 
     // Create the outer pipeline on the message stream.
     let stream_processor = consumer.stream().try_for_each(|borrowed_message| {
-        &consumer.commit_message(&borrowed_message, CommitMode::Sync).unwrap();
+        consumer.commit_message(&borrowed_message, CommitMode::Sync).unwrap();
 
         // Shadow with owned clones.
         let owned_message = borrowed_message.detach();
@@ -244,24 +244,29 @@ async fn process_cmd_message(
     let kind = CommandKind::from_i32(command.kind).unwrap();
 
     // Returns an empty string if location is None.
-    if command.location() == "" {
-        if kind == CommandKind::Create {
-            let locations = infra.get_locations()?;
+    if command.location() == "" && kind == CommandKind::Create {
+        let locations = infra.get_locations()?;
 
-            // Choose a random location
-            let location = locations.choose(&mut rand::thread_rng());
-            let location = location.unwrap().clone();
+        // Choose a random location
+        let location = locations.choose(&mut rand::thread_rng());
+        let location = location.unwrap().clone();
 
-            info!("Assigned command '{}' to location '{}'.", command.identifier(), location);
+        info!(
+            "Assigned command '{}' to location '{}'.",
+            command.identifier(),
+            location
+        );
 
-            let metadata = infra.get_location_metadata(&location)?;
-            command.location = Some(location);
+        let metadata = infra.get_location_metadata(&location)?;
+        command.location = Some(location);
 
-            match metadata {
-                Location::Kube { registry, .. } | Location::Slurm { registry, .. } | Location::Vm { registry, .. } | Location::Local { registry, ..} => {
-                    let image = command.image.unwrap();
-                    command.image = Some(format!("{}/library/{}", registry, image));
-                }
+        match metadata {
+            Location::Kube { registry, .. }
+            | Location::Slurm { registry, .. }
+            | Location::Vm { registry, .. }
+            | Location::Local { registry, .. } => {
+                let image = command.image.unwrap();
+                command.image = Some(format!("{}/library/{}", registry, image));
             }
         }
     }

@@ -12,10 +12,10 @@ use rdkafka::{
     util::Timeout,
     ClientConfig,
 };
-use socksx::socks6::{self, Socks6Request, Socks6Reply};
-use tokio::net::{TcpListener, TcpStream};
+use socksx::socks6::{self, Socks6Reply, Socks6Request};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use tokio::net::{TcpListener, TcpStream};
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
@@ -59,7 +59,6 @@ async fn main() -> Result<()> {
         .create()
         .context("Failed to create Kafka producer.")?;
 
-
     // Event order counter
     let counter = Arc::new(AtomicU32::new(0));
 
@@ -93,7 +92,15 @@ pub async fn handle_connection(
             if let Ok(mut destination) = TcpStream::connect(request.destination.to_string()).await {
                 // EVENT: connection has been established between source and destination.
                 let payload = request.destination.to_string().as_bytes().to_vec();
-                emit_event(EventKind::Connected, &producer, &event_topic, &request, &counter, Some(payload)).await?;
+                emit_event(
+                    EventKind::Connected,
+                    &producer,
+                    &event_topic,
+                    &request,
+                    &counter,
+                    Some(payload),
+                )
+                .await?;
 
                 socks6::write_reply(&mut source, Socks6Reply::Success).await?;
                 // socks6::write_initial_data(&mut destination, &request).await?;

@@ -1,13 +1,15 @@
 use actix_web::Scope;
 use actix_web::{web, HttpRequest, HttpResponse};
-use std::env;
-use reqwest;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use serde_json::json;
+use std::collections::HashMap;
+use std::env;
 
 lazy_static! {
-    static ref VAULT_URL: String = format!("http://{}", env::var("VAULT_HOST").unwrap_or_else(|_| String::from("vault:8020")));
+    static ref VAULT_URL: String = format!(
+        "http://{}",
+        env::var("VAULT_HOST").unwrap_or_else(|_| String::from("vault:8020"))
+    );
     static ref VAULT_TOKEN: String = env::var("VAULT_TOKEN").unwrap_or_else(|_| String::from("mytoken"));
 }
 
@@ -25,21 +27,21 @@ pub fn scope() -> Scope {
 
 #[derive(Serialize, Deserialize)]
 struct Secrets {
-    data: Option<SecretsData>
+    data: Option<SecretsData>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
 struct SecretsData {
-    keys: Vec<String>
+    keys: Vec<String>,
 }
 #[derive(Serialize, Deserialize)]
 struct Secret {
-    data: SecretData
+    data: SecretData,
 }
 
 #[derive(Serialize, Deserialize)]
 struct SecretData {
-    data: HashMap<String, String>
+    data: HashMap<String, String>,
 }
 
 #[derive(Deserialize)]
@@ -50,17 +52,16 @@ pub struct CreateSecret {
 
 #[derive(Deserialize)]
 pub struct UpdateSecret {
-    pub value: String
+    pub value: String,
 }
 
 ///
 ///
 ///
-async fn get_secrets(
-    _req: HttpRequest,
-) -> HttpResponse {
+async fn get_secrets(_req: HttpRequest) -> HttpResponse {
     let client = reqwest::blocking::Client::new();
-    let secrets: Secrets = client.get(&format!("{}/v1/secret/metadata?list=true", VAULT_URL.as_str()))
+    let secrets: Secrets = client
+        .get(&format!("{}/v1/secret/metadata?list=true", VAULT_URL.as_str()))
         .header("X-Vault-Token", VAULT_TOKEN.as_str())
         .send()
         .unwrap()
@@ -79,7 +80,8 @@ async fn get_secret(
     path: web::Path<(String,)>,
 ) -> HttpResponse {
     let client = reqwest::blocking::Client::new();
-    let secret: Secret = client.get(&format!("{}/v1/secret/data/{}", VAULT_URL.as_str(), path.0))
+    let secret: Secret = client
+        .get(&format!("{}/v1/secret/data/{}", VAULT_URL.as_str(), path.0))
         .header("X-Vault-Token", VAULT_TOKEN.as_str())
         .send()
         .unwrap()
@@ -97,7 +99,8 @@ async fn create_secret(
     json: web::Json<CreateSecret>,
 ) -> HttpResponse {
     let client = reqwest::blocking::Client::new();
-    let _ = client.post(&format!("{}/v1/secret/data/{}", VAULT_URL.as_str(), json.key))
+    let _ = client
+        .post(&format!("{}/v1/secret/data/{}", VAULT_URL.as_str(), json.key))
         .header("X-Vault-Token", VAULT_TOKEN.as_str())
         .json(&json!({
             "data": {
@@ -125,7 +128,8 @@ async fn update_secret(
     });
 
     let client = reqwest::blocking::Client::new();
-    let _ = client.put(&format!("{}/v1/secret/data/{}", VAULT_URL.as_str(), path.0))
+    let _ = client
+        .put(&format!("{}/v1/secret/data/{}", VAULT_URL.as_str(), path.0))
         .header("X-Vault-Token", VAULT_TOKEN.as_str())
         .json(&payload)
         .send()
@@ -142,7 +146,8 @@ async fn delete_secret(
     path: web::Path<(String,)>,
 ) -> HttpResponse {
     let client = reqwest::blocking::Client::new();
-    let res = client.delete(&format!("{}/v1/secret/metadata/{}", VAULT_URL.as_str(), path.0))
+    let res = client
+        .delete(&format!("{}/v1/secret/metadata/{}", VAULT_URL.as_str(), path.0))
         .header("X-Vault-Token", VAULT_TOKEN.as_str())
         .send()
         .unwrap();

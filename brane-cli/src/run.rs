@@ -1,6 +1,6 @@
 use crate::{docker::DockerExecutor, registry};
 use anyhow::Result;
-use brane_bvm::{VmOptions, bytecode::Function};
+use brane_bvm::{bytecode::FunctionMut, VmOptions};
 use brane_bvm::{VmResult, VM};
 use brane_dsl::{Compiler, CompilerOptions, Lang};
 use std::fs;
@@ -9,9 +9,7 @@ use std::path::PathBuf;
 ///
 ///
 ///
-pub async fn handle(
-    file: PathBuf,
-) -> Result<()> {
+pub async fn handle(file: PathBuf) -> Result<()> {
     let source_code = fs::read_to_string(&file)?;
 
     let compiler_options = CompilerOptions::new(Lang::BraneScript);
@@ -24,17 +22,7 @@ pub async fn handle(
 
     match compiler.compile(source_code) {
         Ok(function) => {
-            // if let Function::UserDefined { chunk, ..} = &function {
-            //     chunk.constants.iter().for_each(|c|
-            //         if let Value::Function(Function::UserDefined { chunk, .. }) = c {
-            //             debug!("\n{}\n", chunk.disassemble().unwrap());
-            //         }
-            //     );
-
-            //     debug!("\n{}", chunk.disassemble()?);
-            // }
-
-            if let Function::UserDefined { chunk, ..} = function {
+            if let FunctionMut::UserDefined { chunk, .. } = function {
                 // debug!("\n{}", chunk.disassemble()?);
                 vm.call(chunk, 0);
             }
@@ -52,11 +40,11 @@ pub async fn handle(
                         eprintln!("Runtime error!");
                         break;
                     }
-                    _ => unreachable!()
+                    _ => unreachable!(),
                 }
             }
-        },
-        Err(error) => eprintln!("{:?}", error)
+        }
+        Err(error) => eprintln!("{:?}", error),
     }
 
     Ok(())

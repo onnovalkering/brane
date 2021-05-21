@@ -14,7 +14,7 @@ mod scanner;
 use crate::parser::{bakery, bscript};
 use crate::scanner::{Span, Tokens};
 use anyhow::Result;
-use brane_bvm::bytecode::Function;
+use brane_bvm::bytecode::FunctionMut;
 use specifications::package::PackageIndex;
 
 #[derive(Clone, Debug)]
@@ -39,6 +39,12 @@ impl CompilerOptions {
 
 #[derive(Clone, Debug)]
 pub struct CompilerState {}
+
+impl Default for CompilerState {
+    fn default() -> Self {
+        CompilerState::new()
+    }
+}
 
 impl CompilerState {
     ///
@@ -77,7 +83,7 @@ impl Compiler {
     pub fn compile<S: Into<String>>(
         &mut self,
         input: S,
-    ) -> Result<Function> {
+    ) -> Result<FunctionMut> {
         let input = input.into();
         let input = Span::new(&input);
 

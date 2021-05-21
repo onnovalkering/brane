@@ -1,4 +1,4 @@
-use crate::stack::{Slot, Stack};
+use crate::{executor::VmExecutor, stack::Slot, values::Value};
 use std::collections::HashMap;
 
 const BUILTIN_PRINT_NAME: &str = "print";
@@ -17,18 +17,21 @@ pub fn register(globals: &mut HashMap<String, Slot>) {
 ///
 ///
 #[inline]
-pub fn call(
+pub async fn call<E>(
     builtin: u8,
-    stack: &mut Stack,
-) {
+    arguments: Vec<Value>,
+    _executor: &E,
+) -> Value
+where
+    E: VmExecutor,
+{
     match builtin {
         BUILTIN_PRINT_CODE => {
-            let value = stack.pop();
-            println!("{}", value);
+            let value = arguments.first().unwrap();
+            println!("{:?} (TODO: add Display to Value)", value);
+
+            Value::Unit
         }
         _ => unreachable!(),
     }
-
-    // Remove builtin from stack.
-    stack.pop();
 }

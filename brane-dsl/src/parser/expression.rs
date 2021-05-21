@@ -116,8 +116,8 @@ pub fn expr_atom<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
     branch::alt((
         instance::parse,
         call_expr,
-        comb::map(literal::parse, |l| Expr::Literal(l)),
-        comb::map(identifier::parse, |i| Expr::Ident(i)),
+        comb::map(literal::parse, Expr::Literal),
+        comb::map(identifier::parse, Expr::Ident),
     ))
     .parse(input)
 }

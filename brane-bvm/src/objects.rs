@@ -1,9 +1,7 @@
-use std::collections::HashMap;
-
+use crate::{bytecode::Chunk, stack::Slot};
 use broom::prelude::*;
 use specifications::common::Parameter;
-
-use crate::{chunk::FrozenChunk, stack::Slot};
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub enum Object {
@@ -93,8 +91,21 @@ impl Trace<Object> for Class {
 #[derive(Debug, Clone)]
 pub struct Function {
     pub arity: u8,
-    pub chunk: FrozenChunk,
+    pub chunk: Chunk,
     pub name: String,
+}
+
+impl Function {
+    ///
+    ///
+    ///
+    pub fn new(
+        name: String,
+        arity: u8,
+        chunk: Chunk,
+    ) -> Self {
+        Self { arity, chunk, name }
+    }
 }
 
 impl Trace<Object> for Function {
@@ -113,6 +124,8 @@ pub struct FunctionExt {
     pub version: String,
     pub parameters: Vec<Parameter>,
 }
+
+unsafe impl Send for FunctionExt {}
 
 impl Trace<Object> for FunctionExt {
     fn trace(

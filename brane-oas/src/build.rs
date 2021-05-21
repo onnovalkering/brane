@@ -1,8 +1,8 @@
 use super::*;
 use crate::resolver::{self, resolve_schema};
 use anyhow::Result;
-use openapiv3::{OpenAPI, ReferenceOr, SecurityScheme};
 use openapiv3::{Components, Parameter as OParameter, Type as OType};
+use openapiv3::{OpenAPI, ReferenceOr, SecurityScheme};
 use openapiv3::{Operation, ParameterSchemaOrContent, Schema, SchemaKind};
 use specifications::common::{CallPattern, Function, Parameter, Property, Type};
 
@@ -56,11 +56,11 @@ pub fn build_oas_functions(oas_document: &OpenAPI) -> Result<FunctionsAndTypes> 
 /// Generates an identifier for a OpenAPI operation.
 pub fn generate_operation_id(
     method: &str,
-    path: &String,
+    path: &str,
 ) -> String {
     let mut operation_id = method.to_string();
 
-    let segments = path.split("/");
+    let segments = path.split('/');
     for segment in segments {
         if segment.is_empty() {
             continue;
@@ -94,12 +94,10 @@ pub fn get_operation_id(
 ) -> Result<String> {
     let operation_id = if let Some(operation_id) = &operation.operation_id {
         operation_id.clone()
+    } else if let Some(fallback) = fallback {
+        fallback
     } else {
-        if let Some(fallback) = fallback {
-            fallback
-        } else {
-            bail!(OAS_ADD_OPERATION_ID);
-        }
+        bail!(OAS_ADD_OPERATION_ID);
     };
 
     // The identifier must be a valid Bakery / BraneScript function name.
@@ -156,20 +154,16 @@ fn build_oas_function_input(
     }
 
     // Determine input from security schemes.
-    if let Some(security_scheme) = &operation.security.iter().next() {
+    if let Some(security_scheme) = &operation.security.get(0) {
         if let Some(security_scheme) = security_scheme.keys().next() {
             let item = ReferenceOr::Reference::<SecurityScheme> {
-                reference: format!("#/components/schemas/{}", security_scheme)
+                reference: format!("#/components/schemas/{}", security_scheme),
             };
 
             let security_scheme = resolver::resolve_security_scheme(&item, components)?;
             let property = match security_scheme {
-                SecurityScheme::APIKey { name, .. } => {
-                    Property::new_quick(&name, "string")
-                },
-                SecurityScheme::HTTP { .. } => {
-                    Property::new_quick("token", "string")
-                },
+                SecurityScheme::APIKey { name, .. } => Property::new_quick(&name, "string"),
+                SecurityScheme::HTTP { .. } => Property::new_quick("token", "string"),
                 _ => todo!(),
             };
 
@@ -281,7 +275,7 @@ fn build_oas_function_output(
 fn parameter_to_properties(
     parameter: &OParameter,
     components: &Option<Components>,
-    types: &mut Map::<Type>,
+    types: &mut Map<Type>,
 ) -> Result<Vec<Property>> {
     // Get inner parameter object.
     let parameter_data = match parameter {
@@ -310,7 +304,7 @@ pub fn schema_to_properties(
     schema: &Schema,
     required: bool,
     components: &Option<Components>,
-    types: &mut Map::<Type>,
+    types: &mut Map<Type>,
 ) -> Result<Vec<Property>> {
     match schema.schema_kind {
         SchemaKind::Any(_) => any_schema_to_properties(name, schema, required, components, types),
@@ -327,7 +321,7 @@ fn any_schema_to_properties(
     schema: &Schema,
     required: bool,
     components: &Option<Components>,
-    types: &mut Map::<Type>,
+    types: &mut Map<Type>,
 ) -> Result<Vec<Property>> {
     let any_schema = if let SchemaKind::Any(any_schema) = &schema.schema_kind {
         any_schema
@@ -355,7 +349,7 @@ fn type_schema_to_properties(
     schema: &Schema,
     required: bool,
     components: &Option<Components>,
-    types: &mut Map::<Type>,
+    types: &mut Map<Type>,
 ) -> Result<Vec<Property>> {
     let data_type = if let SchemaKind::Type(data_type) = &schema.schema_kind {
         data_type
@@ -374,9 +368,10 @@ fn type_schema_to_properties(
                 SchemaKind::Type(OType::Integer(_)) => String::from("integer[]"),
                 SchemaKind::Type(OType::Boolean {}) => String::from("boolean[]"),
                 SchemaKind::Any(_) => {
-                    let item_type_properties = any_schema_to_properties(None, &items_schema, required, components, types)?;
+                    let item_type_properties =
+                        any_schema_to_properties(None, &items_schema, required, components, types)?;
                     let item_type_name = if let Some(ref_name) = ref_name {
-                        ref_name.clone()
+                        ref_name
                     } else {
                         String::from("todogenerate")
                     };
@@ -389,8 +384,8 @@ fn type_schema_to_properties(
                     types.insert(item_type_name.clone(), item_type);
 
                     format!("{}[]", item_type_name)
-                },
-                _ => todo!()
+                }
+                _ => todo!(),
             };
 
             vec![Property::new(

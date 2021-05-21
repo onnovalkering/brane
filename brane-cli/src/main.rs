@@ -272,7 +272,12 @@ async fn run(options: CLI) -> Result<()> {
         Remove { name, version, force } => {
             packages::remove(name, version, force).await?;
         }
-        Repl { bakery, clear, remote, attach } => {
+        Repl {
+            bakery,
+            clear,
+            remote,
+            attach,
+        } => {
             repl::start(bakery, clear, remote, attach).await?;
         }
         Run { file } => {

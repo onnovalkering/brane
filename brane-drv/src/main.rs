@@ -1,36 +1,37 @@
 use anyhow::{bail, Context, Result};
+use brane_bvm::values::Value;
+use brane_bvm::VmState;
 use brane_drv::grpc::DriverServiceServer;
 use brane_drv::handler::DriverHandler;
 use brane_job::interface::{Event, EventKind};
-use brane_bvm::values::Value;
-use brane_bvm::VmState;
 use clap::Clap;
+use dashmap::DashMap;
 use dotenv::dotenv;
-use log::{info};
+use futures::TryStreamExt;
+use log::info;
 use log::LevelFilter;
 use prost::Message as _;
-use futures::TryStreamExt;
 use rdkafka::{
     admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
-    producer::FutureProducer,
     consumer::{Consumer, StreamConsumer},
     error::RDKafkaErrorCode,
-    ClientConfig,
-    TopicPartitionList,
-    Offset,
+    producer::FutureProducer,
     util::Timeout,
-    Message as _
+    ClientConfig, Message as _, Offset, TopicPartitionList,
 };
-use tonic::transport::Server;
 use specifications::common::Value as SpecValue;
 use std::sync::Arc;
-use dashmap::DashMap;
-
+use tonic::transport::Server;
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
-    #[clap(short, long, default_value = "http://brane-api:8080/packages", env = "PACKAGE_INDEX_URL")]
+    #[clap(
+        short,
+        long,
+        default_value = "http://brane-api:8080/packages",
+        env = "PACKAGE_INDEX_URL"
+    )]
     package_index_url: String,
     #[clap(short, long, default_value = "127.0.0.1:50053", env = "ADDRESS")]
     /// Service address

@@ -1,9 +1,9 @@
-use anyhow::{Context, Result};
 use crate::Secrets;
+use anyhow::{Context, Result};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::BufReader;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use url::Url;
 
@@ -60,11 +60,11 @@ pub enum LocationCredentials {
     SshCertificate {
         username: String,
         certificate: String,
-        passphrase: Option<String>
+        passphrase: Option<String>,
     },
     SshPassword {
         username: String,
-        password: String
+        password: String,
     },
 }
 
@@ -72,16 +72,21 @@ impl LocationCredentials {
     ///
     ///
     ///
-    pub fn resolve_secrets(&self, secrets: &Secrets) -> Self {
+    pub fn resolve_secrets(
+        &self,
+        secrets: &Secrets,
+    ) -> Self {
         use LocationCredentials::*;
 
         let resolve = |value: &String| {
-            if value.starts_with("s$") {
-                // Try to resolve secret, but use the value as-is otherwise.
-                secrets.get(&value[2..]).unwrap_or_else(|_| value.clone())
-            } else {
-                value.clone()
+            // Try to resolve secret, but use the value as-is otherwise.
+            if let Some(value) = value.strip_prefix("s$") {
+                if let Ok(secret) = secrets.get(value) {
+                    return secret;
+                }
             }
+
+            value.clone()
         };
 
         match self {
@@ -90,12 +95,20 @@ impl LocationCredentials {
 
                 Config { file }
             }
-            SshCertificate { username, certificate, passphrase } => {
+            SshCertificate {
+                username,
+                certificate,
+                passphrase,
+            } => {
                 let username = resolve(username);
                 let certificate = resolve(certificate);
                 let passphrase = passphrase.clone().map(|p| resolve(&p));
 
-                SshCertificate { username, certificate, passphrase}
+                SshCertificate {
+                    username,
+                    certificate,
+                    passphrase,
+                }
             }
             SshPassword { username, password } => {
                 let username = resolve(username);
@@ -127,8 +140,8 @@ impl Infrastructure {
     pub fn validate(&self) -> Result<()> {
         if let Store::File(store_file) = &self.store {
             let infra_reader = BufReader::new(File::open(store_file)?);
-            let _: InfrastructureDocument = serde_yaml::from_reader(infra_reader)
-                .context("Infrastructure file is not valid.")?;
+            let _: InfrastructureDocument =
+                serde_yaml::from_reader(infra_reader).context("Infrastructure file is not valid.")?;
 
             Ok(())
         } else {
@@ -153,19 +166,19 @@ impl Infrastructure {
     ///
     ///
     ///
-    pub fn get_location_metadata<S: Into<String>>(&self, location: S) -> Result<Location> {
+    pub fn get_location_metadata<S: Into<String>>(
+        &self,
+        location: S,
+    ) -> Result<Location> {
         let location = location.into();
 
         if let Store::File(store_file) = &self.store {
             let infra_reader = BufReader::new(File::open(store_file)?);
             let infra_document: InfrastructureDocument = serde_yaml::from_reader(infra_reader)?;
 
-            let metadata = infra_document
-                .locations
-                .get(&location)
-                .map(Location::clone);
+            let metadata = infra_document.locations.get(&location).map(Location::clone);
 
-            metadata.ok_or(anyhow!("Location '{}' not found in infrastructure metadata.", location))
+            metadata.ok_or_else(|| anyhow!("Location '{}' not found in infrastructure metadata.", location))
         } else {
             unreachable!()
         }
