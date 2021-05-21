@@ -3,18 +3,13 @@ use brane_bvm::vm::Vm;
 use brane_dsl::{Compiler, CompilerOptions};
 use specifications::package::PackageIndex;
 
-
 const SIMPLE: &str = r#"
     func test(n) {
-        if (n <= 1) {
-            return 1;
-        } else {
-            return test(n - 1);
-        }
+        print(1 + n);
+        return 2;
     }
 
     let a := test(5);
-    print(a);
 "#;
 
 fn compile() -> bytecode::Function {

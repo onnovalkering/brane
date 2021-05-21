@@ -1,8 +1,6 @@
 use anyhow::Result;
 use broom::Heap;
-use bytes::{BufMut, Bytes, BytesMut};
-use specifications::common::Parameter;
-use std::fmt::{self, Write};
+use std::fmt::Write;
 
 pub mod opcodes {
     pub const OP_ADD: u8 = 0x01;
@@ -25,6 +23,7 @@ pub mod opcodes {
     pub const OP_JUMP_BACK: u8 = 0x12;
     pub const OP_JUMP_IF_FALSE: u8 = 0x13;
     pub const OP_LESS: u8 = 0x14;
+    pub const OP_LOC: u8 = 0x25;
     pub const OP_LOC_POP: u8 = 0x15;
     pub const OP_LOC_PUSH: u8 = 0x16;
     pub const OP_MULTIPLY: u8 = 0x17;
@@ -34,15 +33,19 @@ pub mod opcodes {
     pub const OP_OR: u8 = 0x1B;
     pub const OP_PARALLEL: u8 = 0x1C;
     pub const OP_POP: u8 = 0x1D;
-    pub const OP_RETURN: u8 = 0x1E;
-    pub const OP_SET_GLOBAL: u8 = 0x1F;
-    pub const OP_SET_LOCAL: u8 = 0x20;
-    pub const OP_SUBSTRACT: u8 = 0x21;
-    pub const OP_TRUE: u8 = 0x22;
-    pub const OP_UNIT: u8 = 0x23;
+    pub const OP_POP_N: u8 = 0x1E;
+    pub const OP_RETURN: u8 = 0x1F;
+    pub const OP_SET_GLOBAL: u8 = 0x20;
+    pub const OP_SET_LOCAL: u8 = 0x21;
+    pub const OP_SUBSTRACT: u8 = 0x22;
+    pub const OP_TRUE: u8 = 0x23;
+    pub const OP_UNIT: u8 = 0x24;
 }
 
-use crate::{chunk::{Chunk, FrozenChunk}, objects::{self, Object}};
+use crate::{
+    chunk::{Chunk, FrozenChunk},
+    objects::{self, Object},
+};
 #[derive(Clone)]
 pub struct Function {
     pub arity: u8,
@@ -56,11 +59,7 @@ impl Function {
         arity: u8,
         chunk: Chunk,
     ) -> Self {
-        Self {
-            arity,
-            chunk,
-            name,
-        }
+        Self { arity, chunk, name }
     }
 
     pub fn freeze(
@@ -74,12 +73,6 @@ impl Function {
         }
     }
 }
-
-// #[derive(Debug, Clone)]
-// pub struct ReadOnlyChunk2 {
-//     pub code: Bytes,
-//     pub constants: Vec<Value>,
-// }
 
 impl FrozenChunk {
     ///
@@ -138,6 +131,10 @@ impl FrozenChunk {
                 OP_POP => {
                     writeln!(result, "OP_POP")?;
                 }
+                OP_POP_N => {
+                    byte_instruction("OP_POP_N", &self, offset, &mut result);
+                    skip = 1;
+                }
                 OP_RETURN => {
                     writeln!(result, "OP_RETURN")?;
                 }
@@ -149,6 +146,9 @@ impl FrozenChunk {
                 }
                 OP_UNIT => {
                     writeln!(result, "OP_UNIT")?;
+                }
+                OP_LOC => {
+                    writeln!(result, "OP_LOC")?;
                 }
                 OP_INDEX => {
                     writeln!(result, "OP_INDEX")?;
@@ -219,7 +219,7 @@ impl FrozenChunk {
                     constant_instruction("OP_IMPORT", &self, offset, &mut result);
                     skip = 1;
                 }
-                0x00 | 0x24..=u8::MAX => {
+                0x00 | 0x25..=u8::MAX => {
                     unreachable!()
                 }
             }

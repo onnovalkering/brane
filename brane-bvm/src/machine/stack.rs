@@ -1,7 +1,11 @@
-use std::{cmp::Ordering, fmt::{Display, Formatter, Result}, usize};
+use crate::objects::Object;
 use broom::Handle;
 use std::fmt::Write;
-use crate::objects::Object;
+use std::{
+    cmp::Ordering,
+    fmt::{Display, Formatter, Result},
+    usize,
+};
 
 const STACK_MAX: usize = 256;
 
@@ -22,10 +26,27 @@ pub enum Slot {
     Object(Handle<Object>),
 }
 
+impl Slot {
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn as_object(&self) -> Option<Handle<Object>> {
+        if let Slot::Object(object) = self {
+            Some(*object)
+        } else {
+            None
+        }
+    }
+}
+
 impl Display for Slot {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(
+        &self,
+        f: &mut Formatter<'_>,
+    ) -> Result {
         let display = match self {
-            Slot::BuiltIn(code) => format!("builtin<{:#04x}>", code),
+            Slot::BuiltIn(code) => format!("builtin<{:#04x}>", code), // TODO: More information, func or class, name?
             Slot::ConstMinusOne => String::from("-1"),
             Slot::ConstMinusTwo => String::from("-2"),
             Slot::ConstOne => String::from("1"),
@@ -36,18 +57,17 @@ impl Display for Slot {
             Slot::Real(r) => format!("{}", r),
             Slot::True => String::from("true"),
             Slot::Unit => String::from("unit"),
-            Slot::Object(h) => {
-                unsafe {
-                    match h.get_unchecked() {
-                        Object::Array(_) => format!("array<{}>", "?"),
-                        Object::Class(c) => format!("class<{}>", c.name),
-                        Object::Function(f) => format!("function<{}>", f.name),
-                        Object::Instance(_) => format!("instance<{}>", "?"),
-                        Object::String(s) => format!("{:?}", s),
-                    }
+            Slot::Object(h) => unsafe {
+                match h.get_unchecked() {
+                    Object::Array(_) => format!("array<{}>", "?"),
+                    Object::Class(c) => format!("class<{}>", c.name),
+                    Object::Function(f) => format!("function<{}>", f.name),
+                    Object::FunctionExt(f) => format!("function<{}; {}>", f.name, f.kind),
+                    Object::Instance(_) => format!("instance<{}>", "?"),
+                    Object::String(s) => format!("{:?}", s),
                 }
             },
-            _ => todo!()
+            _ => todo!(),
         };
 
         write!(f, "{}", display)
@@ -55,7 +75,10 @@ impl Display for Slot {
 }
 
 impl PartialEq for Slot {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(
+        &self,
+        other: &Self,
+    ) -> bool {
         match (self, other) {
             (Slot::BuiltIn(lhs), Slot::BuiltIn(rhs)) => lhs == rhs,
             (Slot::ConstMinusOne, Slot::ConstMinusOne) => true,
@@ -75,22 +98,24 @@ impl PartialEq for Slot {
 }
 
 impl PartialOrd for Slot {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(
+        &self,
+        other: &Self,
+    ) -> Option<Ordering> {
         match (self, other) {
             (Slot::Integer(lhs), Slot::Integer(rhs)) => lhs.partial_cmp(rhs),
             (Slot::Integer(lhs), Slot::Real(rhs)) => (*lhs as f64).partial_cmp(rhs),
             (Slot::Real(lhs), Slot::Real(rhs)) => lhs.partial_cmp(rhs),
             (Slot::Real(lhs), Slot::Integer(rhs)) => lhs.partial_cmp(&(*rhs as f64)),
-            _ => None
+            _ => None,
         }
-
     }
 }
 
 #[derive(Debug)]
 pub struct Stack {
     inner: Vec<Slot>,
-    use_const: bool, // TODO: benchmark this option
+    use_const: bool, // TODO: benchmark this option (memory use)
 }
 
 impl Default for Stack {
@@ -100,7 +125,10 @@ impl Default for Stack {
 }
 
 impl Display for Stack {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(
+        &self,
+        f: &mut Formatter<'_>,
+    ) -> Result {
         let mut display = String::from(format!("         "));
         self.inner.iter().for_each(|v| write!(display, "[ {} ]", v).unwrap());
 
@@ -112,7 +140,10 @@ impl Stack {
     ///
     ///
     ///
-    pub fn new(size: usize, use_const: bool) -> Self {
+    pub fn new(
+        size: usize,
+        use_const: bool,
+    ) -> Self {
         Self {
             inner: Vec::with_capacity(size),
             use_const,
@@ -131,7 +162,10 @@ impl Stack {
     ///
     ///
     #[inline]
-    pub fn clear_from(&mut self, index: usize) {
+    pub fn clear_from(
+        &mut self,
+        index: usize,
+    ) {
         self.inner.truncate(index)
     }
 
@@ -166,6 +200,17 @@ impl Stack {
         } else {
             panic!("Expecting value");
         }
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn copy_pop(
+        &mut self,
+        index: usize,
+    ) {
+        self.inner.swap_remove(index);
     }
 
     ///
@@ -207,7 +252,19 @@ impl Stack {
     ///
     #[inline]
     pub fn pop(&mut self) -> Slot {
-        self.inner.pop().unwrap()
+        let slot = self.inner.pop().unwrap();
+        if !self.use_const {
+            return slot;
+        }
+
+        match slot {
+            Slot::ConstMinusOne => Slot::Integer(-1),
+            Slot::ConstMinusTwo => Slot::Integer(-2),
+            Slot::ConstOne => Slot::Integer(1),
+            Slot::ConstTwo => Slot::Integer(2),
+            Slot::ConstZero => Slot::Integer(0),
+            slot => slot,
+        }
     }
 
     ///
@@ -333,7 +390,7 @@ impl Stack {
                 0 => Slot::ConstZero,
                 1 => Slot::ConstOne,
                 2 => Slot::ConstTwo,
-                n => Slot::Integer(n)
+                n => Slot::Integer(n),
             }
         } else {
             Slot::Integer(integer)
@@ -384,7 +441,10 @@ impl Stack {
     ///
     ///
     #[inline]
-    pub fn try_push(&mut self, slot: Option<Slot>) {
+    pub fn try_push(
+        &mut self,
+        slot: Option<Slot>,
+    ) {
         if let Some(slot) = slot {
             self.inner.push(slot)
         }
@@ -396,6 +456,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_copy_pop() {
+        let mut stack = Stack::default();
+        stack.push(Slot::Integer(1));
+        stack.push(Slot::Integer(2));
+        stack.push(Slot::Integer(3));
+
+        stack.copy_pop(0);
+
+        assert_eq!(stack.len(), 2);
+        assert_eq!(stack.pop_integer(), 2);
+        assert_eq!(stack.pop_integer(), 3);
+    }
+
+    #[test]
     fn test_copy_push() {
         let mut stack = Stack::default();
         stack.push(Slot::Integer(1));
@@ -403,6 +477,7 @@ mod tests {
 
         stack.copy_push(0);
 
+        assert_eq!(stack.len(), 3);
         assert_eq!(stack.pop_integer(), 1);
         assert_eq!(stack.pop_integer(), 2);
         assert_eq!(stack.pop_integer(), 1);

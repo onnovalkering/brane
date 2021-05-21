@@ -1,9 +1,14 @@
-use std::collections::HashMap;
-use crate::{builtins, bytecode::{self, opcodes::*}};
-use crate::{frames::CallFrame};
+use crate::{frames::CallFrame, objects::{Function, FunctionExt}};
 use crate::objects::Object;
 use crate::stack::{Slot, Stack};
-use broom::Heap;
+use crate::{
+    builtins,
+    bytecode::{self, opcodes::*},
+    objects::{Array, Instance},
+};
+use broom::{Handle, Heap};
+use specifications::package::PackageIndex;
+use std::collections::HashMap;
 
 ///
 ///
@@ -12,6 +17,8 @@ pub struct Vm {
     frames: Vec<CallFrame>,
     globals: HashMap<String, Slot>,
     heap: Heap<Object>,
+    locations: Vec<Handle<Object>>,
+    package_index: PackageIndex,
     stack: Stack,
 }
 
@@ -20,9 +27,11 @@ impl Default for Vm {
         let frames = Vec::default();
         let globals = HashMap::default();
         let heap = Heap::default();
+        let locations = Vec::default();
+        let package_index = PackageIndex::empty();
         let stack = Stack::default();
 
-        Self::new(frames, globals, heap, stack)
+        Self::new(frames, globals, heap, locations, package_index, stack)
     }
 }
 
@@ -34,12 +43,16 @@ impl Vm {
         frames: Vec<CallFrame>,
         globals: HashMap<String, Slot>,
         heap: Heap<Object>,
+        locations: Vec<Handle<Object>>,
+        package_index: PackageIndex,
         stack: Stack,
     ) -> Self {
         let mut vm = Self {
             frames,
             globals,
             heap,
+            locations,
+            package_index,
             stack,
         };
 
@@ -85,7 +98,7 @@ impl Vm {
                     Some(Object::Function(_f)) => {
                         // println!("{}", _f.chunk.disassemble().unwrap());
 
-                        let frame = CallFrame::new(handle.clone(), frame_first);
+                        let frame = CallFrame::new(*handle, frame_first);
                         self.frames.push(frame);
                     }
                     _ => panic!("Expecting a function."),
@@ -102,19 +115,40 @@ impl Vm {
         while let Some(instruction) = self.next() {
             match *instruction {
                 OP_ADD => self.op_add(),
+                OP_AND => self.op_and(),
+                OP_ARRAY => self.op_array(),
                 OP_CALL => self.op_call(),
+                OP_CLASS => self.op_class(),
                 OP_CONSTANT => self.op_constant(),
                 OP_DEFINE_GLOBAL => self.op_define_global(),
+                OP_DIVIDE => self.op_divide(),
+                OP_DOT => self.op_dot(),
+                OP_EQUAL => self.op_equal(),
+                OP_FALSE => self.op_false(),
                 OP_GET_GLOBAL => self.op_get_global(),
                 OP_GET_LOCAL => self.op_get_local(),
                 OP_GREATER => self.op_greater(),
+                OP_IMPORT => self.op_import(),
+                OP_INDEX => self.op_index(),
                 OP_JUMP => self.op_jump(),
                 OP_JUMP_BACK => self.op_jump_back(),
                 OP_JUMP_IF_FALSE => self.op_jump_if_false(),
+                OP_LESS => self.op_less(),
+                OP_LOC => self.op_loc(),
+                OP_LOC_POP => self.op_loc_pop(),
+                OP_LOC_PUSH => self.op_loc_push(),
+                OP_MULTIPLY => self.op_multiply(),
+                OP_NEGATE => self.op_negate(),
+                OP_NEW => self.op_new(),
                 OP_NOT => self.op_not(),
+                OP_OR => self.op_or(),
+                OP_PARALLEL => self.op_parallel(),
                 OP_POP => self.op_pop(),
+                OP_POP_N => self.op_pop_n(),
                 OP_RETURN => self.op_return(),
                 OP_SUBSTRACT => self.op_substract(),
+                OP_TRUE => self.op_true(),
+                OP_UNIT => self.op_unit(),
                 x => {
                     println!("Unkown opcode: {}", x);
                     todo!();
@@ -156,7 +190,7 @@ impl Vm {
             (Slot::Integer(lhs), Slot::Real(rhs)) => self.stack.push_real(lhs as f64 + rhs),
             (Slot::Real(lhs), Slot::Real(rhs)) => self.stack.push_real(lhs + rhs),
             (Slot::Real(lhs), Slot::Integer(rhs)) => self.stack.push_real(lhs + rhs as f64),
-            _ => todo!(),
+            _ => unreachable!(),
         };
     }
 
@@ -164,8 +198,33 @@ impl Vm {
     ///
     ///
     #[inline]
+    pub fn op_and(&mut self) {
+        let rhs = self.stack.pop_boolean();
+        let lhs = self.stack.pop_boolean();
+
+        self.stack.push_boolean(lhs && rhs);
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_array(&mut self) {
+        let n = *self.frame().read_u8().expect("");
+        let elements: Vec<Slot> = (0..n).map(|_| self.stack.pop()).rev().collect();
+
+        let array = Object::Array(Array::new(elements));
+        let handle = self.heap.insert(array).into_handle();
+
+        self.stack.push(Slot::Object(handle));
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
     pub fn op_call(&mut self) {
-        let arity = self.frame().read_u8().expect("").clone();
+        let arity = *self.frame().read_u8().expect("");
         self.call(arity);
     }
 
@@ -173,12 +232,17 @@ impl Vm {
     ///
     ///
     #[inline]
+    pub fn op_class(&mut self) {
+        let class = *self.frame().read_constant().expect("");
+        self.stack.push(class);
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
     pub fn op_constant(&mut self) {
-        let constant = self
-            .frame()
-            .read_constant()
-            .expect("Failed to read constant")
-            .clone();
+        let constant = *self.frame().read_constant().expect("Failed to read constant");
 
         self.stack.push(constant);
     }
@@ -188,38 +252,81 @@ impl Vm {
     ///
     #[inline]
     pub fn op_define_global(&mut self) {
-        let identifier = self.frame()
+        self.op_set_global();
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_divide(&mut self) {
+        let rhs = self.stack.pop();
+        let lhs = self.stack.pop();
+
+        match (lhs, rhs) {
+            (Slot::Integer(lhs), Slot::Integer(rhs)) => self.stack.push_integer(lhs / rhs),
+            (Slot::Integer(lhs), Slot::Real(rhs)) => self.stack.push_real(lhs as f64 / rhs),
+            (Slot::Real(lhs), Slot::Real(rhs)) => self.stack.push_real(lhs / rhs),
+            (Slot::Real(lhs), Slot::Integer(rhs)) => self.stack.push_real(lhs / rhs as f64),
+            _ => unreachable!(),
+        };
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_dot(&mut self) {
+        let instance = self.stack.pop().as_object().expect("expecting object.");
+        let property = self
+            .frame()
             .read_constant()
-            .expect("Failed to read constant.")
-            .clone();
+            .expect("expecting constant.")
+            .as_object()
+            .expect("expecting object.");
 
-        let value = self.stack.pop();
+        if let Some(Object::Instance(instance)) = self.heap.get(instance) {
+            if let Some(Object::String(property)) = self.heap.get(property) {
+                let value = *instance.properties.get(property).expect("expecting property.");
+                self.stack.push(value);
 
-        if let Slot::Object(handle) = identifier {
-            if let Some(Object::String(identifier)) = self.heap.get(handle) {
-                self.globals.insert(identifier.clone(), value);
                 return;
             }
         }
 
-        panic!("Illegal identifier");
+        panic!("invalid");
     }
 
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_equal(&mut self) {
+        let rhs = self.stack.pop();
+        let lhs = self.stack.pop();
+
+        self.stack.push_boolean(lhs == rhs);
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_false(&mut self) {
+        self.stack.push(Slot::False);
+    }
 
     ///
     ///
     ///
     #[inline]
     pub fn op_get_global(&mut self) {
-        let identifier = self.frame()
-            .read_constant()
-            .expect("Failed to read constant.")
-            .clone();
+        let identifier = *self.frame().read_constant().expect("Failed to read constant.");
 
         if let Slot::Object(handle) = identifier {
             if let Some(Object::String(identifier)) = self.heap.get(handle) {
-                let value = self.globals.get(identifier).expect("Failed to retreive global.");
-                self.stack.push(value.clone());
+                let value = *self.globals.get(identifier).expect("Failed to retreive global.");
+                self.stack.push(value);
                 return;
             }
         }
@@ -232,7 +339,7 @@ impl Vm {
     ///
     #[inline]
     pub fn op_get_local(&mut self) {
-        let index = self.frame().read_u8().expect("Failed to read byte.").clone();
+        let index = *self.frame().read_u8().expect("Failed to read byte.");
         let index = self.frame().stack_offset + index as usize;
 
         self.stack.copy_push(index);
@@ -247,6 +354,62 @@ impl Vm {
         let lhs = self.stack.pop();
 
         self.stack.push_boolean(lhs > rhs);
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_import(&mut self) {
+        let p_name = self.frame()
+            .read_constant()
+            .expect("")
+            .as_object()
+            .expect("");
+
+        if let Some(Object::String(p_name_str)) = self.heap.get(p_name) {
+            let package = self.package_index.get(p_name_str, None).expect("");
+            // TODO: update upstream so we don't need this anymore.
+            let kind = match package.kind.as_str() {
+                "ecu" => String::from("code"),
+                "oas" => String::from("oas"),
+                _ => unreachable!(),
+            };
+
+            if let Some(functions) = &package.functions {
+                for (f_name, function) in functions {
+                    let function = FunctionExt {
+                        name: f_name.clone(),
+                        package: p_name,
+                        kind: kind.clone(),
+                        version: package.version.clone(),
+                        parameters: function.parameters.clone(),
+                    };
+
+                    let handle = self.heap.insert(Object::FunctionExt(function)).into_handle();
+                    let object = Slot::Object(handle);
+
+                    self.globals.insert(f_name.clone(), object);
+                }
+            }
+        }
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_index(&mut self) {
+        let index = self.stack.pop_integer();
+        let array = self.stack.pop_object();
+
+        if let Some(Object::Array(array)) = self.heap.get(array) {
+            if let Some(element) = array.elements.get(index as usize) {
+                self.stack.push(*element);
+            }
+        }
+
+        panic!("invalid index.");
     }
 
     ///
@@ -285,6 +448,108 @@ impl Vm {
     ///
     ///
     #[inline]
+    pub fn op_less(&mut self) {
+        let rhs = self.stack.pop();
+        let lhs = self.stack.pop();
+
+        self.stack.push_boolean(lhs < rhs);
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_loc(&mut self) {
+        let location = self.locations.pop().map(|l| Slot::Object(l)).unwrap_or(Slot::Unit);
+
+        self.stack.push(location);
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_loc_pop(&mut self) {
+        self.locations.pop();
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_loc_push(&mut self) {
+        let location = self.stack.pop_object();
+        self.locations.push(location);
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_multiply(&mut self) {
+        let rhs = self.stack.pop();
+        let lhs = self.stack.pop();
+
+        match (lhs, rhs) {
+            (Slot::Integer(lhs), Slot::Integer(rhs)) => self.stack.push_integer(lhs * rhs),
+            (Slot::Integer(lhs), Slot::Real(rhs)) => self.stack.push_real(lhs as f64 * rhs),
+            (Slot::Real(lhs), Slot::Real(rhs)) => self.stack.push_real(lhs * rhs),
+            (Slot::Real(lhs), Slot::Integer(rhs)) => self.stack.push_real(lhs * rhs as f64),
+            _ => unreachable!(),
+        };
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_negate(&mut self) {
+        let value = self.stack.pop();
+
+        let value = match value {
+            Slot::Integer(i) => Slot::Integer(-i),
+            Slot::Real(r) => Slot::Real(-r),
+            _ => panic!("expecting a integer or real value."),
+        };
+
+        self.stack.push(value);
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_new(&mut self) {
+        let properties_n = *self.frame().read_u8().expect("");
+        let class = self.stack.pop().as_object().expect("expecting object");
+
+        let mut properties = HashMap::new();
+        (0..properties_n).for_each(|_| {
+            let ident = self.stack.pop().as_object().expect("expecting object");
+            let value = self.stack.pop();
+
+            if let Some(Object::String(ident)) = self.heap.get(ident) {
+                properties.insert(ident.clone(), value);
+            } else {
+                panic!("Invalid property identifier.");
+            }
+        });
+
+        if let Some(Object::Class(_)) = self.heap.get(class) {
+            let instance = Instance::new(class, properties);
+            let instance = self.heap.insert(Object::Instance(instance)).into_handle();
+
+            self.stack.push_object(instance);
+            return;
+        }
+
+        panic!("Invalid");
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
     pub fn op_not(&mut self) {
         let value = self.stack.pop_boolean();
         self.stack.push_boolean(!value);
@@ -294,8 +559,38 @@ impl Vm {
     ///
     ///
     #[inline]
+    pub fn op_or(&mut self) {
+        let rhs = self.stack.pop_boolean();
+        let lhs = self.stack.pop_boolean();
+
+        self.stack.push_boolean(lhs || rhs);
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_parallel(&mut self) {
+        todo!();
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
     pub fn op_pop(&mut self) {
         self.stack.pop();
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_pop_n(&mut self) {
+        let x = *self.frame().read_u8().expect("");
+
+        let index = self.stack.len() - x as usize;
+        self.stack.clear_from(index);
     }
 
     ///
@@ -318,6 +613,36 @@ impl Vm {
     ///
     ///
     #[inline]
+    pub fn op_set_global(&mut self) {
+        let identifier = *self.frame().read_constant().expect("Failed to read constant.");
+
+        let value = self.stack.pop();
+
+        if let Slot::Object(handle) = identifier {
+            if let Some(Object::String(identifier)) = self.heap.get(handle) {
+                self.globals.insert(identifier.clone(), value);
+                return;
+            }
+        }
+
+        panic!("Illegal identifier");
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_set_local(&mut self) {
+        let index = *self.frame().read_u8().expect("Failed to read byte.");
+        let index = self.frame().stack_offset + index as usize;
+
+        self.stack.copy_pop(index);
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
     pub fn op_substract(&mut self) {
         let rhs = self.stack.pop();
         let lhs = self.stack.pop();
@@ -327,7 +652,23 @@ impl Vm {
             (Slot::Integer(lhs), Slot::Real(rhs)) => self.stack.push_real(lhs as f64 - rhs),
             (Slot::Real(lhs), Slot::Real(rhs)) => self.stack.push_real(lhs - rhs),
             (Slot::Real(lhs), Slot::Integer(rhs)) => self.stack.push_real(lhs - rhs as f64),
-            _ => todo!(),
+            _ => unreachable!(),
         };
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_true(&mut self) {
+        self.stack.push(Slot::True);
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_unit(&mut self) {
+        self.stack.push(Slot::Unit);
     }
 }

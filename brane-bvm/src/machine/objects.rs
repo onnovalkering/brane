@@ -1,12 +1,16 @@
-use broom::prelude::*;
+use std::collections::HashMap;
 
-use crate::chunk::FrozenChunk;
+use broom::prelude::*;
+use specifications::common::Parameter;
+
+use crate::{chunk::FrozenChunk, stack::Slot};
 
 #[derive(Debug)]
 pub enum Object {
-    Array(Vec<Handle<Self>>),
+    Array(Array),
     Class(Class),
     Function(Function),
+    FunctionExt(FunctionExt),
     Instance(Instance),
     String(String),
 }
@@ -16,6 +20,15 @@ impl Object {
     pub fn as_function(&self) -> Option<&Function> {
         if let Object::Function(function) = self {
             Some(function)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    pub fn as_string(&self) -> Option<&String> {
+        if let Object::String(string) = self {
+            Some(string)
         } else {
             None
         }
@@ -32,9 +45,35 @@ impl Trace<Self> for Object {
             Object::Array(a) => a.trace(tracer),
             Object::Class(c) => c.trace(tracer),
             Object::Function(f) => f.trace(tracer),
+            Object::FunctionExt(f) => f.trace(tracer),
             Object::Instance(i) => i.trace(tracer),
             Object::String(_) => {}
         }
+    }
+}
+#[derive(Debug)]
+pub struct Array {
+    pub element_type: String,
+    pub elements: Vec<Slot>,
+}
+
+impl Array {
+    pub fn new(elements: Vec<Slot>) -> Self {
+        let element_type = if elements.is_empty() {
+            String::from("unit")
+        } else {
+            String::from("???")
+        };
+
+        Self { element_type, elements }
+    }
+}
+
+impl Trace<Object> for Array {
+    fn trace(
+        &self,
+        _tracer: &mut Tracer<Object>,
+    ) {
     }
 }
 
@@ -66,13 +105,46 @@ impl Trace<Object> for Function {
     }
 }
 
-#[derive(Debug)]
-pub struct Instance {}
+#[derive(Debug, Clone)]
+pub struct FunctionExt {
+    pub name: String,
+    pub kind: String,
+    pub package: Handle<Object>,
+    pub version: String,
+    pub parameters: Vec<Parameter>,
+}
 
-impl Trace<Object> for Instance {
+impl Trace<Object> for FunctionExt {
     fn trace(
         &self,
         _tracer: &mut Tracer<Object>,
     ) {
+    }
+}
+
+#[derive(Debug)]
+pub struct Instance {
+    pub class: Handle<Object>,
+    pub properties: HashMap<String, Slot>,
+}
+
+impl Instance {
+    ///
+    ///
+    ///
+    pub fn new(
+        class: Handle<Object>,
+        properties: HashMap<String, Slot>,
+    ) -> Self {
+        Self { class, properties }
+    }
+}
+
+impl Trace<Object> for Instance {
+    fn trace(
+        &self,
+        tracer: &mut Tracer<Object>,
+    ) {
+        self.class.trace(tracer);
     }
 }

@@ -25,8 +25,8 @@ pub fn call(
         BUILTIN_PRINT_CODE => {
             let value = stack.pop();
             println!("{}", value);
-        },
-        _ => unreachable!()
+        }
+        _ => unreachable!(),
     }
 
     // Remove builtin from stack.
