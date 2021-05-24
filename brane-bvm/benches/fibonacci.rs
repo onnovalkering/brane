@@ -1,4 +1,4 @@
-use brane_bvm::{bytecode::FunctionMut, executor::NoOpExecutor, vm::Vm};
+use brane_bvm::{bytecode::FunctionMut, executor::NoExtExecutor, vm::Vm};
 use brane_dsl::{Compiler, CompilerOptions};
 use criterion::async_executor::FuturesExecutor;
 use criterion::Criterion;
@@ -27,7 +27,7 @@ fn compile(n: u8) -> FunctionMut {
 }
 
 async fn run(f: FunctionMut) {
-    let mut vm = Vm::<NoOpExecutor>::default();
+    let mut vm = Vm::<NoExtExecutor>::default();
     vm.main(f).await;
 }
 

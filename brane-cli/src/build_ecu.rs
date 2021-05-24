@@ -5,11 +5,11 @@ use fs_extra::dir::CopyOptions;
 use specifications::common::Function;
 use specifications::container::ContainerInfo;
 use specifications::package::PackageInfo;
-use std::fmt::Write as FmtWrite;
 use std::fs::{self, File};
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
 use std::process::Command;
+use std::{fmt::Write as FmtWrite, path::Path};
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -171,12 +171,12 @@ fn generate_dockerfile(
 ///
 fn prepare_directory(
     ecu_document: &ContainerInfo,
-    ecu_file: &PathBuf,
+    ecu_file: &Path,
     dockerfile: String,
     branelet_path: Option<PathBuf>,
-    context: &PathBuf,
+    context: &Path,
     package_info: &PackageInfo,
-    package_dir: &PathBuf,
+    package_dir: &Path,
 ) -> Result<()> {
     fs::create_dir_all(&package_dir)?;
     debug!("Created {:?} as package directory", package_dir);
@@ -264,7 +264,7 @@ fn prepare_directory(
 ///
 ///
 fn build_docker_image(
-    package_dir: &PathBuf,
+    package_dir: &Path,
     tag: String,
 ) -> Result<()> {
     let buildx = Command::new("docker")

@@ -1,4 +1,5 @@
-use crate::{executor::VmExecutor, stack::Slot, values::Value};
+use crate::{executor::VmExecutor, stack::Slot};
+use specifications::common::Value;
 use std::collections::HashMap;
 
 const BUILTIN_PRINT_NAME: &str = "print";
@@ -21,6 +22,7 @@ pub async fn call<E>(
     builtin: u8,
     arguments: Vec<Value>,
     _executor: &E,
+    _location: Option<String>,
 ) -> Value
 where
     E: VmExecutor,
@@ -28,7 +30,7 @@ where
     match builtin {
         BUILTIN_PRINT_CODE => {
             let value = arguments.first().unwrap();
-            println!("{:?} (TODO: add Display to Value)", value);
+            println!("{}", value);
 
             Value::Unit
         }

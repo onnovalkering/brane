@@ -166,6 +166,7 @@ async fn ensure_topics(
 ///
 ///
 ///
+#[allow(clippy::too_many_arguments)]
 async fn start_worker(
     brokers: String,
     group_id: String,
@@ -205,7 +206,7 @@ async fn start_worker(
     if let Some(offset) = committed_offsets.get(&(clb_topic.clone(), 0)) {
         match offset {
             Offset::Invalid => tpl.set_partition_offset(&clb_topic, 0, Offset::Beginning)?,
-            offset => tpl.set_partition_offset(&clb_topic, 0, offset.clone())?,
+            offset => tpl.set_partition_offset(&clb_topic, 0, *offset)?,
         };
     }
     if let Some(offset) = committed_offsets.get(&(cmd_topic.clone(), 0)) {

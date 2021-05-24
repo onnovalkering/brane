@@ -65,7 +65,7 @@ impl PackageInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PackageIndex {
     pub packages: Map<PackageInfo>,
     pub standard: Map<PackageInfo>,
@@ -121,6 +121,15 @@ impl PackageIndex {
         let v = serde_json::from_reader(r)?;
 
         PackageIndex::from_value(v)
+    }
+
+    ///
+    ///
+    ///
+    pub async fn from_url(url: &str) -> Result<Self> {
+        let json = reqwest::get(url).await?.json().await?;
+
+        PackageIndex::from_value(json)
     }
 
     ///

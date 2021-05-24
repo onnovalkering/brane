@@ -1,3 +1,4 @@
+use crate::stack::{Slot, Stack};
 use crate::{
     builtins,
     bytecode::{opcodes::*, FunctionMut},
@@ -5,15 +6,60 @@ use crate::{
     objects::Object,
     objects::{Array, Instance},
 };
-use crate::{frames::CallFrame, objects::FunctionExt};
-use crate::{
-    stack::{Slot, Stack},
-    values::Value,
-};
-use smallvec::SmallVec;
+use crate::{frames::CallFrame};
 use broom::{Handle, Heap};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use smallvec::SmallVec;
+use specifications::common::{Value, FunctionExt};
 use specifications::package::PackageIndex;
 use std::collections::HashMap;
+use tokio::runtime::Runtime;
+
+#[derive(Clone, Default)]
+pub struct VmOptions {
+    ///
+    ///
+    ///
+    pub clear_after_main: bool,
+
+    ///
+    ///
+    ///
+    pub global_return_halts: bool,
+}
+
+#[derive(Clone, Default)]
+pub struct VmState {
+    globals: HashMap<String, Value>,
+    options: VmOptions,
+}
+
+unsafe impl Send for VmState {}
+
+impl VmState {
+    fn new(
+        globals: HashMap<String, Value>,
+        options: VmOptions,
+    ) -> Self {
+        Self { globals, options }
+    }
+
+    ///
+    ///
+    ///
+    fn get_globals(
+        &self,
+        heap: &mut Heap<Object>,
+    ) -> HashMap<String, Slot> {
+        let mut globals = HashMap::new();
+        for (name, value) in &self.globals {
+            let slot = Slot::from_value(value.clone(), heap);
+            globals.insert(name.clone(), slot);
+        }
+
+        globals
+    }
+}
 
 ///
 ///
@@ -28,6 +74,7 @@ where
     heap: Heap<Object>,
     locations: Vec<Handle<Object>>,
     package_index: PackageIndex,
+    options: VmOptions,
     stack: Stack,
 }
 
@@ -40,11 +87,21 @@ where
         let frames = SmallVec::with_capacity(64);
         let globals = HashMap::default();
         let heap = Heap::default();
-        let locations = Vec::default();
-        let package_index = PackageIndex::empty();
+        let locations = Vec::with_capacity(16);
+        let package_index = PackageIndex::default();
+        let options = VmOptions::default();
         let stack = Stack::default();
 
-        Self::new(executor, frames, globals, heap, locations, package_index, stack)
+        Self::new(
+            executor,
+            frames,
+            globals,
+            heap,
+            locations,
+            package_index,
+            options,
+            stack,
+        )
     }
 }
 
@@ -55,6 +112,7 @@ where
     ///
     ///
     ///
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         executor: E,
         frames: SmallVec<[CallFrame; 64]>,
@@ -62,6 +120,7 @@ where
         heap: Heap<Object>,
         locations: Vec<Handle<Object>>,
         package_index: PackageIndex,
+        options: VmOptions,
         stack: Stack,
     ) -> Self {
         let mut vm = Self {
@@ -71,12 +130,66 @@ where
             heap,
             locations,
             package_index,
+            options,
             stack,
         };
 
         builtins::register(&mut vm.globals);
 
         vm
+    }
+
+    ///
+    ///
+    ///
+    pub fn new_with(
+        executor: E,
+        package_index: Option<PackageIndex>,
+        options: Option<VmOptions>,
+    ) -> Self {
+        // Override options, if provided.
+        let mut state = VmState::default();
+        if let Some(options) = options {
+            state.options = options;
+        }
+
+        Self::new_with_state(executor, package_index, state)
+    }
+
+    ///
+    ///
+    ///
+    pub fn new_with_state(
+        executor: E,
+        package_index: Option<PackageIndex>,
+        state: VmState,
+    ) -> Self {
+        let package_index = package_index.unwrap_or_default();
+        let mut heap = Heap::default();
+
+        Self::new(
+            executor,
+            Default::default(),
+            state.get_globals(&mut heap),
+            heap,
+            Default::default(),
+            package_index,
+            state.options,
+            Stack::default(),
+        )
+    }
+
+    ///
+    ///
+    ///
+    pub fn capture_state(&self) -> VmState {
+        let mut globals = HashMap::new();
+        for (name, slot) in &self.globals {
+            let value = slot.clone().into_value(&self.heap);
+            globals.insert(name.clone(), value);
+        }
+
+        VmState::new(globals, self.options.clone())
     }
 
     ///
@@ -90,12 +203,45 @@ where
             panic!("VM not in a state to accept main function.");
         }
 
-        let object = Object::Function(function.freeze(&mut self.heap));
-        let handle = self.heap.insert(object).into_handle();
+        let function = Object::Function(function.freeze(&mut self.heap));
+        let handle = self.heap.insert(function).into_handle();
 
         self.stack.push_object(handle);
         self.call(0);
         self.run().await;
+
+        // For REPLs
+        if self.options.clear_after_main {
+            self.frames.pop();
+            self.stack.pop();
+        }
+    }
+
+    ///
+    ///
+    ///
+    pub async fn anonymous(
+        &mut self,
+        function: FunctionMut,
+    ) -> Value {
+        if function.arity != 0 {
+            panic!("Not a nullary function.");
+        }
+
+        self.options.global_return_halts = true;
+
+        let function = Object::Function(function.freeze(&mut self.heap));
+        let handle = self.heap.insert(function).into_handle();
+
+        self.stack.push_object(handle);
+        self.call(0);
+        self.run().await;
+
+        if self.stack.len() == 1 {
+            self.stack.pop().into_value(&self.heap)
+        } else {
+            Value::Unit
+        }
     }
 
     ///
@@ -119,16 +265,6 @@ where
         }
 
         panic!("illegal");
-    }
-
-    ///
-    ///
-    ///
-    fn arguments(
-        &mut self,
-        arity: u8,
-    ) -> Vec<Value> {
-        (0..arity).map(|_| self.stack.pop().into_value(&self.heap)).collect()
     }
 
     ///
@@ -168,7 +304,13 @@ where
                 OP_PARALLEL => self.op_parallel(),
                 OP_POP => self.op_pop(),
                 OP_POP_N => self.op_pop_n(),
-                OP_RETURN => self.op_return(),
+                OP_RETURN => {
+                    self.op_return();
+
+                    if self.options.global_return_halts && self.frames.is_empty() {
+                        break;
+                    }
+                }
                 OP_SUBSTRACT => self.op_substract(),
                 OP_TRUE => self.op_true(),
                 OP_UNIT => self.op_unit(),
@@ -190,6 +332,16 @@ where
     #[inline]
     fn next(&mut self) -> Option<&u8> {
         self.frame().read_u8()
+    }
+
+    ///
+    ///
+    ///
+    fn arguments(
+        &mut self,
+        arity: u8,
+    ) -> Vec<Value> {
+        (0..arity).map(|_| self.stack.pop().into_value(&self.heap)).collect()
     }
 
     ///
@@ -252,12 +404,18 @@ where
         let frame_first = frame_last - (arity + 1) as usize;
 
         let function = self.stack.get(frame_first);
+        let location = self
+            .locations
+            .last()
+            .map(|l| self.heap.get(l).unwrap())
+            .map(|l| l.as_string().cloned().unwrap());
+
         let value = match function {
             Slot::BuiltIn(code) => {
                 let function = *code;
                 let arguments = self.arguments(arity);
 
-                builtins::call(function, arguments, &self.executor).await
+                builtins::call(function, arguments, &self.executor, location).await
             }
             Slot::Object(handle) => match self.heap.get(handle).expect("") {
                 Object::Function(_) => {
@@ -269,9 +427,16 @@ where
                     let function = f.clone();
                     let arguments = self.arguments(arity);
 
-                    match self.executor.call(function, arguments).await {
+                    let arguments = itertools::zip(&function.parameters, arguments)
+                        .map(|(p, a)| (p.name.clone(), a))
+                        .collect();
+
+                    match self.executor.call(function, arguments, location).await {
                         Ok(value) => value,
-                        Err(_) => panic!("External function failed"),
+                        Err(e) => {
+                            error!("{:?}", e);
+                            panic!("External function failed");
+                        }
                     }
                 }
                 _ => panic!("Not a callable object"),
@@ -386,6 +551,7 @@ where
             if let Some(Object::String(identifier)) = self.heap.get(handle) {
                 let value = *self.globals.get(identifier).expect("Failed to retreive global.");
                 self.stack.push(value);
+
                 return;
             }
         }
@@ -422,8 +588,10 @@ where
     pub fn op_import(&mut self) {
         let p_name = self.frame().read_constant().expect("").as_object().expect("");
 
-        if let Some(Object::String(p_name_str)) = self.heap.get(p_name) {
-            let package = self.package_index.get(p_name_str, None).expect("");
+        if let Some(Object::String(p_name)) = self.heap.get(p_name) {
+            let p_name = p_name.clone();
+            let package = self.package_index.get(&p_name, None).expect("");
+
             // TODO: update upstream so we don't need this anymore.
             let kind = match package.kind.as_str() {
                 "ecu" => String::from("code"),
@@ -435,7 +603,7 @@ where
                 for (f_name, function) in functions {
                     let function = FunctionExt {
                         name: f_name.clone(),
-                        package: p_name,
+                        package: p_name.clone(),
                         kind: kind.clone(),
                         version: package.version.clone(),
                         parameters: function.parameters.clone(),
@@ -494,7 +662,6 @@ where
         if !truthy {
             self.op_jump();
         } else {
-            // Skip the OP_JUMP_IF_FALSE operand.
             self.frame().ip += 2;
         }
     }
@@ -626,7 +793,46 @@ where
     ///
     #[inline]
     pub fn op_parallel(&mut self) {
-        todo!();
+        let branches_n = *self.frame().read_u8().expect("");
+        let mut branches: Vec<FunctionMut> = Vec::new();
+
+        // TODO: combine op_parallel with op_array.
+        for _ in 0..branches_n {
+            let handle = self.stack.pop_object();
+            let function = self.heap.get(handle).expect("").as_function().expect("").clone();
+
+            let function = function.unfreeze(&self.heap);
+            branches.push(function);
+        }
+
+        let results = if branches.is_empty() {
+            Array::new(vec![])
+        } else {
+            let executor = self.executor.clone();
+            let package_index = self.package_index.clone();
+            let state = self.capture_state();
+
+            let results = branches
+                .into_par_iter()
+                .map(|f| {
+                    let mut vm = Vm::<E>::new_with_state(executor.clone(), Some(package_index.clone()), state.clone());
+
+                    // TEMP: needed because the VM is not completely `send`.
+                    let rt = Runtime::new().unwrap();
+                    rt.block_on(vm.anonymous(f))
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|v| Slot::from_value(v, &mut self.heap))
+                .collect();
+
+            Array::new(results)
+        };
+
+        let array = Object::Array(results);
+        let array = self.heap.insert(array).into_handle();
+
+        self.stack.push_object(array);
     }
 
     ///
@@ -653,7 +859,7 @@ where
     ///
     #[inline]
     pub fn op_return(&mut self) {
-        if self.frames.len() == 1 {
+        if self.frames.len() == 1 && !self.options.global_return_halts {
             panic!("Cannot return outside a function.");
         }
 

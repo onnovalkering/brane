@@ -1,7 +1,7 @@
 use crate::parser::ast::*;
 use anyhow::Result;
-use brane_bvm::bytecode::{opcodes::*, FunctionMut, ChunkMut};
-use brane_bvm::values::{Class, Value};
+use brane_bvm::bytecode::{opcodes::*, ChunkMut, FunctionMut};
+use specifications::common::{Class, SpecFunction, Value};
 
 #[derive(Debug, Clone)]
 pub struct Local {
@@ -264,7 +264,8 @@ pub fn stmt_to_opcodes(
             params,
             body,
         } => {
-            let function = compile_function(body, scope + 1, &params, ident.clone()).unwrap();
+            let function: FunctionMut = compile_function(body, scope + 1, &params, ident.clone()).unwrap();
+            let function: SpecFunction = function.into();
 
             let function = chunk.add_constant(function.into());
             chunk.write_pair(OP_CONSTANT, function);
@@ -308,6 +309,8 @@ pub fn stmt_to_opcodes(
             let block_n = blocks.len() as u8;
             for block in blocks.into_iter().rev() {
                 let function = compile_function(vec![block], scope, &[], String::new()).unwrap();
+                let function: SpecFunction = function.into();
+
                 let function = chunk.add_constant(function.into());
 
                 chunk.write_pair(OP_CONSTANT, function);

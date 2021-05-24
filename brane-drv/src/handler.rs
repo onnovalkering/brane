@@ -1,7 +1,8 @@
 use crate::grpc;
 use anyhow::Result;
-use brane_bvm::bytecode::FunctionMut;
-use brane_bvm::values::Value;
+use async_trait::async_trait;
+use brane_bvm::vm::{VmOptions, VmState};
+use brane_bvm::{executor::VmExecutor, vm::Vm};
 use brane_dsl::{Compiler, CompilerOptions, Lang};
 use brane_job::interface::{Command, CommandKind};
 use bytes::BytesMut;
@@ -10,12 +11,14 @@ use prost::Message as _;
 use rand::distributions::Alphanumeric;
 use rand::{self, Rng};
 use rdkafka::message::ToBytes;
-use rdkafka::producer::{FutureProducer, FutureRecord};
-use rdkafka::util::Timeout;
+use rdkafka::{
+    producer::{FutureProducer, FutureRecord},
+    util::Timeout,
+};
+use specifications::common::{Value, FunctionExt};
 use specifications::package::PackageIndex;
-use std::iter;
 use std::sync::Arc;
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -23,12 +26,12 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct DriverHandler {
-    pub producer: FutureProducer,
     pub command_topic: String,
     pub package_index_url: String,
-    pub states: Arc<DashMap<String, String>>,
+    pub producer: FutureProducer,
     pub results: Arc<DashMap<String, Value>>,
     pub sessions: Arc<DashMap<String, VmState>>,
+    pub states: Arc<DashMap<String, String>>,
 }
 
 #[tonic::async_trait]
@@ -56,93 +59,52 @@ impl grpc::DriverService for DriverHandler {
         request: Request<grpc::ExecuteRequest>,
     ) -> Result<Response<Self::ExecuteStream>, Status> {
         let request = request.into_inner();
-        let packages = reqwest::get(&self.package_index_url)
-            .await
-            .unwrap()
-            .json()
-            .await
-            .unwrap();
-        let package_index = PackageIndex::from_value(packages).unwrap();
-        let sessions = self.sessions.clone();
+        let package_index = PackageIndex::from_url(&self.package_index_url).await.unwrap();
 
-        let executor = Executor {
+        let executor = JobExecutor {
             command_topic: self.command_topic.clone(),
             producer: self.producer.clone(),
-            request_uuid: request.uuid.clone(),
+            session_uuid: request.uuid.clone(),
             states: self.states.clone(),
             results: self.results.clone(),
         };
 
-        let (tx, rx) = mpsc::channel::<Result<grpc::ExecuteReply, Status>>(10);
+        let vm_state = self.sessions.get(&request.uuid).as_deref().cloned();
 
+        let (tx, rx) = mpsc::channel::<Result<grpc::ExecuteReply, Status>>(10);
         tokio::spawn(async move {
             let options = CompilerOptions::new(Lang::BraneScript);
             let mut compiler = Compiler::new(options, package_index.clone());
 
-            let function = compiler
-                .compile(request.input)
-                .map_err(|e| Status::invalid_argument(e.to_string()));
+            // Compile input and send update to client.
+            let function = match compiler.compile(request.input) {
+                Ok(function) => {
+                    let reply = grpc::ExecuteReply {
+                        output: String::new(),
+                        bytecode: String::from("TODO"),
+                        close: false,
+                    };
 
-            if function.is_err() {
-                tx.send(Err(function.unwrap_err())).await.unwrap();
-                return;
-            }
-
-            let function = function.unwrap();
-
-            // Disassemble bytecode to representative format
-            let bytecode = if let FunctionMut::UserDefined { chunk, .. } = &function {
-                chunk.disassemble().unwrap() // Infallible
-            } else {
-                unreachable!()
-            };
-
-            let reply = grpc::ExecuteReply {
-                output: String::new(),
-                bytecode: bytecode.clone(),
-                close: false,
-            };
-            tx.send(Ok(reply)).await.unwrap();
-
-            let options = VmOptions { always_return: true };
-            let mut vm = if let Some(session) = sessions.get(&request.uuid) {
-                VM::new(
-                    &request.uuid,
-                    package_index.clone(),
-                    Some(session.clone()),
-                    Some(options),
-                    executor,
-                )
-            } else {
-                VM::new(&request.uuid, package_index.clone(), None, Some(options), executor)
-            };
-
-            if let FunctionMut::UserDefined { chunk, .. } = function {
-                vm.call(chunk, 0);
-            }
-
-            loop {
-                match vm.run(None).await {
-                    Ok(VmResult::Ok(value)) => {
-                        let output = value.map(|v| format!("{:?}", v)).unwrap_or_default();
-
-                        sessions.insert(request.uuid.clone(), vm.state.clone());
-                        let reply = grpc::ExecuteReply {
-                            output,
-                            bytecode: String::new(),
-                            close: true,
-                        };
-                        tx.send(Ok(reply)).await.unwrap();
-                        break;
-                    }
-                    Ok(VmResult::RuntimeError) => {
-                        tx.send(Err(Status::invalid_argument("Runtime error."))).await.unwrap();
-                    }
-                    _ => unreachable!(),
+                    tx.send(Ok(reply)).await.unwrap();
+                    function
                 }
-            }
+                Err(error) => {
+                    let status = Status::invalid_argument(error.to_string());
+                    tx.send(Err(status)).await.unwrap();
+                    return;
+                }
+            };
 
-            return;
+            // Restore VM state corresponding to the session, if any.
+            let mut vm = if let Some(vm_state) = vm_state {
+                Vm::new_with_state(executor, Some(package_index), vm_state)
+            } else {
+                let options = VmOptions { clear_after_main: true, ..Default::default() };
+                Vm::new_with(executor, Some(package_index), Some(options))
+            };
+
+            // TEMP: needed because the VM is not completely `send`.
+            futures::executor::block_on(vm.main(function));
         });
 
         Ok(Response::new(ReceiverStream::new(rx)))
@@ -150,101 +112,85 @@ impl grpc::DriverService for DriverHandler {
 }
 
 #[derive(Clone)]
-struct Executor {
+struct JobExecutor {
     pub command_topic: String,
     pub producer: FutureProducer,
-    pub request_uuid: String,
+    pub session_uuid: String,
     pub states: Arc<DashMap<String, String>>,
     pub results: Arc<DashMap<String, Value>>,
 }
 
-#[async_trait::async_trait]
-impl VmExecutor for Executor {
-    async fn execute(
+impl JobExecutor {
+    ///
+    ///
+    ///
+    fn get_random_identifier(&self) -> String {
+        let mut rng = rand::thread_rng();
+
+        let identifier: String = std::iter::repeat(())
+            .map(|()| rng.sample(Alphanumeric))
+            .map(char::from)
+            .take(6)
+            .collect();
+
+        identifier.to_lowercase()
+    }
+}
+
+#[async_trait]
+impl VmExecutor for JobExecutor {
+    async fn call(
         &self,
-        call: VmCall,
+        function: FunctionExt,
+        arguments: HashMap<String, Value>,
+        location: Option<String>,
     ) -> Result<Value> {
-        make_function_call(
-            call,
-            self.command_topic.clone(),
-            self.producer.clone(),
-            self.request_uuid.clone(),
-            self.states.clone(),
-            self.results.clone(),
-        )
-        .await
+        let image = format!("{}:{}", function.package, function.version);
+        let command = vec![
+            function.kind.to_string(),
+            function.name.to_string(),
+            base64::encode(serde_json::to_string(&arguments)?),
+        ];
+
+        let session_uuid = Uuid::parse_str(&self.session_uuid)?;
+        let session_uuid_simple = session_uuid.to_simple().to_string();
+
+        let random_id = self.get_random_identifier();
+        let correlation_id = format!("A{}R{}", &session_uuid_simple[..8], random_id);
+
+        let command = Command::new(
+            CommandKind::Create,
+            Some(correlation_id.clone()),
+            Some(self.session_uuid.clone()),
+            location,
+            Some(image),
+            command,
+            None,
+        );
+
+        let mut payload = BytesMut::with_capacity(64);
+        command.encode(&mut payload)?;
+
+        let message = FutureRecord::to(&self.command_topic)
+            .key(&correlation_id)
+            .payload(payload.to_bytes());
+
+        dbg!(&message);
+
+        let timeout = Timeout::After(Duration::from_secs(5));
+        if self.producer.send(message, timeout).await.is_err() {
+            bail!("Failed to send command to '{}' topic.", self.command_topic);
+        }
+
+        // TODO: await value to be in states & results.
+        let call = Call {
+            correlation_id: correlation_id.clone(),
+            states: self.states.clone(),
+            results: self.results.clone(),
+        };
+
+        Ok(call.await)
     }
-}
-
-///
-///
-///
-async fn make_function_call(
-    call: VmCall,
-    command_topic: String,
-    producer: FutureProducer,
-    session: String,
-    states: Arc<DashMap<String, String>>,
-    results: Arc<DashMap<String, Value>>,
-) -> Result<Value> {
-    let image = format!("{}:{}", call.package, call.version);
-    let command = vec![
-        call.kind.to_string(),
-        call.function.to_string(),
-        base64::encode(serde_json::to_string(&call.arguments)?),
-    ];
-
-    let session_uuid = Uuid::parse_str(&session)?;
-    let session_uuid_simple = session_uuid.to_simple().to_string();
-
-    let random_id = get_random_identifier();
-    let correlation_id = format!("A{}R{}", &session_uuid_simple[..8], random_id);
-
-    let command = Command::new(
-        CommandKind::Create,
-        Some(correlation_id.clone()),
-        Some(session.clone()),
-        call.location,
-        Some(image),
-        command,
-        None,
-    );
-
-    let mut payload = BytesMut::with_capacity(64);
-    command.encode(&mut payload)?;
-
-    let message = FutureRecord::to(&command_topic)
-        .key(&correlation_id)
-        .payload(payload.to_bytes());
-
-    dbg!(&message);
-
-    if let Err(_) = producer.send(message, Timeout::After(Duration::from_secs(5))).await {
-        bail!("Failed to send command to '{}' topic.", command_topic);
-    }
-
-    // TODO: await value to be in states & results.
-    let call = Call {
-        correlation_id: correlation_id.clone(),
-        states: states.clone(),
-        results: results.clone(),
-    };
-    Ok(call.await)
-}
-
-///
-///
-///
-fn get_random_identifier() -> String {
-    let mut rng = rand::thread_rng();
-
-    let identifier: String = iter::repeat(())
-        .map(|()| rng.sample(Alphanumeric))
-        .map(char::from)
-        .take(6)
-        .collect();
-
-    identifier.to_lowercase()
 }
 
 struct Call {
@@ -271,15 +217,14 @@ impl Future for Call {
         }
 
         let state = state.unwrap().clone();
-        if state == String::from("finished") {
+        if state == *"finished" {
             let (_, value) = self.results.remove(&self.correlation_id).unwrap();
-            let value = value.clone();
 
             self.states.remove(&self.correlation_id);
             return Poll::Ready(value);
         }
 
         cx.waker().wake_by_ref();
-        return Poll::Pending;
+        Poll::Pending
     }
 }

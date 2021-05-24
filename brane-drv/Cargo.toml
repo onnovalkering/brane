@@ -26,7 +26,6 @@ log = "0.4"
 prost = "0.7"
 rand = "0.8"
 rdkafka = { version = "0.26", features = ["cmake-build"] }
-reqwest = { version = "0.11", features = ["json", "stream"] }
 semver = "0.9"
 serde = "1"
 serde_json = "1"

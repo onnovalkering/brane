@@ -1,8 +1,8 @@
 use anyhow::Result;
 use crc32fast::Hasher;
-use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
+use std::{fs::File, path::Path};
 
 ///
 ///
@@ -14,7 +14,7 @@ pub fn get_config_dir() -> PathBuf {
 ///
 ///
 ///
-pub fn calculate_crc32(path: &PathBuf) -> Result<u32> {
+pub fn calculate_crc32(path: &Path) -> Result<u32> {
     let mut file = File::open(&path)?;
     let mut hasher = Hasher::new();
 

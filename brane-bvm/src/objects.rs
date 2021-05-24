@@ -1,6 +1,7 @@
+use crate::bytecode::FunctionMut;
 use crate::{bytecode::Chunk, stack::Slot};
 use broom::prelude::*;
-use specifications::common::Parameter;
+use specifications::common::{FunctionExt, Parameter};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -43,7 +44,7 @@ impl Trace<Self> for Object {
             Object::Array(a) => a.trace(tracer),
             Object::Class(c) => c.trace(tracer),
             Object::Function(f) => f.trace(tracer),
-            Object::FunctionExt(f) => f.trace(tracer),
+            Object::FunctionExt(f) => {},
             Object::Instance(i) => i.trace(tracer),
             Object::String(_) => {}
         }
@@ -106,28 +107,19 @@ impl Function {
     ) -> Self {
         Self { arity, chunk, name }
     }
-}
 
-impl Trace<Object> for Function {
-    fn trace(
-        &self,
-        _tracer: &mut Tracer<Object>,
-    ) {
+    ///
+    ///
+    ///
+    pub fn unfreeze(
+        self,
+        heap: &Heap<Object>,
+    ) -> FunctionMut {
+        FunctionMut::new(self.name, self.arity, self.chunk.unfreeze(heap))
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct FunctionExt {
-    pub name: String,
-    pub kind: String,
-    pub package: Handle<Object>,
-    pub version: String,
-    pub parameters: Vec<Parameter>,
-}
-
-unsafe impl Send for FunctionExt {}
-
-impl Trace<Object> for FunctionExt {
+impl Trace<Object> for Function {
     fn trace(
         &self,
         _tracer: &mut Tracer<Object>,

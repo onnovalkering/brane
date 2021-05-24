@@ -13,7 +13,7 @@ use tempfile::tempdir;
 
 #[derive(StructOpt)]
 #[structopt(name = "brane", about = "The Brane command-line interface.")]
-struct CLI {
+struct Cli {
     #[structopt(short, long, help = "Enable debug mode")]
     debug: bool,
     #[structopt(short, long, help = "Skip dependencies check")]
@@ -154,7 +154,7 @@ enum SubCommand {
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenv().ok();
-    let options = CLI::from_args();
+    let options = Cli::from_args();
 
     let mut logger = env_logger::builder();
     logger.format_module_path(false);
@@ -192,7 +192,7 @@ async fn main() -> Result<()> {
 ///
 ///
 ///
-async fn run(options: CLI) -> Result<()> {
+async fn run(options: Cli) -> Result<()> {
     use SubCommand::*;
     match options.sub_command {
         Build {

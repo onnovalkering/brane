@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate anyhow;
+#[macro_use]
+extern crate log;
 
 mod builtins;
 pub mod bytecode;
@@ -10,4 +12,4 @@ mod stack;
 pub mod values;
 pub mod vm;
 
-pub use objects::{Function, FunctionExt};
+pub use objects::Function;

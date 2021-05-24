@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JValue};
 use serde_with::skip_serializing_none;
 use std::cmp::{Ordering, PartialEq, PartialOrd};
+use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 
 type Map<T> = std::collections::HashMap<String, T>;
@@ -168,6 +169,32 @@ impl Property {
     }
 }
 
+#[skip_serializing_none]
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Class {
+    pub name: String,
+    pub properties: HashMap<String, String>,
+}
+
+impl Class {
+    pub fn new(
+        name: String,
+        properties: HashMap<String, String>,
+    ) -> Self {
+        Self { name, properties }
+    }
+}
+
+impl fmt::Debug for Class {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        write!(f, "class<{}>", self.name)
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "v", content = "c", rename_all = "camelCase")]
 pub enum Value {
@@ -193,7 +220,74 @@ pub enum Value {
     },
     Unicode(String),
     Unit,
+    Class(Class),
+    Function(SpecFunction),
+    FunctionExt(FunctionExt),
 }
+
+#[skip_serializing_none]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FunctionExt {
+    pub name: String,
+    pub kind: String,
+    pub package: String,
+    pub version: String,
+    pub parameters: Vec<Parameter>,
+}
+
+#[skip_serializing_none]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpecFunction {
+    pub arity: u8,
+    pub bytecode: Bytecode,
+    pub name: String,
+}
+
+#[skip_serializing_none]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Bytecode {
+    pub code: Vec<u8>,
+    pub constants: Vec<Value>,
+}
+
+impl From<SpecFunction> for Value {
+    fn from(function: SpecFunction) -> Self {
+        Value::Function(function)
+    }
+}
+
+impl From<String> for Value {
+    fn from(string: String) -> Self {
+        Value::Unicode(string)
+    }
+}
+
+impl From<bool> for Value {
+    fn from(boolean: bool) -> Self {
+        Value::Boolean(boolean)
+    }
+}
+
+impl From<i64> for Value {
+    fn from(integer: i64) -> Self {
+        Value::Integer(integer)
+    }
+}
+
+impl From<f64> for Value {
+    fn from(real: f64) -> Self {
+        Value::Real(real)
+    }
+}
+
+impl From<()> for Value {
+    fn from(_: ()) -> Self {
+        Value::Unit
+    }
+}
+
 
 impl Value {
     ///
@@ -244,6 +338,9 @@ impl Value {
             Struct { data_type, .. } => data_type.as_str(),
             Unicode(_) => "string",
             Unit => "unit",
+            Function(_) => "function",
+            Class(_) => "class",
+            FunctionExt(_) => "FunctionExt"
         }
     }
 
@@ -321,6 +418,7 @@ impl Value {
             },
             Unicode(s) => json!(s),
             Unit => json!(null),
+            _ => todo!(),
         }
     }
 }
@@ -354,6 +452,7 @@ impl Display for Value {
             }
             Unicode(s) => s.to_string(),
             Unit => String::from("unit"),
+            _ => String::from("class/function: TODO"),
         };
 
         write!(f, "{}", value)

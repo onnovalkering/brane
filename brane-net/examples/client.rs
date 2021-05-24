@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, str::FromStr};
 
 use anyhow::Result;
-use socksx::options::MetadataOption;
+use socksx::socks6::options::{MetadataOption, SocksOption};
 use socksx::Socks6Client;
 use tokio::io::AsyncWriteExt;
 
@@ -16,6 +16,8 @@ async fn main() -> Result<()> {
         MetadataOption::new(3, String::from("job-id")),
         MetadataOption::new(4, String::from("1")),
     ];
+
+    let options = options.into_iter().map(SocksOption::Metadata).collect();
 
     let (mut socket, _) = client.connect(socket_addr, None, Some(options)).await?;
     socket.write(String::from("Hello, world!\n").as_bytes()).await?;

@@ -206,6 +206,7 @@ fn construct_envs(variables: &Map<Value>) -> Result<Map<String>> {
                 envs.insert(name, value.to_string());
             }
             Value::Unit => unreachable!(),
+            _ => todo!()
         }
     }
 

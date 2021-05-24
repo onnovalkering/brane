@@ -1,4 +1,5 @@
 use brane_bvm::bytecode;
+use brane_bvm::executor::NoExtExecutor;
 use brane_bvm::vm::Vm;
 use brane_dsl::{Compiler, CompilerOptions};
 use specifications::package::PackageIndex;
@@ -27,7 +28,7 @@ fn main() {
     dbg!(&function.chunk);
     println!();
 
-    let mut vm = Vm::default();
+    let mut vm = Vm::<NoExtExecutor>::default();
 
     futures::executor::block_on(vm.main(function));
 }

@@ -1,6 +1,5 @@
 use anyhow::{bail, Context, Result};
-use brane_bvm::values::Value;
-use brane_bvm::VmState;
+use brane_bvm::vm::VmState;
 use brane_drv::grpc::DriverServiceServer;
 use brane_drv::handler::DriverHandler;
 use brane_job::interface::{Event, EventKind};
@@ -20,6 +19,7 @@ use rdkafka::{
     ClientConfig, Message as _, Offset, TopicPartitionList,
 };
 use specifications::common::Value as SpecValue;
+use specifications::common::Value;
 use std::sync::Arc;
 use tonic::transport::Server;
 
@@ -93,12 +93,12 @@ async fn main() -> Result<()> {
     let package_index_url = opts.package_index_url.clone();
     let sessions: Arc<DashMap<String, VmState>> = Arc::new(DashMap::new());
     let handler = DriverHandler {
+        command_topic,
         package_index_url,
         producer,
-        command_topic,
-        states,
         results,
         sessions,
+        states,
     };
 
     // Start gRPC server with callback service.
@@ -171,7 +171,7 @@ async fn start_event_monitor(
     if let Some(offset) = committed_offsets.get(&(topic.clone(), 0)) {
         match offset {
             Offset::Invalid => tpl.set_partition_offset(&topic, 0, Offset::Beginning)?,
-            offset => tpl.set_partition_offset(&topic, 0, offset.clone())?,
+            offset => tpl.set_partition_offset(&topic, 0, *offset)?,
         };
     }
 
@@ -217,12 +217,11 @@ async fn start_event_monitor(
                         EventKind::Finished => {
                             let payload = String::from_utf8_lossy(&event.payload).to_string();
                             let value: SpecValue = serde_json::from_str(&payload).unwrap();
-                            let value = Value::from(value);
 
                             // Using these two hashmaps is not ideal, they lock and we're dependend on polling (from call future).
                             // NOTE: for now we have to make sure the results are inserted before the state becomes "finished" to prevent race conditions.
                             owned_results.insert(correlation_id.clone(), value);
-                            owned_states.insert(correlation_id.clone(), String::from("finished"));
+                            owned_states.insert(correlation_id, String::from("finished"));
                             dbg!(&owned_results);
                         }
                         EventKind::Stopped => {

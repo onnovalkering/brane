@@ -3,13 +3,12 @@ use anyhow::Result;
 use brane_oas::{self, build};
 use console::style;
 use openapiv3::OpenAPI;
-use serde_yaml;
 use specifications::package::PackageInfo;
-use std::fmt::Write as FmtWrite;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
+use std::{fmt::Write as FmtWrite, path::Path};
 
 const BRANELET_URL: &str = concat!(
     "https://github.com/onnovalkering/brane/releases/download/",
@@ -120,11 +119,11 @@ fn generate_dockerfile(
 ///
 ///
 fn prepare_directory(
-    oas_file: &PathBuf,
+    oas_file: &Path,
     dockerfile: String,
     init_path: Option<PathBuf>,
     package_info: &PackageInfo,
-    package_dir: &PathBuf,
+    package_dir: &Path,
 ) -> Result<()> {
     fs::create_dir_all(&package_dir)?;
     debug!("Created {:?} as package directory", package_dir);
@@ -183,7 +182,7 @@ fn prepare_directory(
 ///
 ///
 fn build_docker_image(
-    package_dir: &PathBuf,
+    package_dir: &Path,
     tag: String,
 ) -> Result<()> {
     let buildx = Command::new("docker")

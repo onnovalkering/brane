@@ -1,5 +1,6 @@
-use crate::{objects::Object, values::Value};
+use crate::objects::Object;
 use broom::{Handle, Heap};
+use specifications::common::Value;
 use std::fmt::Write;
 use std::{
     cmp::Ordering,
@@ -8,7 +9,6 @@ use std::{
 };
 
 const STACK_MAX: usize = 256;
-type InnerStack = Vec<Slot>;
 
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
@@ -45,10 +45,10 @@ impl Slot {
     ///
     pub fn from_value(
         value: Value,
-        _heap: &mut Heap<Object>,
+        heap: &mut Heap<Object>,
     ) -> Self {
         match value {
-            Value::String(_s) => todo!(),
+            Value::Unicode(_s) => todo!(),
             Value::Boolean(b) => match b {
                 false => Slot::False,
                 true => Slot::True,
@@ -56,10 +56,16 @@ impl Slot {
             Value::Integer(i) => Slot::Integer(i),
             Value::Real(r) => Slot::Real(r),
             Value::Unit => Slot::Unit,
-            Value::Function(_f) => todo!(),
-            Value::Class(_c) => todo!(),
-            Value::Instance(_i) => todo!(),
-            Value::Array(_a) => todo!(),
+            Value::FunctionExt(f) => {
+                let function = Object::FunctionExt(f);
+                let handle = heap.insert(function).into_handle();
+
+                Slot::Object(handle)
+            }
+            todo => {
+                dbg!(&todo);
+                todo!();
+            }
         }
     }
 
@@ -71,7 +77,11 @@ impl Slot {
         heap: &Heap<Object>,
     ) -> Value {
         match self {
-            Slot::BuiltIn(_) => panic!("Cannot convert built-in to value."),
+            Slot::BuiltIn(_) => {
+                // panic!("Cannot convert built-in to value.")
+
+                Value::Unit
+            },
             Slot::ConstMinusOne => Value::Integer(-1),
             Slot::ConstMinusTwo => Value::Integer(-2),
             Slot::ConstOne => Value::Integer(1),
@@ -83,12 +93,15 @@ impl Slot {
             Slot::True => Value::Boolean(true),
             Slot::Unit => Value::Unit,
             Slot::Object(h) => match heap.get(h).unwrap() {
-                Object::Array(_a) => todo!(),
+                Object::Array(a) => {
+                    dbg!(&a);
+                    todo!();
+                }
                 Object::Class(_c) => todo!(),
                 Object::Function(_) => panic!("Cannot convert function to value."),
-                Object::FunctionExt(_) => panic!("Cannot convert external function to value."),
+                Object::FunctionExt(f) => Value::FunctionExt(f.clone()),
                 Object::Instance(_i) => todo!(),
-                Object::String(s) => Value::String(s.clone()),
+                Object::String(s) => Value::Unicode(s.clone()),
             },
         }
     }
@@ -167,8 +180,8 @@ impl PartialOrd for Slot {
 
 #[derive(Debug)]
 pub struct Stack {
-    inner: InnerStack,
-    use_const: bool, // TODO: benchmark this option (memory use)
+    inner: Vec<Slot>,
+    use_const: bool,
 }
 
 impl Default for Stack {
@@ -193,9 +206,12 @@ impl Stack {
     ///
     ///
     ///
-    pub fn new(size: usize, use_const: bool) -> Self {
+    pub fn new(
+        size: usize,
+        use_const: bool,
+    ) -> Self {
         Self {
-            inner: InnerStack::with_capacity(size),
+            inner: Vec::with_capacity(size),
             use_const,
         }
     }

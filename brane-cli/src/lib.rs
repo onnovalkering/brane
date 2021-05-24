@@ -19,10 +19,13 @@ pub mod utils;
 
 use anyhow::Result;
 use semver::Version;
-use std::fs::{self, File};
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::Command;
+use std::{
+    fs::{self, File},
+    path::Path,
+};
 
 const MIN_DOCKER_VERSION: &str = "19.0.0";
 
@@ -46,7 +49,7 @@ pub fn check_dependencies() -> Result<()> {
 ///
 ///
 ///
-pub fn determine_file(context: &PathBuf) -> Result<PathBuf> {
+pub fn determine_file(context: &Path) -> Result<PathBuf> {
     let files = fs::read_dir(context)?;
     for file in files {
         let file_name = file?.file_name();
@@ -71,8 +74,8 @@ pub fn determine_file(context: &PathBuf) -> Result<PathBuf> {
 ///
 ///
 pub fn determine_kind(
-    context: &PathBuf,
-    file: &PathBuf,
+    context: &Path,
+    file: &Path,
 ) -> Result<String> {
     let file = String::from(file.as_os_str().to_string_lossy());
 

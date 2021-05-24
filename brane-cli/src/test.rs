@@ -165,14 +165,13 @@ fn prompt_for_value(
     data_type: &str,
     p: &Parameter,
 ) -> Result<Value> {
-    let value = if data_type.ends_with("[]") {
-        let entry_data_type = data_type[..data_type.len() - 2].to_string();
-        let mut entries = vec![];
+    let value = if let Some(element_data_type) = data_type.strip_suffix("[]") {
+        let mut elements = vec![];
 
         loop {
             let mut p = p.clone();
-            p.data_type = format!("{}[{}]", entry_data_type, entries.len());
-            entries.push(prompt_for_value(&entry_data_type, &p)?);
+            p.data_type = format!("{}[{}]", element_data_type, elements.len());
+            elements.push(prompt_for_value(element_data_type, &p)?);
 
             if !Confirm::new()
                 .with_prompt(format!(
@@ -187,7 +186,7 @@ fn prompt_for_value(
 
         Value::Array {
             data_type: data_type.to_string(),
-            entries,
+            entries: elements,
         }
     } else {
         match data_type {
@@ -278,7 +277,7 @@ fn prompt_password(
 ///
 ///
 ///
-fn print_output(value: &Value) -> () {
+fn print_output(value: &Value) {
     match value {
         Value::Array { entries, .. } => {
             println!("{}", style("[").bold().cyan());
@@ -298,7 +297,10 @@ fn print_output(value: &Value) -> () {
                 println!("{}:", style(name).bold().cyan());
                 println!("{}\n", style(value).cyan());
             }
-        }
+        },
+        Value::Function(_) => println!("TODO function."),
+        Value::FunctionExt(_) => println!("TODO FunctionExt."),
+        Value::Class(_) => println!("TODO class."),
     }
 }
 

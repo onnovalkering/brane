@@ -1,5 +1,5 @@
 use crate::bytecode::FunctionMut;
-use specifications::common::Value as SpecValue;
+use specifications::common::{Class, Value as SpecValue};
 use std::{collections::HashMap, fmt};
 
 #[derive(Clone)]
@@ -79,30 +79,6 @@ impl fmt::Debug for Array {
 }
 
 #[derive(Clone)]
-pub struct Class {
-    pub name: String,
-    pub properties: HashMap<String, String>,
-}
-
-impl Class {
-    pub fn new(
-        name: String,
-        properties: HashMap<String, String>,
-    ) -> Self {
-        Self { name, properties }
-    }
-}
-
-impl fmt::Debug for Class {
-    fn fmt(
-        &self,
-        f: &mut fmt::Formatter<'_>,
-    ) -> fmt::Result {
-        write!(f, "class<{}>", self.name)
-    }
-}
-
-#[derive(Clone)]
 pub struct Instance {
     pub class: Class,
     pub fields: HashMap<String, Value>,
@@ -113,8 +89,8 @@ impl Instance {
         class: Class,
         fields: Option<HashMap<String, Value>>,
     ) -> Self {
-        let mut fields = fields.unwrap_or_default();
-        fields.insert(String::from("__class"), class.name.clone().into());
+        let fields = fields.unwrap_or_default();
+        // fields.insert(String::from("__class"), class.name.clone().into());
 
         Self { class, fields }
     }
@@ -159,38 +135,3 @@ impl From<SpecValue> for Value {
     }
 }
 
-impl From<FunctionMut> for Value {
-    fn from(function: FunctionMut) -> Self {
-        Value::Function(function)
-    }
-}
-
-impl From<String> for Value {
-    fn from(string: String) -> Self {
-        Value::String(string)
-    }
-}
-
-impl From<bool> for Value {
-    fn from(boolean: bool) -> Self {
-        Value::Boolean(boolean)
-    }
-}
-
-impl From<i64> for Value {
-    fn from(integer: i64) -> Self {
-        Value::Integer(integer)
-    }
-}
-
-impl From<f64> for Value {
-    fn from(real: f64) -> Self {
-        Value::Real(real)
-    }
-}
-
-impl From<()> for Value {
-    fn from(_: ()) -> Self {
-        Value::Unit
-    }
-}

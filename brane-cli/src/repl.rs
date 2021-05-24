@@ -1,9 +1,7 @@
 use crate::docker::DockerExecutor;
 use crate::registry;
 use anyhow::Result;
-use brane_bvm::bytecode::FunctionMut;
-use brane_bvm::VmOptions;
-use brane_bvm::{VmResult, VM};
+use brane_bvm::vm::{Vm, VmOptions};
 use brane_drv::grpc::{CreateSessionRequest, DriverServiceClient, ExecuteRequest};
 use brane_dsl::{Compiler, CompilerOptions, Lang};
 use rustyline::completion::{Completer, FilenameCompleter, Pair};
@@ -278,11 +276,13 @@ async fn local_repl(
     } else {
         CompilerOptions::new(Lang::BraneScript)
     };
+
     let package_index = registry::get_package_index().await?;
     let mut compiler = Compiler::new(compiler_options, package_index.clone());
-    let options = VmOptions { always_return: true };
-    let executor = DockerExecutor::new();
-    let mut vm = VM::new("local-repl", package_index, None, Some(options), executor);
+
+    let executor = DockerExecutor::default();
+    let options = VmOptions { clear_after_main: true, ..Default::default() };
+    let mut vm = Vm::new_with(executor, Some(package_index), Some(options));
 
     let mut count: u32 = 1;
     loop {
@@ -295,32 +295,8 @@ async fn local_repl(
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
                 match compiler.compile(line) {
-                    Ok(function) => {
-                        if let FunctionMut::UserDefined { chunk, .. } = function {
-                            debug!("\n{}", chunk.disassemble()?);
-                            vm.call(chunk, 0);
-                        }
-
-                        loop {
-                            match vm.run(None).await {
-                                Ok(VmResult::Ok(value)) => {
-                                    let output = value.map(|v| format!("{:?}", v)).unwrap_or_default();
-                                    if !output.is_empty() {
-                                        println!("{}", output);
-                                    }
-                                    break;
-                                }
-                                Ok(VmResult::RuntimeError) => {
-                                    eprintln!("Runtime error!");
-                                    break;
-                                }
-                                _ => unreachable!(),
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("\n{}", e);
-                    }
+                    Ok(function) => vm.main(function).await,
+                    Err(error) => eprintln!("{:?}", error),
                 }
             }
             Err(ReadlineError::Interrupted) => {

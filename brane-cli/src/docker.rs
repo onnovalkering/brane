@@ -9,19 +9,17 @@ use bollard::errors::Error;
 use bollard::image::{CreateImageOptions, ImportImageOptions, RemoveImageOptions};
 use bollard::models::{DeviceRequest, HostConfig};
 use bollard::Docker;
-use brane_bvm::values::Value;
-use brane_bvm::VmCall;
-use brane_bvm::VmExecutor;
+use brane_bvm::executor::VmExecutor;
 use futures_util::stream::TryStreamExt;
 use futures_util::StreamExt;
 use hyper::Body;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use specifications::common::Value as SpecValue;
+use specifications::common::{Value, FunctionExt};
 use specifications::package::PackageInfo;
-use std::default::Default;
 use std::env;
 use std::path::PathBuf;
+use std::{collections::HashMap, default::Default, path::Path};
 use tokio::fs::File as TFile;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use uuid::Uuid;
@@ -34,7 +32,7 @@ lazy_static! {
     static ref DOCKER_VOLUMES_FROM: String = env::var("DOCKER_VOLUMES_FROM").unwrap_or_else(|_| String::from(""));
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct DockerExecutor {}
 
 impl DockerExecutor {
@@ -45,64 +43,56 @@ impl DockerExecutor {
 
 #[async_trait]
 impl VmExecutor for DockerExecutor {
-    async fn execute(
+    async fn call(
         &self,
-        call: VmCall,
+        function: FunctionExt,
+        arguments: HashMap<String, Value>,
+        location: Option<String>,
     ) -> Result<Value> {
-        make_function_call(call).await
-    }
-}
+        let package_dir = packages::get_package_dir(&function.package, Some("latest"))?;
+        let package_file = package_dir.join("package.yml");
+        let package_info = PackageInfo::from_path(package_file)?;
 
-///
-///
-///
-async fn make_function_call(call: VmCall) -> Result<Value> {
-    let package_dir = packages::get_package_dir(&call.package, Some("latest"))?;
-    let package_file = package_dir.join("package.yml");
-    let package_info = PackageInfo::from_path(package_file)?;
-
-    if let Some(location) = call.location {
-        warn!("Ignoring location '{}', running locally.", location);
-    }
-
-    let kind = match package_info.kind.as_str() {
-        "ecu" => String::from("code"),
-        "oas" => String::from("oas"),
-        _ => {
-            unreachable!()
+        if let Some(location) = location {
+            warn!("Ignoring location '{}', running locally.", location);
         }
-    };
 
-    let image = format!("{}:{}", package_info.name, package_info.version);
-    let image_file = Some(package_dir.join("image.tar"));
+        // TODO: update upstream that this isn't required.
+        let kind = match package_info.kind.as_str() {
+            "ecu" => String::from("code"),
+            "oas" => String::from("oas"),
+            _ => {
+                unreachable!()
+            }
+        };
 
-    let command = vec![
-        String::from("-d"),
-        String::from("--application-id"),
-        String::from("test"),
-        String::from("--location-id"),
-        String::from("localhost"),
-        String::from("--job-id"),
-        String::from("1"),
-        kind,
-        call.function.clone(),
-        base64::encode(serde_json::to_string(&call.arguments)?),
-    ];
+        let image = format!("{}:{}", package_info.name, package_info.version);
+        let image_file = Some(package_dir.join("image.tar"));
 
-    let exec = ExecuteInfo::new(image, image_file, None, Some(command));
+        let command = vec![
+            String::from("-d"),
+            String::from("--application-id"),
+            String::from("test"),
+            String::from("--location-id"),
+            String::from("localhost"),
+            String::from("--job-id"),
+            String::from("1"),
+            kind,
+            function.name.clone(),
+            base64::encode(serde_json::to_string(&arguments)?),
+        ];
 
-    let (stdout, stderr) = run_and_wait(exec).await?;
-    debug!("stderr: {}", stderr);
-    debug!("stdout: {}", stdout);
+        let exec = ExecuteInfo::new(image, image_file, None, Some(command));
 
-    let output = stdout.lines().last().unwrap_or_default().to_string();
-    let output: Result<SpecValue> = decode_b64(output);
-    match output {
-        Ok(value) => Ok(Value::from(value)),
-        Err(err) => {
-            println!("{:?}", err);
+        let (stdout, stderr) = run_and_wait(exec).await?;
+        debug!("stderr: {}", stderr);
+        debug!("stdout: {}", stdout);
+
+        let output = stdout.lines().last().unwrap_or_default().to_string();
+        decode_b64(output).or_else(|err| {
+            error!("{:?}", err);
             Ok(Value::Unit)
-        }
+        })
     }
 }
 
@@ -298,7 +288,7 @@ async fn ensure_image(
 ///
 async fn import_image(
     docker: &Docker,
-    image_file: &PathBuf,
+    image_file: &Path,
 ) -> Result<()> {
     let options = ImportImageOptions { quiet: true };
 
@@ -336,7 +326,7 @@ async fn pull_image(
 ///
 async fn remove_container(
     docker: &Docker,
-    name: &String,
+    name: &str,
 ) -> Result<()> {
     let remove_options = Some(RemoveContainerOptions {
         force: true,
@@ -351,7 +341,7 @@ async fn remove_container(
 ///
 ///
 ///
-pub async fn remove_image(name: &String) -> Result<()> {
+pub async fn remove_image(name: &str) -> Result<()> {
     let docker = Docker::connect_with_local_defaults()?;
 
     let image = docker.inspect_image(name).await;

@@ -16,19 +16,19 @@ use serde_json::{json, Value as JValue};
 use serde_with::skip_serializing_none;
 use specifications::package::PackageIndex;
 use specifications::package::PackageInfo;
-use std::env;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::{env, path::Path};
 use tar::Archive;
 use tokio::fs::File as TokioFile;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use url::Url;
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct RegistryConfig {
     pub url: String,
     pub username: String,
@@ -42,7 +42,7 @@ impl RegistryConfig {
         }
     }
 
-    fn from_path(path: &PathBuf) -> Result<RegistryConfig> {
+    fn from_path(path: &Path) -> Result<RegistryConfig> {
         let config_reader = BufReader::new(File::open(path)?);
         let config = serde_yaml::from_reader(config_reader)?;
 
@@ -143,7 +143,7 @@ pub async fn pull(
     progress.finish();
 
     // Remove temporary file
-    if let Err(_) = fs::remove_file(&temp_filepath) {
+    if fs::remove_file(&temp_filepath).is_err() {
         warn!("Failed to remove temporary file: {:?}", temp_filepath);
     }
 
@@ -297,14 +297,14 @@ pub async fn get_package_index() -> Result<PackageIndex> {
 ///
 ///
 pub async fn get_package_source(
-    name: &String,
-    version: &String,
-    kind: &String,
+    name: &str,
+    version: &str,
+    kind: &str,
 ) -> Result<PathBuf> {
     let package_dir = packages::get_package_dir(name, Some(version))?;
     let temp_dir = PathBuf::from("/tmp"); // TODO: get from OS
 
-    let path = match kind.as_str() {
+    let path = match kind {
         "dsl" => {
             let instructions = package_dir.join("instructions.yml");
             if instructions.exists() {

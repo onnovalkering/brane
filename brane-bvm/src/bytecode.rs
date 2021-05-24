@@ -1,9 +1,11 @@
 use crate::objects::{self, Object};
-use crate::{stack::Slot, values::Value};
+use crate::Function;
+use crate::stack::Slot;
 use anyhow::Result;
 use broom::Heap;
 use bytes::{BufMut, Bytes, BytesMut};
 use std::fmt::Write;
+use specifications::common::{Bytecode, SpecFunction, Value};
 
 pub mod opcodes {
     pub const OP_ADD: u8 = 0x01;
@@ -52,6 +54,26 @@ pub struct FunctionMut {
     pub name: String,
 }
 
+impl From<SpecFunction> for FunctionMut {
+    fn from(f: SpecFunction) -> Self {
+        let chunk = ChunkMut::new(f.bytecode.code[..].into(), f.bytecode.constants);
+        Self::new(f.name, f.arity, chunk)
+    }
+}
+
+impl Into<SpecFunction> for FunctionMut {
+    fn into(self) -> SpecFunction {
+        SpecFunction {
+            arity: self.arity,
+            name: self.name,
+            bytecode: Bytecode {
+                code: self.chunk.code[..].to_vec(),
+                constants: self.chunk.constants,
+            }
+        }
+    }
+}
+
 impl FunctionMut {
     ///
     ///
@@ -82,11 +104,7 @@ impl FunctionMut {
         self,
         heap: &mut Heap<Object>,
     ) -> objects::Function {
-        objects::Function {
-            arity: self.arity,
-            name: self.name,
-            chunk: self.chunk.freeze(heap),
-        }
+        Function::new(self.name, self.arity, self.chunk.freeze(heap))
     }
 }
 
@@ -97,6 +115,18 @@ pub struct Chunk {
 }
 
 impl Chunk {
+    ///
+    ///
+    ///
+    pub fn unfreeze(
+        self,
+        heap: &Heap<Object>,
+    ) -> ChunkMut {
+        let constants = self.constants.into_iter().map(|s| s.into_value(heap)).collect();
+
+        ChunkMut::new(BytesMut::from(&self.code[..]), constants)
+    }
+
     ///
     ///
     ///
@@ -349,12 +379,14 @@ impl ChunkMut {
                 Value::Integer(i) => Slot::Integer(i),
                 Value::Real(r) => Slot::Real(r),
                 Value::Function(f) => {
+                    let f = FunctionMut::from(f);
+
                     let function = Object::Function(f.freeze(heap));
                     let handle = heap.insert(function).into_handle();
 
                     Slot::Object(handle)
                 }
-                Value::String(s) => {
+                Value::Unicode(s) => {
                     let string = Object::String(s);
                     let handle = heap.insert(string).into_handle();
 

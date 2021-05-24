@@ -10,7 +10,9 @@ async-trait = "0.1"
 broom = "0.3"
 bytes = "1"
 futures = "0.3"
+itertools = "0.10"
 log = "0.4"
+rayon = "1.5"
 smallvec = "1.6"
 specifications = { path = "../specifications" }
 tokio = { version = "1.6", features = ["macros", "rt-multi-thread"] }
