@@ -1,3 +1,4 @@
+use crate::objects::Class;
 use crate::stack::{Slot, Stack};
 use crate::{
     builtins,
@@ -53,7 +54,7 @@ impl VmState {
     ) -> HashMap<String, Slot> {
         let mut globals = HashMap::new();
         for (name, value) in &self.globals {
-            let slot = Slot::from_value(value.clone(), heap);
+            let slot = Slot::from_value(value.clone(), &HashMap::new(), heap);
             globals.insert(name.clone(), slot);
         }
 
@@ -341,7 +342,10 @@ where
         &mut self,
         arity: u8,
     ) -> Vec<Value> {
-        (0..arity).map(|_| self.stack.pop().into_value(&self.heap)).collect()
+        let mut arguments: Vec<Value> = (0..arity).map(|_| self.stack.pop().into_value(&self.heap)).collect();
+        arguments.reverse();
+
+        arguments
     }
 
     ///
@@ -448,7 +452,7 @@ where
         self.stack.pop();
 
         // Store return value on the stack.
-        let slot = Slot::from_value(value, &mut self.heap);
+        let slot = Slot::from_value(value, &self.globals, &mut self.heap);
         self.stack.push(slot);
     }
 
@@ -549,7 +553,7 @@ where
 
         if let Slot::Object(handle) = identifier {
             if let Some(Object::String(identifier)) = self.heap.get(handle) {
-                let value = *self.globals.get(identifier).expect("Failed to retreive global.");
+                let value = *self.globals.get(identifier).unwrap_or_else(|| panic!("Failed to retreive global: {}", identifier));
                 self.stack.push(value);
 
                 return;
@@ -613,6 +617,19 @@ where
                     let object = Slot::Object(handle);
 
                     self.globals.insert(f_name.clone(), object);
+                }
+            }
+
+            if let Some(types) = &package.types {
+                for (t_name, _class) in types {
+                    let class = Class {
+                        name: t_name.clone(),
+                    };
+
+                    let handle = self.heap.insert(Object::Class(class)).into_handle();
+                    let object = Slot::Object(handle);
+
+                    self.globals.insert(t_name.clone(), object);
                 }
             }
         }
@@ -823,7 +840,7 @@ where
                 })
                 .collect::<Vec<_>>()
                 .into_iter()
-                .map(|v| Slot::from_value(v, &mut self.heap))
+                .map(|v| Slot::from_value(v, &self.globals, &mut self.heap))
                 .collect();
 
             Array::new(results)

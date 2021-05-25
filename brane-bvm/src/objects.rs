@@ -1,7 +1,7 @@
 use crate::bytecode::FunctionMut;
 use crate::{bytecode::Chunk, stack::Slot};
 use broom::prelude::*;
-use specifications::common::{FunctionExt, Parameter};
+use specifications::common::FunctionExt;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -15,6 +15,15 @@ pub enum Object {
 }
 
 impl Object {
+    #[inline]
+    pub fn as_class(&self) -> Option<&Class> {
+        if let Object::Class(class) = self {
+            Some(class)
+        } else {
+            None
+        }
+    }
+
     #[inline]
     pub fn as_function(&self) -> Option<&Function> {
         if let Object::Function(function) = self {
@@ -44,7 +53,7 @@ impl Trace<Self> for Object {
             Object::Array(a) => a.trace(tracer),
             Object::Class(c) => c.trace(tracer),
             Object::Function(f) => f.trace(tracer),
-            Object::FunctionExt(f) => {},
+            Object::FunctionExt(_f) => {},
             Object::Instance(i) => i.trace(tracer),
             Object::String(_) => {}
         }

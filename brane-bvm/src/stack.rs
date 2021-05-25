@@ -1,6 +1,9 @@
+use crate::objects::Array;
+use crate::objects::Instance;
 use crate::objects::Object;
 use broom::{Handle, Heap};
 use specifications::common::Value;
+use std::collections::HashMap;
 use std::fmt::Write;
 use std::{
     cmp::Ordering,
@@ -45,10 +48,16 @@ impl Slot {
     ///
     pub fn from_value(
         value: Value,
+        globals: &HashMap<String, Slot>,
         heap: &mut Heap<Object>,
     ) -> Self {
         match value {
-            Value::Unicode(_s) => todo!(),
+            Value::Unicode(s) => {
+                let string = Object::String(s);
+                let handle = heap.insert(string).into_handle();
+
+                Slot::Object(handle)
+            },
             Value::Boolean(b) => match b {
                 false => Slot::False,
                 true => Slot::True,
@@ -62,6 +71,27 @@ impl Slot {
 
                 Slot::Object(handle)
             }
+            Value::Struct { data_type, properties } => {
+                let mut i_properties = HashMap::new();
+                for (name, value) in properties {
+                    i_properties.insert(name.clone(), Slot::from_value(value.clone(), globals, heap));
+                }
+
+                let i_class = globals.get(&data_type).unwrap().as_object().unwrap();
+                let instance = Instance::new(i_class, i_properties);
+
+                let instance = Object::Instance(instance);
+                let handle = heap.insert(instance).into_handle();
+
+                Slot::Object(handle)
+            }
+            Value::Array { entries, .. } => {
+                let entries = entries.into_iter().map(|e| Slot::from_value(e, globals, heap)).collect();
+                let array = Object::Array(Array::new(entries));
+                let handle = heap.insert(array).into_handle();
+
+                Slot::Object(handle)
+            },
             todo => {
                 dbg!(&todo);
                 todo!();
@@ -94,13 +124,32 @@ impl Slot {
             Slot::Unit => Value::Unit,
             Slot::Object(h) => match heap.get(h).unwrap() {
                 Object::Array(a) => {
-                    dbg!(&a);
-                    todo!();
+                    let data_type = a.element_type.clone();
+                    let entries = a.elements.iter().map(|s| s.into_value(heap)).collect();
+
+                    Value::Array {
+                        data_type,
+                        entries
+                    }
                 }
                 Object::Class(_c) => todo!(),
                 Object::Function(_) => panic!("Cannot convert function to value."),
                 Object::FunctionExt(f) => Value::FunctionExt(f.clone()),
-                Object::Instance(_i) => todo!(),
+                Object::Instance(i) => {
+                    let class = heap.get(i.class).expect("").as_class().expect("");
+                    let data_type = class.name.clone();
+
+                    let mut properties = HashMap::new();
+
+                    for (name, slot) in &i.properties {
+                        properties.insert(name.clone(), slot.clone().into_value(heap));
+                    }
+
+                    Value::Struct {
+                        data_type,
+                        properties
+                    }
+                },
                 Object::String(s) => Value::Unicode(s.clone()),
             },
         }

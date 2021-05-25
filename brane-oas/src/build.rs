@@ -180,8 +180,8 @@ fn build_oas_function_input(
             if let Some(schema) = &content.schema {
                 let (_, schema) = resolver::resolve_schema(schema, components)?;
 
-                let optional = false; // check if is in required list
-                let properties = schema_to_properties(None, &schema, optional, components, &mut input_types)?;
+                let required = true; // At the top-level, the request body is required, if present.
+                let properties = schema_to_properties(None, &schema, required, components, &mut input_types)?;
 
                 input_properties.extend(properties);
             }
@@ -195,13 +195,24 @@ fn build_oas_function_input(
         let type_name = uppercase_first_letter(&operation_id);
         let input_data_type = format!("{}Input", type_name);
 
+        debug!("Grouping input into a single object: {}", input_data_type);
+        let (token, input_properties) = input_properties
+            .into_iter()
+            .partition(|p| p.name == *"token");
+
         let input_type = Type {
             name: input_data_type.clone(),
             properties: input_properties,
         };
-        input_types.insert(input_data_type.clone(), input_type);
 
-        vec![Parameter::new(String::from("input"), input_data_type, None, None, None)]
+        input_types.insert(input_data_type.clone(), input_type);
+        let mut input_parameters = vec![Parameter::new(String::from("input"), input_data_type, None, None, None)];
+
+        if let Some(token) = token.first().cloned() {
+            input_parameters.push(token.into_parameter())
+        }
+
+        input_parameters
     } else {
         input_properties
             .iter()
@@ -307,7 +318,7 @@ pub fn schema_to_properties(
     types: &mut Map<Type>,
 ) -> Result<Vec<Property>> {
     match schema.schema_kind {
-        SchemaKind::Any(_) => any_schema_to_properties(name, schema, required, components, types),
+        SchemaKind::Any(_) => any_schema_to_properties(name, schema, components, types),
         SchemaKind::Type(_) => type_schema_to_properties(name, schema, required, components, types),
         _ => todo!(),
     }
@@ -319,7 +330,6 @@ pub fn schema_to_properties(
 fn any_schema_to_properties(
     _name: Option<String>,
     schema: &Schema,
-    required: bool,
     components: &Option<Components>,
     types: &mut Map<Type>,
 ) -> Result<Vec<Property>> {
@@ -332,8 +342,9 @@ fn any_schema_to_properties(
     let mut properties = vec![];
     for (name, property) in any_schema.properties.iter() {
         let property = property.clone().unbox();
-        let (_, schema) = resolve_schema(&property, components)?;
+        let required = any_schema.required.contains(name);
 
+        let (_, schema) = resolve_schema(&property, components)?;
         let props = schema_to_properties(Some(name.clone()), &schema, required, components, types)?;
         properties.extend(props);
     }
@@ -369,7 +380,8 @@ fn type_schema_to_properties(
                 SchemaKind::Type(OType::Boolean {}) => String::from("boolean[]"),
                 SchemaKind::Any(_) => {
                     let item_type_properties =
-                        any_schema_to_properties(None, &items_schema, required, components, types)?;
+                        any_schema_to_properties(None, &items_schema, components, types)?;
+
                     let item_type_name = if let Some(ref_name) = ref_name {
                         ref_name
                     } else {
@@ -404,6 +416,8 @@ fn type_schema_to_properties(
             for (name, p_schema) in object.properties.iter() {
                 let p_schema = p_schema.clone().unbox();
                 let (_, p_schema) = resolver::resolve_schema(&p_schema, components)?;
+
+                let required = object.required.contains(name);
                 let props = schema_to_properties(Some(name.clone()), &p_schema, required, components, types)?;
 
                 properties.extend(props);

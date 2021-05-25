@@ -121,7 +121,7 @@ fn generate_dockerfile(
 fn prepare_directory(
     oas_file: &Path,
     dockerfile: String,
-    init_path: Option<PathBuf>,
+    branelet_path: Option<PathBuf>,
     package_info: &PackageInfo,
     package_dir: &Path,
 ) -> Result<()> {
@@ -136,9 +136,9 @@ fn prepare_directory(
     let mut buffer = File::create(package_dir.join("package.yml"))?;
     write!(buffer, "{}", serde_yaml::to_string(&package_info)?)?;
 
-    // Copy custom init binary to package directory
-    if let Some(init_path) = init_path {
-        fs::copy(fs::canonicalize(init_path)?, package_dir.join("init"))?;
+    // Copy custom branelet binary to package directory
+    if let Some(branelet_path) = branelet_path {
+        fs::copy(fs::canonicalize(branelet_path)?, package_dir.join("branelet"))?;
     }
 
     // Create the working directory and copy required files.

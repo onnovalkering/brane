@@ -17,7 +17,17 @@ pub async fn execute(
     arguments: &Map<Value>,
     oas_document: &OpenAPI,
 ) -> Result<String> {
-    debug!("{:?}", arguments);
+    let mut arguments = arguments.clone();
+    debug!("Arguments: {:?}", arguments);
+
+    if let Some(Value::Struct { properties, .. }) = arguments.get("input") {
+        debug!("Observed a struct argument with name `input`, expanding..");
+
+        let properties = properties.clone();
+        arguments.extend(properties);
+
+        debug!("Arguments: {:?}", arguments);
+    }
 
     let components = oas_document.components.clone();
     let base_url = &oas_document
@@ -94,7 +104,7 @@ pub async fn execute(
                         todo!();
                     }
 
-                    let value = arguments.get("token").expect("Missing argument.");
+                    let value = arguments.get("token").expect("Missing `token` argument.");
                     headers.push((String::from("Authorization"), format!("Bearer {}", value)));
                 }
                 _ => todo!(),
@@ -141,6 +151,7 @@ pub async fn execute(
                 }
             }
 
+            debug!("Request body:\n {}", serde_json::to_string_pretty(&json)?);
             client = client.json(&json);
         } else {
             unreachable!()
