@@ -4,6 +4,8 @@ use anyhow::Result;
 use openapiv3::{Components, Parameter as OParameter, Type as OType};
 use openapiv3::{OpenAPI, ReferenceOr, SecurityScheme};
 use openapiv3::{Operation, ParameterSchemaOrContent, Schema, SchemaKind};
+use rand::distributions::Alphanumeric;
+use rand::{self, Rng};
 use specifications::common::{CallPattern, Function, Parameter, Property, Type};
 
 type Map<T> = std::collections::HashMap<String, T>;
@@ -78,7 +80,7 @@ pub fn generate_operation_id(
     }
 
     debug!(
-        "Generated ID {} based on {} ({}).",
+        "Generated (potential) ID {} based on {} ({}).",
         operation_id,
         path,
         method.to_uppercase()
@@ -178,10 +180,10 @@ fn build_oas_function_input(
         // Only 'application/json' request bodies are supported
         if let Some(content) = request_body.content.get("application/json") {
             if let Some(schema) = &content.schema {
-                let (_, schema) = resolver::resolve_schema(schema, components)?;
+                let (ref_name, schema) = resolver::resolve_schema(schema, components)?;
 
                 let required = true; // At the top-level, the request body is required, if present.
-                let properties = schema_to_properties(None, &schema, required, components, &mut input_types)?;
+                let properties = schema_to_properties(None, &schema, required, components, &mut input_types, ref_name)?;
 
                 input_properties.extend(properties);
             }
@@ -249,9 +251,9 @@ fn build_oas_function_output(
     // Only 'application/json' responses are supported
     if let Some(content) = response.content.get("application/json") {
         if let Some(schema) = &content.schema {
-            let (_, schema) = resolver::resolve_schema(schema, components)?;
+            let (ref_name, schema) = resolver::resolve_schema(schema, components)?;
             let required = true; // check if is in required list
-            let properties = schema_to_properties(None, &schema, required, components, &mut output_types)?;
+            let properties = schema_to_properties(None, &schema, required, components, &mut output_types, ref_name)?;
 
             output_properties.extend(properties);
         }
@@ -259,8 +261,17 @@ fn build_oas_function_output(
         return Err(anyhow!(OAS_JSON_MEDIA_NOT_FOUND));
     }
 
-    // Convert output properties to return type
-    let return_type = if output_properties.len() > 1 {
+    // Special treatment for array types.
+    if output_properties.len() == 1 {
+        if let Some(Property { data_type, ..}) = output_properties.first() {
+            if data_type.ends_with("[]") {
+                return Ok((data_type.clone(), output_types));
+            }
+        }
+    }
+
+    // Else, we use an object or unit if there is no output.
+    let return_type = if output_properties.len() >= 1 {
         let type_name = uppercase_first_letter(&operation_id);
         let output_data_type = format!("{}Output", type_name);
 
@@ -271,8 +282,6 @@ fn build_oas_function_output(
 
         output_types.insert(output_data_type.clone(), output_type);
         output_data_type
-    } else if let Some(output_property) = output_properties.first() {
-        output_property.data_type.clone()
     } else {
         String::from("unit")
     };
@@ -300,8 +309,8 @@ fn parameter_to_properties(
     let required = parameter_data.required;
     match &parameter_data.format {
         ParameterSchemaOrContent::Schema(schema) => {
-            let (_, schema) = resolver::resolve_schema(schema, components)?;
-            schema_to_properties(name, &schema, required, components, types)
+            let (ref_name, schema) = resolver::resolve_schema(schema, components)?;
+            schema_to_properties(name, &schema, required, components, types, ref_name)
         }
         ParameterSchemaOrContent::Content(_) => Err(anyhow!(OAS_CONTENT_NOT_SUPPORTED)),
     }
@@ -316,10 +325,11 @@ pub fn schema_to_properties(
     required: bool,
     components: &Option<Components>,
     types: &mut Map<Type>,
+    ref_name: Option<String>,
 ) -> Result<Vec<Property>> {
     match schema.schema_kind {
-        SchemaKind::Any(_) => any_schema_to_properties(name, schema, components, types),
-        SchemaKind::Type(_) => type_schema_to_properties(name, schema, required, components, types),
+        SchemaKind::Any(_) => any_schema_to_properties(name, schema, components, types, ref_name),
+        SchemaKind::Type(_) => type_schema_to_properties(name, schema, required, components, types, ref_name),
         _ => todo!(),
     }
 }
@@ -328,10 +338,11 @@ pub fn schema_to_properties(
 ///
 ///
 fn any_schema_to_properties(
-    _name: Option<String>,
+    name: Option<String>,
     schema: &Schema,
     components: &Option<Components>,
     types: &mut Map<Type>,
+    ref_name: Option<String>,
 ) -> Result<Vec<Property>> {
     let any_schema = if let SchemaKind::Any(any_schema) = &schema.schema_kind {
         any_schema
@@ -339,14 +350,41 @@ fn any_schema_to_properties(
         unreachable!()
     };
 
-    let mut properties = vec![];
-    for (name, property) in any_schema.properties.iter() {
-        let property = property.clone().unbox();
-        let required = any_schema.required.contains(name);
+    if let Some(name) = &name {
+        debug!("Converting nested AnySchema '{}', to property.", name);
+    } else {
+        debug!("Converting top-level AnySchema property[].");
+    }
 
-        let (_, schema) = resolve_schema(&property, components)?;
-        let props = schema_to_properties(Some(name.clone()), &schema, required, components, types)?;
-        properties.extend(props);
+    let mut properties = vec![];
+    for (p_name, property) in any_schema.properties.iter() {
+        let property = property.clone().unbox();
+        let required = any_schema.required.contains(p_name);
+
+        let (p_ref_name, p_schema) = resolve_schema(&property, components)?;
+        let props = schema_to_properties(Some(p_name.clone()), &p_schema, required, components, types, p_ref_name)?;
+
+        // Group subproperties
+        if let Some(name) = &name {
+            let type_name = if let Some(ref_name) = &ref_name {
+                ref_name.clone()
+            } else {
+                let random_id = get_random_identifier();
+                info!("Couldn't determine name for {}'s type, using a random one: {}", name, random_id);
+
+                random_id
+            };
+
+            let item_type = Type {
+                name: type_name.clone(),
+                properties: props,
+            };
+
+            properties.push(Property::new_quick(name, &type_name));
+            types.insert(type_name, item_type);
+        } else {
+            properties.extend(props);
+        }
     }
 
     Ok(properties)
@@ -361,12 +399,19 @@ fn type_schema_to_properties(
     required: bool,
     components: &Option<Components>,
     types: &mut Map<Type>,
+    _ref_name: Option<String>,
 ) -> Result<Vec<Property>> {
     let data_type = if let SchemaKind::Type(data_type) = &schema.schema_kind {
         data_type
     } else {
         unreachable!()
     };
+
+    if let Some(name) = &name {
+        debug!("Converting nested TypeSchema '{}', to property.", name);
+    } else {
+        debug!("Converting top-level TypeSchema property[].");
+    }
 
     let properties = match data_type {
         OType::Array(array) => {
@@ -380,12 +425,15 @@ fn type_schema_to_properties(
                 SchemaKind::Type(OType::Boolean {}) => String::from("boolean[]"),
                 SchemaKind::Any(_) => {
                     let item_type_properties =
-                        any_schema_to_properties(None, &items_schema, components, types)?;
+                        any_schema_to_properties(None, &items_schema, components, types, ref_name.clone())?;
 
                     let item_type_name = if let Some(ref_name) = ref_name {
                         ref_name
                     } else {
-                        String::from("todogenerate")
+                        let random_id = get_random_identifier();
+                        info!("Couldn't properly determine array item type name (AnySchema), using a random one: {}", random_id);
+
+                        random_id
                     };
 
                     let item_type = Type {
@@ -415,10 +463,10 @@ fn type_schema_to_properties(
             let mut properties = Vec::<Property>::new();
             for (name, p_schema) in object.properties.iter() {
                 let p_schema = p_schema.clone().unbox();
-                let (_, p_schema) = resolver::resolve_schema(&p_schema, components)?;
+                let (ref_name, p_schema) = resolver::resolve_schema(&p_schema, components)?;
 
                 let required = object.required.contains(name);
-                let props = schema_to_properties(Some(name.clone()), &p_schema, required, components, types)?;
+                let props = schema_to_properties(Some(name.clone()), &p_schema, required, components, types, ref_name)?;
 
                 properties.extend(props);
             }
@@ -455,4 +503,17 @@ fn uppercase_first_letter(s: &str) -> String {
         None => String::new(),
         Some(f) => f.to_uppercase().chain(c).collect(),
     }
+}
+
+// Utility to generate a random identifier.
+fn get_random_identifier() -> String {
+    let mut rng = rand::thread_rng();
+
+    let identifier: String = std::iter::repeat(())
+        .map(|()| rng.sample(Alphanumeric))
+        .map(char::from)
+        .take(6)
+        .collect();
+
+    identifier.to_lowercase()
 }

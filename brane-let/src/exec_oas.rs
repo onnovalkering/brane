@@ -2,6 +2,7 @@ use crate::callback::Callback;
 use anyhow::{Context, Result};
 use specifications::common::{Parameter, Type, Value};
 use specifications::package::PackageInfo;
+use std::os::raw::c_schar;
 use std::path::{Path, PathBuf};
 
 type Map<T> = std::collections::HashMap<String, T>;
@@ -104,70 +105,58 @@ fn capture_output(
     let json = serde_json::from_str(stdout)?;
     let output = Value::from_json(&json);
 
-    let filter = |object: &Value, c_type: &Type| {
-        let mut filtered = Map::<Value>::new();
+    debug!("Received JSON response:\n{}", serde_json::to_string_pretty(&json)?);
+    debug!("Parsed response:\n{:#?}", output);
+    debug!("Trying to construct '{}' from parsed response.", return_type);
 
-        if let Value::Struct { properties, .. } = object {
-            for p in &c_type.properties {
-                let property = properties
-                    .get(&p.name)
-                    .with_context(|| format!("Cannot find {} in output (required)", p.name))
-                    .unwrap();
-
-                filtered.insert(p.name.to_string(), property.clone());
-            }
-
-            return Value::Struct {
-                data_type: c_type.name.clone(),
-                properties: filtered,
-            };
+    let c_types = c_types.clone().unwrap_or_default();
+    let output = match &output {
+        Value::Array { .. } | Value::Struct { .. } => {
+            Some(as_type(&output, return_type, &c_types))
         }
-
-        object.clone()
+        Value::Unit => None,
+        _ => Some(output),
     };
 
-    match &output {
-        Value::Array { entries, .. } => {
-            if let Some(c_types) = c_types {
-                let c_type = return_type.strip_suffix("[]").unwrap();
+    Ok(output)
+}
 
-                if let Some(c_type) = c_types.get(c_type) {
-                    let entries = entries.iter().map(|e| filter(e, c_type)).collect();
-                    return Ok(Some(Value::Array {
-                        entries,
-                        data_type: return_type.to_string(),
-                    }));
-                }
-            }
+///
+///
+///
+fn as_type(object: &Value, c_type: &str, c_types: &Map<Type>) -> Value {
+    let mut filtered = Map::<Value>::new();
 
-            Ok(Some(output))
-        }
+    match object {
         Value::Struct { properties, .. } => {
-            let properties = if let Some(c_types) = c_types {
-                let mut filtered = Map::<Value>::new();
-                let c_type = c_types
-                    .get(return_type)
-                    .with_context(|| format!("Cannot find {} in custom types.", return_type))?;
-
+            if let Some(c_type) = c_types.get(c_type) {
                 for p in &c_type.properties {
                     let property = properties
                         .get(&p.name)
-                        .with_context(|| format!("Cannot find {} in output (required)", p.name))?;
+                        .with_context(|| format!("Cannot find {} in output (required)", p.name))
+                        .unwrap();
 
+                    let property = as_type(property, &p.data_type, c_types);
                     filtered.insert(p.name.to_string(), property.clone());
                 }
 
-                filtered
+                Value::Struct {
+                    data_type: c_type.name.clone(),
+                    properties: filtered,
+                }
             } else {
-                properties.clone()
-            };
+                object.clone()
+            }
+        },
+        Value::Array { entries, .. } => {
+            let element_type = c_type.strip_suffix("[]").unwrap();
 
-            Ok(Some(Value::Struct {
-                data_type: return_type.to_string(),
-                properties,
-            }))
-        }
-        Value::Unit => Ok(None),
-        _ => Ok(Some(output)),
+            let entries = entries.iter().map(|e| as_type(e, element_type, &c_types)).collect();
+            Value::Array {
+                entries,
+                data_type: c_type.to_string(),
+            }
+        },
+        _ => object.clone()
     }
 }

@@ -646,6 +646,7 @@ where
         if let Some(Object::Array(array)) = self.heap.get(array) {
             if let Some(element) = array.elements.get(index as usize) {
                 self.stack.push(*element);
+                return;
             }
         }
 

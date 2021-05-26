@@ -140,9 +140,9 @@ pub async fn execute(
         // Only 'application/json' request bodies are supported
         if let Some(content) = request_body.content.get("application/json") {
             if let Some(schema) = &content.schema {
-                let (_, schema) = resolver::resolve_schema(schema, &components)?;
+                let (ref_name, schema) = resolver::resolve_schema(schema, &components)?;
                 let mut _types = HashMap::new();
-                let properties = build::schema_to_properties(None, &schema, true, &components, &mut _types)?;
+                let properties = build::schema_to_properties(None, &schema, true, &components, &mut _types, ref_name)?;
 
                 for property in properties {
                     if let Some(value) = arguments.get(&property.name) {
