@@ -2,6 +2,7 @@ use crate::objects::Array;
 use crate::objects::Instance;
 use crate::objects::Object;
 use broom::{Handle, Heap};
+use fnv::FnvHashMap;
 use specifications::common::Value;
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -48,7 +49,7 @@ impl Slot {
     ///
     pub fn from_value(
         value: Value,
-        globals: &HashMap<String, Slot>,
+        globals: &FnvHashMap<String, Slot>,
         heap: &mut Heap<Object>,
     ) -> Self {
         match value {
@@ -72,7 +73,7 @@ impl Slot {
                 Slot::Object(handle)
             }
             Value::Struct { data_type, properties } => {
-                let mut i_properties = HashMap::new();
+                let mut i_properties = FnvHashMap::default();
                 for (name, value) in properties {
                     i_properties.insert(name.clone(), Slot::from_value(value.clone(), globals, heap));
                 }

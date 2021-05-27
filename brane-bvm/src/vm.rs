@@ -13,8 +13,8 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use smallvec::SmallVec;
 use specifications::common::{Value, FunctionExt};
 use specifications::package::PackageIndex;
-use std::collections::HashMap;
 use tokio::runtime::Runtime;
+use fnv::FnvHashMap;
 
 #[derive(Clone, Default)]
 pub struct VmOptions {
@@ -31,7 +31,7 @@ pub struct VmOptions {
 
 #[derive(Clone, Default)]
 pub struct VmState {
-    globals: HashMap<String, Value>,
+    globals: FnvHashMap<String, Value>,
     options: VmOptions,
 }
 
@@ -39,7 +39,7 @@ unsafe impl Send for VmState {}
 
 impl VmState {
     fn new(
-        globals: HashMap<String, Value>,
+        globals: FnvHashMap<String, Value>,
         options: VmOptions,
     ) -> Self {
         Self { globals, options }
@@ -51,10 +51,10 @@ impl VmState {
     fn get_globals(
         &self,
         heap: &mut Heap<Object>,
-    ) -> HashMap<String, Slot> {
-        let mut globals = HashMap::new();
+    ) -> FnvHashMap<String, Slot> {
+        let mut globals = FnvHashMap::default();
         for (name, value) in &self.globals {
-            let slot = Slot::from_value(value.clone(), &HashMap::new(), heap);
+            let slot = Slot::from_value(value.clone(), &FnvHashMap::default(), heap);
             globals.insert(name.clone(), slot);
         }
 
@@ -71,7 +71,7 @@ where
 {
     executor: E,
     frames: SmallVec<[CallFrame; 64]>,
-    globals: HashMap<String, Slot>,
+    globals: FnvHashMap<String, Slot>,
     heap: Heap<Object>,
     locations: Vec<Handle<Object>>,
     package_index: PackageIndex,
@@ -86,7 +86,7 @@ where
     fn default() -> Self {
         let executor = E::default();
         let frames = SmallVec::with_capacity(64);
-        let globals = HashMap::default();
+        let globals = FnvHashMap::<String, Slot>::with_capacity_and_hasher(256, Default::default());
         let heap = Heap::default();
         let locations = Vec::with_capacity(16);
         let package_index = PackageIndex::default();
@@ -117,7 +117,7 @@ where
     pub fn new(
         executor: E,
         frames: SmallVec<[CallFrame; 64]>,
-        globals: HashMap<String, Slot>,
+        globals: FnvHashMap<String, Slot>,
         heap: Heap<Object>,
         locations: Vec<Handle<Object>>,
         package_index: PackageIndex,
@@ -184,7 +184,7 @@ where
     ///
     ///
     pub fn capture_state(&self) -> VmState {
-        let mut globals = HashMap::new();
+        let mut globals = FnvHashMap::default();
         for (name, slot) in &self.globals {
             let value = slot.clone().into_value(&self.heap);
             globals.insert(name.clone(), value);
@@ -763,7 +763,7 @@ where
         let properties_n = *self.frame().read_u8().expect("");
         let class = self.stack.pop().as_object().expect("expecting object");
 
-        let mut properties = HashMap::new();
+        let mut properties = FnvHashMap::default();
         (0..properties_n).for_each(|_| {
             let ident = self.stack.pop().as_object().expect("expecting object");
             let value = self.stack.pop();

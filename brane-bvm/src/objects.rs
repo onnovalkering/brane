@@ -1,8 +1,8 @@
 use crate::bytecode::FunctionMut;
 use crate::{bytecode::Chunk, stack::Slot};
 use broom::prelude::*;
+use fnv::FnvHashMap;
 use specifications::common::FunctionExt;
-use std::collections::HashMap;
 
 #[derive(Debug)]
 pub enum Object {
@@ -139,7 +139,7 @@ impl Trace<Object> for Function {
 #[derive(Debug)]
 pub struct Instance {
     pub class: Handle<Object>,
-    pub properties: HashMap<String, Slot>,
+    pub properties: FnvHashMap<String, Slot>,
 }
 
 impl Instance {
@@ -148,7 +148,7 @@ impl Instance {
     ///
     pub fn new(
         class: Handle<Object>,
-        properties: HashMap<String, Slot>,
+        properties: FnvHashMap<String, Slot>,
     ) -> Self {
         Self { class, properties }
     }

@@ -1,6 +1,6 @@
 use crate::{executor::VmExecutor, stack::Slot};
+use fnv::FnvHashMap;
 use specifications::common::Value;
-use std::collections::HashMap;
 
 const BUILTIN_PRINT_NAME: &str = "print";
 const BUILTIN_PRINT_CODE: u8 = 0x01;
@@ -8,7 +8,7 @@ const BUILTIN_PRINT_CODE: u8 = 0x01;
 ///
 ///
 ///
-pub fn register(globals: &mut HashMap<String, Slot>) {
+pub fn register(globals: &mut FnvHashMap<String, Slot>) {
     // TODO: use a macro for this.
 
     globals.insert(String::from(BUILTIN_PRINT_NAME), Slot::BuiltIn(BUILTIN_PRINT_CODE));
