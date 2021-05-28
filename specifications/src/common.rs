@@ -229,11 +229,12 @@ pub enum Value {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FunctionExt {
-    pub name: String,
+    pub detached: bool,
     pub kind: String,
+    pub name: String,
     pub package: String,
-    pub version: String,
     pub parameters: Vec<Parameter>,
+    pub version: String,
 }
 
 #[skip_serializing_none]
@@ -442,13 +443,13 @@ impl Display for Value {
             Integer(i) => i.to_string(),
             Pointer { variable, .. } => format!("@{}", variable),
             Real(r) => r.to_string(),
-            Struct { properties, .. } => {
+            Struct { properties, data_type } => {
                 let properties = properties
                     .iter()
                     .map(|(n, p)| format!("{}: {}", n, p.to_string()))
                     .collect::<Vec<String>>()
                     .join(", ");
-                format!("{{{}}}", properties)
+                format!("{} {{{}}}", data_type, properties)
             }
             Unicode(s) => s.to_string(),
             Unit => String::from("unit"),

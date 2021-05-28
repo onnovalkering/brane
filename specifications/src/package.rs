@@ -19,6 +19,7 @@ type Map<T> = std::collections::HashMap<String, T>;
 pub struct PackageInfo {
     pub created: DateTime<Utc>,
     pub description: Option<String>,
+    pub detached: bool,
     pub functions: Option<Map<Function>>,
     pub id: Uuid,
     pub kind: String,
@@ -33,6 +34,7 @@ impl PackageInfo {
         name: String,
         version: String,
         description: Option<String>,
+        detached: bool,
         kind: String,
         functions: Option<Map<Function>>,
         types: Option<Map<Type>>,
@@ -43,6 +45,7 @@ impl PackageInfo {
         PackageInfo {
             created,
             description,
+            detached,
             functions,
             id,
             kind,
