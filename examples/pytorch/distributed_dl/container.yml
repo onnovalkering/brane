@@ -1,0 +1,56 @@
+name: distributed_dl
+version: 1.0.0
+
+kind: compute
+
+entrypoint:
+  kind: service
+  exec: entrypoint.sh
+
+dependencies:
+  - python3
+  - python3-pip
+
+install:
+  - pip3 install -f https://download.pytorch.org/whl/torch_stable.html
+    torch==1.8.1+cpu
+    torchvision==0.9.1+cpu
+    torchaudio==0.8.1
+
+files:
+  - entrypoint.sh
+  - run.py
+
+actions:
+  startMaster:
+    command:
+      args: []
+      capture: prefixed
+
+    input:
+      - name: world_size
+        type: integer
+
+    output:
+      - name: output
+        type: string
+
+  startWorker:
+    command:
+      args: []
+      capture: prefixed
+
+    input:
+      - name: world_size
+        type: integer
+
+      - name: rank
+        type: integer
+
+      - name: master_addr
+        type: string
+
+    output:
+      - name: output
+        type: string
+
