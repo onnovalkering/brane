@@ -23,6 +23,7 @@ table! {
         uuid -> Varchar,
         version -> Varchar,
         description -> Nullable<Varchar>,
+        detached -> Bool,
         functions_json -> Nullable<Text>,
         source -> Nullable<Text>,
         types_json -> Nullable<Text>,

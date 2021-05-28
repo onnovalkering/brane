@@ -59,6 +59,7 @@ impl Package {
             id,
             created,
             description: self.description.clone(),
+            detached: self.detached.clone(),
             functions: Some(functions),
             kind: self.kind.clone(),
             name: self.name.clone(),

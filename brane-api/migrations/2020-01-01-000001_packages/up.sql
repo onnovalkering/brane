@@ -11,6 +11,7 @@ CREATE TABLE "packages" (
 
   -- content
   , "description" VARCHAR
+  , "detached" BOOLEAN
   , "functions_json" TEXT
   , "source" TEXT
   , "types_json" TEXT

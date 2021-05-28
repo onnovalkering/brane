@@ -26,6 +26,7 @@ pub struct Package {
     pub version: String,
     // Content
     pub description: Option<String>,
+    pub detached: bool,
     pub functions_json: Option<String>,
     pub source: Option<String>,
     pub types_json: Option<String>,
@@ -46,6 +47,7 @@ pub struct NewPackage {
     pub version: String,
     // Content
     pub description: Option<String>,
+    pub detached: bool,
     pub functions_json: Option<String>,
     pub source: Option<String>,
     pub types_json: Option<String>,
@@ -78,6 +80,7 @@ impl NewPackage {
             checksum: checksum as i64,
             created: info.created.naive_utc(),
             description: info.description,
+            detached: info.detached,
             filename,
             functions_json,
             kind: info.kind,
