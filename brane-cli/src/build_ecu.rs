@@ -86,6 +86,7 @@ fn generate_package_info(container_info: &ContainerInfo) -> Result<PackageInfo> 
         container_info.name.clone(),
         container_info.version.clone(),
         container_info.description.clone(),
+        container_info.entrypoint.kind == *"service",
         String::from("ecu"),
         Some(functions),
         container_info.types.clone(),

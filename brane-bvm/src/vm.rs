@@ -607,6 +607,7 @@ where
                 for (f_name, function) in functions {
                     let function = FunctionExt {
                         name: f_name.clone(),
+                        detached: package.detached,
                         package: p_name.clone(),
                         kind: kind.clone(),
                         version: package.version.clone(),
@@ -621,7 +622,7 @@ where
             }
 
             if let Some(types) = &package.types {
-                for (t_name, _class) in types {
+                for t_name in types.keys() {
                     let class = Class {
                         name: t_name.clone(),
                     };

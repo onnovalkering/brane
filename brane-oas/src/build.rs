@@ -271,7 +271,7 @@ fn build_oas_function_output(
     }
 
     // Else, we use an object or unit if there is no output.
-    let return_type = if output_properties.len() >= 1 {
+    let return_type = if !output_properties.is_empty() {
         let type_name = uppercase_first_letter(&operation_id);
         let output_data_type = format!("{}Output", type_name);
 

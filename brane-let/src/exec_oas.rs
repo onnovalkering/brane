@@ -2,7 +2,6 @@ use crate::callback::Callback;
 use anyhow::{Context, Result};
 use specifications::common::{Parameter, Type, Value};
 use specifications::package::PackageInfo;
-use std::os::raw::c_schar;
 use std::path::{Path, PathBuf};
 
 type Map<T> = std::collections::HashMap<String, T>;

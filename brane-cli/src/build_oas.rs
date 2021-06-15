@@ -69,6 +69,7 @@ fn create_package_info(oas_document: &OpenAPI) -> Result<PackageInfo> {
         name,
         version,
         description,
+        false,
         String::from("oas"),
         Some(functions),
         Some(types),

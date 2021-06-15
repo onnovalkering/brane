@@ -61,14 +61,14 @@ impl From<SpecFunction> for FunctionMut {
     }
 }
 
-impl Into<SpecFunction> for FunctionMut {
-    fn into(self) -> SpecFunction {
+impl From<FunctionMut> for SpecFunction {
+    fn from(f: FunctionMut) -> Self {
         SpecFunction {
-            arity: self.arity,
-            name: self.name,
+            arity: f.arity,
+            name: f.name,
             bytecode: Bytecode {
-                code: self.chunk.code[..].to_vec(),
-                constants: self.chunk.constants,
+                code: f.chunk.code[..].to_vec(),
+                constants: f.chunk.constants,
             }
         }
     }
