@@ -10,7 +10,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3890928.svg)](https://doi.org/10.5281/zenodo.3890928)
 
 
-Regardless of the context and rationale, running distributed applications on geographically dispersed IT resources often comes with various technical and organizational challenges. If not addressed appropriately, these challenges may impede development, and in turn, scientific and business innovation. We have developed the Brane framework to support implementers in addressing these challenges. Brane utilizes containerization to encapsulate functionalities as portable building blocks. Through programmability,  application orchestration can be expressed using an intuitive domain-specific language. As a result, end-users with limited programming experience are empowered to compose applications by themselves, without having to deal with the underlying technical details. They can do this from user-friendly interactive notebooks. 
+Regardless of the context and rationale, running distributed applications on geographically dispersed IT resources often comes with various technical and organizational challenges. If not addressed appropriately, these challenges may impede development, and in turn, scientific and business innovation. We have developed Brane to support implementers in addressing these challenges. Brane utilizes containerization to encapsulate functionalities as portable building blocks. Through programmability,  application orchestration can be expressed using an intuitive domain-specific language. As a result, end-users with limited programming experience are empowered to compose applications by themselves, without having to deal with the underlying technical details. 
 
 See the [documentation](https://onnovalkering.gitbook.io/brane) for more information.
 
@@ -24,7 +24,7 @@ The following system dependencies must be installed (assuming Ubuntu 20.04):
 
 - build-essential
 - cmake
-- libcassandra (see ./contrib/datastax)
+- libcassandra (see [./contrib/datastax](https://github.com/onnovalkering/brane/tree/develop/contrib/datastax))
 - libpq-dev
 - libssl-dev
 - pkg-config
