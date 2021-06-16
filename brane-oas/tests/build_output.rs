@@ -12,8 +12,8 @@ fn resp_empty_unit() -> Result<()> {
 #[test]
 fn resp_string_string() -> Result<()> {
     let (function, types) = common::build_oas_function_resp("/schema-string", "string")?;
-    assert_eq!(function.return_type, String::from("string"));
-    assert_eq!(types.len(), 0);
+    assert_eq!(function.return_type, String::from("StringOutput"));
+    assert_eq!(types.len(), 1);
 
     Ok(())
 }
@@ -21,8 +21,8 @@ fn resp_string_string() -> Result<()> {
 #[test]
 fn resp_number_real() -> Result<()> {
     let (function, types) = common::build_oas_function_resp("/schema-number", "number")?;
-    assert_eq!(function.return_type, String::from("real"));
-    assert_eq!(types.len(), 0);
+    assert_eq!(function.return_type, String::from("NumberOutput"));
+    assert_eq!(types.len(), 1);
 
     Ok(())
 }
@@ -30,8 +30,8 @@ fn resp_number_real() -> Result<()> {
 #[test]
 fn resp_integer_integer() -> Result<()> {
     let (function, types) = common::build_oas_function_resp("/schema-integer", "integer")?;
-    assert_eq!(function.return_type, String::from("integer"));
-    assert_eq!(types.len(), 0);
+    assert_eq!(function.return_type, String::from("IntegerOutput"));
+    assert_eq!(types.len(), 1);
 
     Ok(())
 }
@@ -39,8 +39,8 @@ fn resp_integer_integer() -> Result<()> {
 #[test]
 fn resp_boolean_boolean() -> Result<()> {
     let (function, types) = common::build_oas_function_resp("/schema-boolean", "boolean")?;
-    assert_eq!(function.return_type, String::from("boolean"));
-    assert_eq!(types.len(), 0);
+    assert_eq!(function.return_type, String::from("BooleanOutput"));
+    assert_eq!(types.len(), 1);
 
     Ok(())
 }
