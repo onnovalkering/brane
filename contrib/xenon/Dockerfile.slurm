@@ -21,8 +21,8 @@ RUN wget https://github.com/sylabs/singularity/releases/download/v${VERSION}/sin
     tar -xzf singularity-${VERSION}.tar.gz && \
     cd singularity && \
     ./mconfig -p /usr/local/singularity && \
-    make -C ./builddir && \
-    make -C ./builddir install
+    make -j -C ./builddir && \
+    make -j -C ./builddir install
 
 FROM nlesc/xenon-slurm
 

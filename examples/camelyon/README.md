@@ -16,7 +16,7 @@ $ brane list
 ```
 
 ## 3. Start a local Brane deployment
-Navigate to the Docker deployment folder, and run `docker-compose`.
+Navigate to the Docker deployment folder, and run `docker-compose -p brane`.
 ```shell
 $ cd ./deployment/docker
 $ docker-compose up -d

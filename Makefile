@@ -46,22 +46,22 @@ stop-instance: \
 	stop-services
 
 start-services:
-	COMPOSE_IGNORE_ORPHANS=1 docker-compose -f docker-compose-svc.yml up -d
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-svc.yml up -d
 
 stop-services:
-	COMPOSE_IGNORE_ORPHANS=1 docker-compose -f docker-compose-svc.yml down
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-svc.yml down
 
 start-brane:
-	COMPOSE_IGNORE_ORPHANS=1 docker-compose -f docker-compose-brn.yml up -d
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-brn.yml up -d
 
 stop-brane:
-	COMPOSE_IGNORE_ORPHANS=1 docker-compose -f docker-compose-brn.yml down
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-brn.yml down
 
 start-ide:
-	COMPOSE_IGNORE_ORPHANS=1 docker-compose -f docker-compose-ide.yml up -d
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-ide.yml up -d
 
 stop-ide:
-	COMPOSE_IGNORE_ORPHANS=1 docker-compose -f docker-compose-ide.yml down
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-ide.yml down
 
 # Kubernetes in Docker (kind)
 

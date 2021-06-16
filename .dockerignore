@@ -9,3 +9,4 @@ brane-let/
 brane-log/target
 examples/
 target/
+contrib/datastax/cpp-driver/build/

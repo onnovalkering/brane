@@ -20,7 +20,7 @@ build: checkout
 	&& mkdir -p build \
 	&& cd build \
 	&& cmake .. \
-	&& make \
+	&& make -j \
 	&& make install
 
 checkout:

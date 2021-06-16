@@ -11,7 +11,7 @@ COPY ./contrib/datastax /datastax
 
 # Build DataStax driver
 WORKDIR /datastax
-RUN make
+RUN make -j
 
 # Copy over relevant crates
 COPY ./brane-log /brane-log
