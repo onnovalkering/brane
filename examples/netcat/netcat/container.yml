@@ -1,0 +1,52 @@
+name: netcat
+version: 1.0.0
+
+kind: compute
+
+entrypoint:
+  kind: service
+  exec: entrypoint.sh
+
+dependencies:
+  - netcat-openbsd
+
+files:
+  - entrypoint.sh
+
+actions:
+  listen:
+    command:
+      args:
+        - listen
+      capture: prefixed
+
+    input:
+      - name: port
+        type: integer
+
+      - name: keep_alive
+        type: boolean
+
+    output:
+      - name: output
+        type: string
+
+  send:
+    command:
+      args:
+        - send
+      capture: prefixed
+
+    input: 
+      - name: address
+        type: string
+
+      - name: port
+        type: integer
+
+      - name: message
+        type: string
+
+    output:
+      - name: output
+        type: string

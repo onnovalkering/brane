@@ -1,0 +1,10 @@
+import netcat;
+
+let port := 12345;
+let message := "Hello, world!";
+
+let service := listen(port, false);
+service.waitUntilStarted();
+
+send(service.address, port, message);
+service.waitUntilDone();
