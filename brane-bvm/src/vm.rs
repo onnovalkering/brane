@@ -135,7 +135,7 @@ where
             stack,
         };
 
-        builtins::register(&mut vm.globals);
+        builtins::register(&mut vm.globals, &mut vm.heap);
 
         vm
     }

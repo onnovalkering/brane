@@ -84,15 +84,29 @@ impl VmExecutor for DockerExecutor {
 
         let exec = ExecuteInfo::new(image, image_file, None, Some(command));
 
-        let (stdout, stderr) = run_and_wait(exec).await?;
-        debug!("stderr: {}", stderr);
-        debug!("stdout: {}", stdout);
+        if function.detached {
+            let name = run(exec).await?;
+            let address = get_container_address(&name).await?;
 
-        let output = stdout.lines().last().unwrap_or_default().to_string();
-        decode_b64(output).or_else(|err| {
-            error!("{:?}", err);
-            Ok(Value::Unit)
-        })
+            let mut properties = HashMap::default();
+            properties.insert(String::from("identifier"), Value::Unicode(name));
+            properties.insert(String::from("address"), Value::Unicode(address));
+
+            Ok(Value::Struct {
+                data_type: String::from("Service"),
+                properties
+            })
+        } else {
+            let (stdout, stderr) = run_and_wait(exec).await?;
+            debug!("stderr: {}", stderr);
+            debug!("stdout: {}", stdout);
+
+            let output = stdout.lines().last().unwrap_or_default().to_string();
+            decode_b64(output).or_else(|err| {
+                error!("{:?}", err);
+                Ok(Value::Unit)
+            })            
+        }
     }
 }
 
@@ -146,16 +160,14 @@ impl ExecuteInfo {
 ///
 ///
 ///
-pub async fn run(exec: ExecuteInfo) -> Result<()> {
+pub async fn run(exec: ExecuteInfo) -> Result<String> {
     let docker = Docker::connect_with_local_defaults()?;
 
     // Either import or pull image, if not already present
     ensure_image(&docker, &exec).await?;
 
-    // Start container and wait for completion
-    create_and_start_container(&docker, &exec).await?;
-
-    Ok(())
+    // Start container, return immediatly
+    create_and_start_container(&docker, &exec).await
 }
 
 ///
@@ -358,4 +370,28 @@ pub async fn remove_image(name: &str) -> Result<()> {
     docker.remove_image(&image.id, remove_options, None).await?;
 
     Ok(())
+}
+
+///
+///
+///
+pub async fn get_container_address(name: &str) -> Result<String> {
+    let docker = Docker::connect_with_local_defaults()?;
+
+    let container = docker.inspect_container(name, None).await?;
+    let networks = container.network_settings.map(|n| n.networks).flatten().unwrap_or_default();
+
+    let address = if let Some(network) = networks.values().next() {
+        let ip = network.ip_address.clone().unwrap_or_default();
+
+        if ip.is_empty() {
+            String::from("127.0.0.1")
+        } else {
+            ip
+        }
+    } else {
+        String::new()
+    };
+
+    Ok(address)
 }
