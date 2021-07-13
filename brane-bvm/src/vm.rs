@@ -257,7 +257,7 @@ where
 
         let function = self.stack.get(frame_first).as_object().expect("");
         if let Some(Object::Function(_f)) = self.heap.get(function) {
-            // println!("{}", _f.chunk.disassemble().unwrap());
+            println!("{}", _f.chunk.disassemble().unwrap());
 
             let frame = CallFrame::new(function, frame_first);
             self.frames.push(frame);
@@ -312,6 +312,8 @@ where
                         break;
                     }
                 }
+                OP_SET_GLOBAL => self.op_set_global(false),
+                OP_SET_LOCAL => self.op_set_local(),
                 OP_SUBSTRACT => self.op_substract(),
                 OP_TRUE => self.op_true(),
                 OP_UNIT => self.op_unit(),
@@ -480,7 +482,7 @@ where
     ///
     #[inline]
     pub fn op_define_global(&mut self) {
-        self.op_set_global();
+        self.op_set_global(true);
     }
 
     ///
@@ -893,14 +895,19 @@ where
     ///
     ///
     #[inline]
-    pub fn op_set_global(&mut self) {
+    pub fn op_set_global(&mut self, create_if_not_exists: bool) {
         let identifier = *self.frame().read_constant().expect("Failed to read constant.");
 
         let value = self.stack.pop();
 
         if let Slot::Object(handle) = identifier {
             if let Some(Object::String(identifier)) = self.heap.get(handle) {
-                self.globals.insert(identifier.clone(), value);
+                if create_if_not_exists || self.globals.contains_key(identifier) {
+                    self.globals.insert(identifier.clone(), value);
+                } else {
+                    panic!("Variable '{}' not found.", identifier);
+                }
+
                 return;
             }
         }
