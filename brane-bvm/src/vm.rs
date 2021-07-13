@@ -287,6 +287,8 @@ where
                 OP_FALSE => self.op_false(),
                 OP_GET_GLOBAL => self.op_get_global(),
                 OP_GET_LOCAL => self.op_get_local(),
+                OP_GET_METHOD => self.op_get_method(),
+                OP_GET_PROPERTY => self.op_get_property(),
                 OP_GREATER => self.op_greater(),
                 OP_IMPORT => self.op_import(),
                 OP_INDEX => self.op_index(),
@@ -445,7 +447,11 @@ where
                         }
                     }
                 }
-                _ => panic!("Not a callable object"),
+                object => {
+                    dbg!(&object);
+                    dbg!(&self.stack);
+                    panic!("Not a callable object");
+                }
             },
             _ => panic!("Not a callable object"),
         };
@@ -580,6 +586,61 @@ where
     ///
     ///
     #[inline]
+    pub fn op_get_method(&mut self) {
+        let instance_slot = self.stack.pop();
+        let instance = instance_slot.as_object().expect("expecting object.");
+        let method = self
+            .frame()
+            .read_constant()
+            .expect("expecting constant.")
+            .as_object()
+            .expect("expecting object.");
+
+        if let Some(Object::Instance(instance)) = self.heap.get(instance) {
+            if let Some(Object::String(method)) = self.heap.get(method) {
+                if let Some(Object::Class(class)) = self.heap.get(instance.class) {
+                    let method = *class.methods.get(method).expect("expecting method.");
+
+                    self.stack.push(method);
+                    self.stack.push(instance_slot);
+
+                    return;
+                }
+            }
+        }
+
+        panic!("invalid");
+    }
+
+    ///
+    ///
+    ///
+    #[inline]
+    pub fn op_get_property(&mut self) {
+        let instance = self.stack.pop().as_object().expect("expecting object.");
+        let property = self
+            .frame()
+            .read_constant()
+            .expect("expecting constant.")
+            .as_object()
+            .expect("expecting object.");
+
+        if let Some(Object::Instance(instance)) = self.heap.get(instance) {
+            if let Some(Object::String(property)) = self.heap.get(property) {
+                let value = *instance.properties.get(property).expect("expecting property.");
+                self.stack.push(value);
+
+                return;
+            }
+        }
+
+        panic!("invalid");
+    }    
+
+    ///
+    ///
+    ///
+    #[inline]
     pub fn op_greater(&mut self) {
         let rhs = self.stack.pop();
         let lhs = self.stack.pop();
@@ -627,6 +688,7 @@ where
                 for t_name in types.keys() {
                     let class = Class {
                         name: t_name.clone(),
+                        methods: Default::default(),
                     };
 
                     let handle = self.heap.insert(Object::Class(class)).into_handle();

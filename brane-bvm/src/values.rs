@@ -122,6 +122,7 @@ impl From<SpecValue> for Value {
                 let class = Class {
                     name: data_type,
                     properties: HashMap::new(),
+                    methods: HashMap::new(),
                 };
                 Value::Instance(Instance { class, fields })
             }

@@ -10,7 +10,8 @@ pub enum Stmt {
     Block(Block),
     DeclareClass {
         ident: Ident,
-        properties: HashMap<String, String>,
+        properties: HashMap<Ident, Ident>,
+        methods: HashMap<Ident, Stmt>,
     },
     DeclareFunc {
         ident: Ident,
@@ -41,6 +42,10 @@ pub enum Stmt {
     Parallel {
         let_assign: Option<Ident>,
         blocks: Vec<Stmt>,
+    },
+    Property {
+        ident: Ident,
+        class: Ident,
     },
     Return(Option<Expr>),
     While {
@@ -78,7 +83,7 @@ pub enum Expr {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Ident(pub String);
 
 #[derive(Clone, Debug)]

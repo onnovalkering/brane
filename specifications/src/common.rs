@@ -175,14 +175,16 @@ impl Property {
 pub struct Class {
     pub name: String,
     pub properties: HashMap<String, String>,
+    pub methods: HashMap<String, SpecFunction>,
 }
 
 impl Class {
     pub fn new(
         name: String,
         properties: HashMap<String, String>,
+        methods: HashMap<String, SpecFunction>,
     ) -> Self {
-        Self { name, properties }
+        Self { name, properties, methods }
     }
 }
 

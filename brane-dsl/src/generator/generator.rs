@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use crate::parser::ast::*;
 use anyhow::Result;
 use brane_bvm::bytecode::{opcodes::*, ChunkMut, FunctionMut};
-use specifications::common::{Class, SpecFunction, Value};
+use specifications::common::{SpecFunction, Value, Class};
 
 #[derive(Debug, Clone)]
 pub struct Local {
@@ -77,8 +79,22 @@ pub fn stmt_to_opcodes(
         Stmt::DeclareClass {
             ident: Ident(ident),
             properties,
+            methods,
         } => {
-            let class = Value::Class(Class::new(ident.clone(), properties));
+            let properties = properties.into_iter().map(|(Ident(k), Ident(v))| (k, v)).collect();
+            let methods: HashMap<String, SpecFunction> = methods.into_iter().map(|(Ident(k), stmt)| {
+                if let Stmt::DeclareFunc { ident: Ident(ident), params, body } = stmt {
+                    let method: FunctionMut = compile_function(body, 1, &params, ident).unwrap();
+                    let method: SpecFunction = method.into();
+                    
+                    (k, method)
+                } else {
+                    unreachable!()
+                }
+            }).collect();
+
+            let class = Value::Class(Class::new(ident.clone(), properties, methods));
+            
             let class = chunk.add_constant(class);
             chunk.write_pair(OP_CLASS, class);
 
@@ -250,6 +266,9 @@ pub fn stmt_to_opcodes(
             expr_to_opcodes(expr, chunk, locals, scope);
             chunk.write(OP_POP);
         }
+        Stmt::Property { ..} => {
+            unreachable!()
+        }
         Stmt::Return(expr) => {
             if let Some(expr) = expr {
                 expr_to_opcodes(expr, chunk, locals, scope);
@@ -273,6 +292,7 @@ pub fn stmt_to_opcodes(
             let ident = chunk.add_constant(ident.into());
             chunk.write_pair(OP_DEFINE_GLOBAL, ident);
         }
+        
         // TODO: merge with block statement?
         Stmt::On { location, block } => {
             // Create a new scope (shadow).
@@ -358,13 +378,31 @@ pub fn expr_to_opcodes(
             expr_to_opcodes(*lhs_operand, chunk, locals, scope);
             let rhs_operand = *rhs_operand;
 
+            dbg!(&rhs_operand);
+
             if let BinOp::Dot = operator {
-                if let Expr::Ident(Ident(ident)) = &rhs_operand {
-                    let constant = chunk.add_constant(ident.clone().into());
-                    chunk.write_pair(OP_DOT, constant);
-                    return;
-                } else {
-                    unreachable!()
+                match &rhs_operand {
+                    Expr::Ident(Ident(ident)) => {
+                        let property = chunk.add_constant(ident.clone().into());
+                        chunk.write_pair(OP_GET_PROPERTY, property);
+                        return;
+                    },
+                    Expr::Call { function: Ident(ident), arguments } => {
+                        // Put method on the stack.
+                        let method = chunk.add_constant(ident.clone().into());
+                        chunk.write_pair(OP_GET_METHOD, method);
+
+                        // Call method with arguments, implicitly pass self.
+                        let arguments_n = arguments.len() as u8 + 1;
+                        for argument in arguments.iter().skip(1) {
+                            expr_to_opcodes(argument.clone(), chunk, locals, scope);
+                        }
+            
+                        chunk.write_pair(OP_CALL, arguments_n);
+
+                        return;
+                    }
+                    _ => unreachable!()
                 }
             }
 

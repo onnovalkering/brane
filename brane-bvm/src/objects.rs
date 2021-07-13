@@ -88,6 +88,7 @@ impl Trace<Object> for Array {
 #[derive(Debug)]
 pub struct Class {
     pub name: String,
+    pub methods: FnvHashMap<String, Slot>,
 }
 
 impl Trace<Object> for Class {

@@ -1,0 +1,11 @@
+
+class Animal {
+    name: string;
+
+    func say(self) {
+        print(self.name);
+    }
+}
+
+let a := new Animal { name := "Pokky" };
+a.say();

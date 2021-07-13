@@ -7,7 +7,7 @@ mod builtins;
 pub mod bytecode;
 pub mod executor;
 mod frames;
-mod objects;
+pub mod objects;
 mod stack;
 pub mod values;
 pub mod vm;

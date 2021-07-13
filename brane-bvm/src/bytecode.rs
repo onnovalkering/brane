@@ -1,9 +1,11 @@
-use crate::objects::{self, Object};
+use crate::objects::{self, Class, Object};
 use crate::Function;
 use crate::stack::Slot;
 use anyhow::Result;
 use broom::Heap;
 use bytes::{BufMut, Bytes, BytesMut};
+use fnv::FnvHashMap;
+use std::collections::HashMap;
 use std::fmt::Write;
 use specifications::common::{Bytecode, SpecFunction, Value};
 
@@ -21,6 +23,8 @@ pub mod opcodes {
     pub const OP_FALSE: u8 = 0x0B;
     pub const OP_GET_GLOBAL: u8 = 0x0C;
     pub const OP_GET_LOCAL: u8 = 0x0D;
+    pub const OP_GET_METHOD: u8 = 0x26;    
+    pub const OP_GET_PROPERTY: u8 = 0x27;
     pub const OP_GREATER: u8 = 0x0E;
     pub const OP_IMPORT: u8 = 0x0F;
     pub const OP_INDEX: u8 = 0x10;
@@ -45,6 +49,14 @@ pub mod opcodes {
     pub const OP_SUBSTRACT: u8 = 0x22;
     pub const OP_TRUE: u8 = 0x23;
     pub const OP_UNIT: u8 = 0x24;
+}
+
+
+#[derive(Clone)]
+pub struct ClassMut {
+    pub name: String,
+    pub properties: HashMap<String, String>,
+    pub methods: HashMap<String, FunctionMut>,
 }
 
 #[derive(Clone)]
@@ -255,6 +267,14 @@ impl Chunk {
                     byte_instruction("OP_GET_LOCAL", &self, offset, &mut result);
                     skip = 1;
                 }
+                OP_GET_METHOD => {
+                    constant_instruction("OP_GET_METHOD", &self, offset, &mut result);
+                    skip = 1;
+                }                   
+                OP_GET_PROPERTY => {
+                    constant_instruction("OP_GET_PROPERTY", &self, offset, &mut result);
+                    skip = 1;
+                }                                     
                 OP_SET_GLOBAL => {
                     byte_instruction("OP_SET_GLOBAL", &self, offset, &mut result);
                     skip = 1;
@@ -271,7 +291,7 @@ impl Chunk {
                     constant_instruction("OP_IMPORT", &self, offset, &mut result);
                     skip = 1;
                 }
-                0x00 | 0x25..=u8::MAX => {
+                0x00 | 0x28..=u8::MAX => {
                     unreachable!()
                 }
             }
@@ -389,6 +409,27 @@ impl ChunkMut {
                 Value::Unicode(s) => {
                     let string = Object::String(s);
                     let handle = heap.insert(string).into_handle();
+
+                    Slot::Object(handle)
+                }
+                Value::Class(c) => {
+                    let mut methods = FnvHashMap::default();
+
+                    for (name, method) in c.methods.clone().into_iter() {
+                        let method_mut: FunctionMut = method.into();
+                        let method = Object::Function(method_mut.freeze(heap));
+
+                        let handle = heap.insert(method).into_handle();
+                        methods.insert(name, Slot::Object(handle));
+                    }
+
+                    let class = Class { 
+                        name: c.name.clone(),
+                        methods,
+                    };
+
+                    let class = Object::Class(class);
+                    let handle = heap.insert(class).into_handle();
 
                     Slot::Object(handle)
                 }

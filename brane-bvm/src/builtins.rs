@@ -25,7 +25,8 @@ pub fn register(globals: &mut FnvHashMap<String, Slot>, heap: &mut Heap<Object>)
 ///
 fn class(name: String) -> Object {
     Object::Class(Class {
-        name
+        name,
+        methods: Default::default(),
     })
 }
 

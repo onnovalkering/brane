@@ -1,4 +1,4 @@
-use super::ast::{Ident, Stmt};
+use super::ast::Stmt;
 use crate::parser::{expression, identifier};
 use crate::scanner::{Token, Tokens};
 use crate::tag_token;
@@ -169,24 +169,23 @@ pub fn declare_class_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a
             seq::preceded(tag_token!(Token::Class), identifier::parse),
             seq::delimited(
                 tag_token!(Token::LeftBrace),
-                comb::opt(seq::pair(
-                    declare_property_stmt,
-                    multi::many0(seq::preceded(tag_token!(Token::Comma), declare_property_stmt)),
-                )),
+                multi::many0(branch::alt((declare_property_stmt, declare_func_stmt))),
                 tag_token!(Token::RightBrace),
             ),
         )),
-        |(ident, properties)| {
-            let properties_items = properties
-                .map(|(h, e)| [&[h], &e[..]].concat().to_vec())
-                .unwrap_or_default();
-
+        |(ident, body)| {
             let mut properties = HashMap::new();
-            for (Ident(name), Ident(class)) in properties_items.iter() {
-                properties.insert(name.clone(), class.clone());
+            let mut methods = HashMap::new();
+
+            for stmt in body.iter() {
+                match stmt {
+                    Stmt::Property { ident, class } => { properties.insert(ident.clone(), class.clone()); }
+                    Stmt::DeclareFunc { ident, .. } => { methods.insert(ident.clone(), stmt.clone()); }
+                    _ => unreachable!()
+                }
             }
 
-            Stmt::DeclareClass { ident, properties }
+            Stmt::DeclareClass { ident, properties, methods }
         },
     )
     .parse(input)
@@ -197,8 +196,15 @@ pub fn declare_class_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a
 ///
 pub fn declare_property_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a>>>(
     input: Tokens<'a>
-) -> IResult<Tokens, (Ident, Ident), E> {
-    seq::separated_pair(identifier::parse, tag_token!(Token::Colon), identifier::parse).parse(input)
+) -> IResult<Tokens, Stmt, E> {
+    comb::map(
+        seq::terminated(
+            seq::separated_pair(identifier::parse, tag_token!(Token::Colon), identifier::parse),
+            comb::cut(tag_token!(Token::Semicolon)),
+        ),
+        |(ident, class)| Stmt::Property { ident, class },
+    )
+    .parse(input)
 }
 
 ///
