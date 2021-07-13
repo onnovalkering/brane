@@ -599,7 +599,16 @@ where
         if let Some(Object::Instance(instance)) = self.heap.get(instance) {
             if let Some(Object::String(method)) = self.heap.get(method) {
                 if let Some(Object::Class(class)) = self.heap.get(instance.class) {
-                    let method = *class.methods.get(method).expect("expecting method.");
+                    let method = if class.name == *"Service" {
+                        match method.as_str() {
+                            // Quickfix :( 
+                            "waitUntilStarted" => Slot::BuiltIn(0x02),
+                            "waitUntilDone" => Slot::BuiltIn(0x03),
+                            _ => panic!("expecting method."),
+                        }
+                    } else {
+                        *class.methods.get(method).expect("expecting method.")
+                    };
 
                     self.stack.push(method);
                     self.stack.push(instance_slot);

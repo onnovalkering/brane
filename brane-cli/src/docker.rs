@@ -108,6 +108,23 @@ impl VmExecutor for DockerExecutor {
             })            
         }
     }
+
+    ///
+    ///
+    ///
+    async fn wait_until(&self, name: String, state: brane_bvm::executor::ServiceState) -> Result<()> {
+        if let brane_bvm::executor::ServiceState::Started = state {
+            return Ok(());
+        }
+
+        let docker = Docker::connect_with_local_defaults()?;
+        docker
+            .wait_container(&name, None::<WaitContainerOptions<String>>)
+            .try_collect::<Vec<_>>()
+            .await?;
+
+        Ok(())
+    }    
 }
 
 ///

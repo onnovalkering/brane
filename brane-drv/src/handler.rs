@@ -191,6 +191,13 @@ impl VmExecutor for JobExecutor {
 
         Ok(call.await)
     }
+
+    ///
+    ///
+    ///
+    async fn wait_until(&self, _service: String, _state: brane_bvm::executor::ServiceState) -> Result<()> {
+        Ok(())
+    }
 }
 
 struct Call {
