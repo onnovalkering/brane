@@ -35,6 +35,7 @@ build-plr-image:
 
 # Development setup
 start-instance: \
+	ensure-configuration \
 	create-kind-network \
 	start-services \
 	format-dfs \
@@ -83,6 +84,12 @@ delete-kind-cluster:
 kind-cluster-config:
 	@kind get kubeconfig --internal --name brane | base64
 
+# Configuration
+
+ensure-configuration:
+	touch infra.yml && \
+	touch secrets.yml
+
 # Slurm
 
 start-slurm: create-kind-network
@@ -112,3 +119,4 @@ jupyterlab-token:
 	| grep "token=" \
 	| tail -1 \
 	| sed "s#.*token=##"
+
