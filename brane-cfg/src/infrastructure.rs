@@ -3,11 +3,11 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::BufReader;
+use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use url::Url;
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Default)]
 pub struct InfrastructureDocument {
     locations: HashMap<String, Location>,
 }
@@ -139,9 +139,14 @@ impl Infrastructure {
     ///
     pub fn validate(&self) -> Result<()> {
         if let Store::File(store_file) = &self.store {
-            let infra_reader = BufReader::new(File::open(store_file)?);
+            let mut infra_reader = BufReader::new(File::open(store_file)?);
+            let mut infra_file = String::new();
+            infra_reader.read_to_string(&mut infra_file)?;
+
+            ensure!(!infra_file.is_empty(), "Infrastrucutre file may not be empty.");
+
             let _: InfrastructureDocument =
-                serde_yaml::from_reader(infra_reader).context("Infrastructure file is not valid.")?;
+                serde_yaml::from_str(&infra_file).context("Infrastructure file is not valid.")?;
 
             Ok(())
         } else {

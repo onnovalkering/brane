@@ -25,8 +25,9 @@ impl Secrets {
     pub fn validate(&self) -> Result<()> {
         if let Store::File(store_file) = &self.store {
             let infra_reader = BufReader::new(File::open(store_file)?);
-            let _: HashMap<String, String> =
-                serde_yaml::from_reader(infra_reader).context("Secrets file is not valid.")?;
+            let _: HashMap<String, String> = serde_yaml::from_reader(infra_reader)
+                .context("Secrets file is not valid.")
+                .unwrap_or_default();
 
             Ok(())
         } else {
