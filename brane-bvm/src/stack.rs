@@ -1,8 +1,10 @@
+use crate::bytecode::ClassMut;
 use crate::objects::Array;
 use crate::objects::Instance;
 use crate::objects::Object;
 use broom::{Handle, Heap};
 use fnv::FnvHashMap;
+use specifications::common::SpecClass;
 use specifications::common::Value;
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -72,6 +74,13 @@ impl Slot {
 
                 Slot::Object(handle)
             }
+            Value::Class(c) => {
+                let class: ClassMut = c.into();
+                let class = class.freeze(heap);
+
+                let handle = heap.insert(Object::Class(class)).into_handle();
+                Slot::Object(handle)
+            }
             Value::Struct { data_type, properties } => {
                 let mut i_properties = FnvHashMap::default();
                 for (name, value) in properties {
@@ -136,7 +145,11 @@ impl Slot {
                         entries
                     }
                 }
-                Object::Class(_c) => todo!(),
+                Object::Class(c) => {
+                    let class = c.clone().unfreeze(heap);
+                    let class: SpecClass = class.into();
+                    Value::Class(class.into())
+                },
                 Object::Function(_) => panic!("Cannot convert function to value."),
                 Object::FunctionExt(f) => Value::FunctionExt(f.clone()),
                 Object::Instance(i) => {

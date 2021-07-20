@@ -60,6 +60,7 @@ impl grpc::DriverService for DriverHandler {
     ) -> Result<Response<Self::ExecuteStream>, Status> {
         let request = request.into_inner();
         let package_index = PackageIndex::from_url(&self.package_index_url).await.unwrap();
+        let sessions = self.sessions.clone();
 
         let executor = JobExecutor {
             command_topic: self.command_topic.clone(),
@@ -69,7 +70,8 @@ impl grpc::DriverService for DriverHandler {
             results: self.results.clone(),
         };
 
-        let vm_state = self.sessions.get(&request.uuid).as_deref().cloned();
+        let vm_state = sessions.get(&request.uuid).as_deref().cloned();
+        dbg!(&vm_state);
 
         let (tx, rx) = mpsc::channel::<Result<grpc::ExecuteReply, Status>>(10);
         tokio::spawn(async move {
@@ -105,6 +107,8 @@ impl grpc::DriverService for DriverHandler {
 
             // TEMP: needed because the VM is not completely `send`.
             futures::executor::block_on(vm.main(function));
+            let vm_state = vm.capture_state();
+            sessions.insert(request.uuid, vm_state);
         });
 
         Ok(Response::new(ReceiverStream::new(rx)))

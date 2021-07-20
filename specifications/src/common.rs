@@ -172,13 +172,13 @@ impl Property {
 #[skip_serializing_none]
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Class {
+pub struct SpecClass {
     pub name: String,
     pub properties: HashMap<String, String>,
     pub methods: HashMap<String, SpecFunction>,
 }
 
-impl Class {
+impl SpecClass {
     pub fn new(
         name: String,
         properties: HashMap<String, String>,
@@ -188,7 +188,7 @@ impl Class {
     }
 }
 
-impl fmt::Debug for Class {
+impl fmt::Debug for SpecClass {
     fn fmt(
         &self,
         f: &mut fmt::Formatter<'_>,
@@ -222,7 +222,7 @@ pub enum Value {
     },
     Unicode(String),
     Unit,
-    Class(Class),
+    Class(SpecClass),
     Function(SpecFunction),
     FunctionExt(FunctionExt),
 }

@@ -1,5 +1,5 @@
 use crate::bytecode::FunctionMut;
-use specifications::common::{Class, Value as SpecValue};
+use specifications::common::{SpecClass, Value as SpecValue};
 use std::{collections::HashMap, fmt};
 
 #[derive(Clone)]
@@ -10,7 +10,7 @@ pub enum Value {
     Real(f64),
     Unit,
     Function(FunctionMut),
-    Class(Class),
+    Class(SpecClass),
     Instance(Instance),
     Array(Array),
 }
@@ -80,13 +80,13 @@ impl fmt::Debug for Array {
 
 #[derive(Clone)]
 pub struct Instance {
-    pub class: Class,
+    pub class: SpecClass,
     pub fields: HashMap<String, Value>,
 }
 
 impl Instance {
     pub fn new(
-        class: Class,
+        class: SpecClass,
         fields: Option<HashMap<String, Value>>,
     ) -> Self {
         let fields = fields.unwrap_or_default();
@@ -119,7 +119,7 @@ impl From<SpecValue> for Value {
                     fields.insert(key.clone(), Value::from(spec_value.clone()));
                 }
 
-                let class = Class {
+                let class = SpecClass {
                     name: data_type,
                     properties: HashMap::new(),
                     methods: HashMap::new(),

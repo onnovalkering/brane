@@ -16,7 +16,7 @@ use specifications::package::PackageIndex;
 use tokio::runtime::Runtime;
 use fnv::FnvHashMap;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct VmOptions {
     ///
     ///
@@ -29,7 +29,7 @@ pub struct VmOptions {
     pub global_return_halts: bool,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct VmState {
     globals: FnvHashMap<String, Value>,
     options: VmOptions,

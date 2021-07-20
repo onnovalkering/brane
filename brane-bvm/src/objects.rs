@@ -1,4 +1,4 @@
-use crate::bytecode::FunctionMut;
+use crate::bytecode::{ClassMut, FunctionMut};
 use crate::{bytecode::Chunk, stack::Slot};
 use broom::prelude::*;
 use fnv::FnvHashMap;
@@ -85,10 +85,35 @@ impl Trace<Object> for Array {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Class {
     pub name: String,
     pub methods: FnvHashMap<String, Slot>,
+}
+
+impl Class {
+    ///
+    ///
+    ///
+    pub fn unfreeze(
+        self,
+        heap: &Heap<Object>,
+    ) -> ClassMut {
+        let methods = self.methods.into_iter().map(|(k, v)| {
+            let function = v.as_object().unwrap();
+            let function = heap.get(function).unwrap();
+            let function = function.as_function().unwrap();
+            let function = function.clone().unfreeze(heap);
+
+            (k, function)
+        }).collect();
+
+        ClassMut {
+            name: self.name.clone(),
+            properties: Default::default(),
+            methods,
+        }
+    }
 }
 
 impl Trace<Object> for Class {

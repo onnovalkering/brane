@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::parser::ast::*;
 use anyhow::Result;
 use brane_bvm::bytecode::{opcodes::*, ChunkMut, FunctionMut};
-use specifications::common::{SpecFunction, Value, Class};
+use specifications::common::{SpecFunction, Value, SpecClass};
 
 #[derive(Debug, Clone)]
 pub struct Local {
@@ -93,7 +93,7 @@ pub fn stmt_to_opcodes(
                 }
             }).collect();
 
-            let class = Value::Class(Class::new(ident.clone(), properties, methods));
+            let class = Value::Class(SpecClass::new(ident.clone(), properties, methods));
             
             let class = chunk.add_constant(class);
             chunk.write_pair(OP_CLASS, class);

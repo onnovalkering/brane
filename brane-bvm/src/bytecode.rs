@@ -7,7 +7,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use fnv::FnvHashMap;
 use std::collections::HashMap;
 use std::fmt::Write;
-use specifications::common::{Bytecode, SpecFunction, Value};
+use specifications::common::{Bytecode, SpecClass, SpecFunction, Value};
 
 pub mod opcodes {
     pub const OP_ADD: u8 = 0x01;
@@ -57,6 +57,55 @@ pub struct ClassMut {
     pub name: String,
     pub properties: HashMap<String, String>,
     pub methods: HashMap<String, FunctionMut>,
+}
+
+impl ClassMut {
+    pub fn new(
+        name: String,
+        properties: HashMap<String, String>,
+        methods: HashMap<String, FunctionMut>,
+    ) -> Self {
+        Self {
+            name,
+            properties,
+            methods
+        }
+    }
+
+    ///
+    ///
+    ///
+    pub fn freeze(
+        self,
+        heap: &mut Heap<Object>,
+    ) -> Class {
+        let methods = self.methods.into_iter().map(|(k, v)| {
+            let function = v.freeze(heap);
+            let handle = heap.insert(Object::Function(function)).into_handle();
+            let slot = Slot::Object(handle);
+
+            (k, slot)
+        }).collect();
+
+        Class {
+            name: self.name,
+            methods,
+        }
+    }
+}
+
+impl From<SpecClass> for ClassMut {
+    fn from(f: SpecClass) -> Self {
+        let methods = f.methods.iter().map(|(k, v)| (k.clone(), v.clone().into())).collect();
+        Self::new(f.name, f.properties, methods)
+    }
+}
+
+impl From<ClassMut> for SpecClass {
+    fn from(f: ClassMut) -> Self {
+        let methods = f.methods.iter().map(|(k, v)| (k.clone(), v.clone().into())).collect();
+        Self::new(f.name, f.properties, methods)
+    }
 }
 
 #[derive(Clone)]
