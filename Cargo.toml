@@ -9,13 +9,12 @@ members = [
     "brane-dsl",
     "brane-job",
     "brane-let",
+    "brane-log",
     "brane-net",
     "brane-oas",
     "brane-plr",
     "specifications",
 ]
 
-# Keep it seperate: conflicting dependencies.
 exclude = [
-    "brane-log"
 ]

@@ -109,7 +109,7 @@ pub async fn start_worker(
         .assign(&tpl)
         .context("Failed to manually assign topic, partition, and/or offset to consumer.")?;
 
-    let mut message_stream = consumer.start();
+    let mut message_stream = consumer.stream();
 
     // Process incoming event messages.
     while let Some(message) = message_stream.next().await {
@@ -218,7 +218,7 @@ fn process_message(
         timestamp: OffsetDateTime::from_unix_timestamp(event.timestamp.clone()).format(Format::Rfc3339),
     };
 
-    events_tx.broadcast(event)?;
+    events_tx.send(event)?;
 
     Ok(())
 }

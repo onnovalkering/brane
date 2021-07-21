@@ -117,7 +117,9 @@ impl Subscription {
         let mut events_rx = context.events_rx.clone();
 
         let stream = stream! {
-            while let Some(event) = events_rx.recv().await {
+            while events_rx.changed().await.is_ok() {
+                let event = events_rx.borrow().clone();
+
                 if event.application != application {
                     continue;
                 }

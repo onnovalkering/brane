@@ -13,16 +13,17 @@ cassandra-cpp = "0.16"
 clap = "3.0.0-beta.2"
 derive_more = "0.99"
 dotenv = "0.15"
-env_logger = "0.8"
+env_logger = "0.9"
 futures = "0.3"
 juniper = "0.15"
-juniper_graphql_ws = "0.2"
-juniper_warp = { version = "0.6", features = ["subscriptions"] }
+juniper_graphql_ws = "0.3"
+juniper_warp = { version = "0.7", features = ["subscriptions"] }
 log = "0.4"
-prost = "0.7"
-rdkafka = { version = "0.24", features = ["cmake-build"] }
+prost = "0.8"
+rdkafka = { version = "0.26", features = ["cmake-build"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 time = "0.2"
-tokio = { version = "0.2", features = ["full"] }
-warp = "0.2"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+warp = "0.3"
