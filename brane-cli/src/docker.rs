@@ -33,11 +33,15 @@ lazy_static! {
 }
 
 #[derive(Clone, Default)]
-pub struct DockerExecutor {}
+pub struct DockerExecutor {
+    pub data: Option<PathBuf>
+}
 
 impl DockerExecutor {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(data: Option<PathBuf>) -> Self {
+        Self {
+            data
+        }
     }
 }
 
@@ -82,7 +86,18 @@ impl VmExecutor for DockerExecutor {
             base64::encode(serde_json::to_string(&arguments)?),
         ];
 
-        let exec = ExecuteInfo::new(image, image_file, None, Some(command));
+        let mounts = if let Some(data) = &self.data {
+            let data = std::fs::canonicalize(data)?;
+            if data.exists() {
+                Some(vec![format!("{}:/data", data.into_os_string().into_string().unwrap())])
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let exec = ExecuteInfo::new(image, image_file, mounts, Some(command));
 
         if function.detached {
             let name = run(exec).await?;
@@ -260,14 +275,16 @@ async fn create_and_start_container(
         None
     };
 
-    let binds = if DOCKER_VOLUME.as_str() != "" {
-        Some(vec![format!("{}:/brane", DOCKER_VOLUME.as_str())])
+    let mut binds = if DOCKER_VOLUME.as_str() != "" {
+        vec![format!("{}:/brane", DOCKER_VOLUME.as_str())]
     } else {
-        exec.mounts.clone()
+        exec.mounts.clone().unwrap_or_default()
     };
 
+    binds.push(String::from("/var/run/docker.sock:/var/run/docker.sock"));
+
     let host_config = HostConfig {
-        binds,
+        binds: Some(binds),
         network_mode: Some(DOCKER_NETWORK.to_string()),
         privileged: Some(DOCKER_PRIVILEGED.as_str() == "true"),
         volumes_from,

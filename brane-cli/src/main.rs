@@ -116,12 +116,16 @@ enum SubCommand {
         remote: Option<String>,
         #[structopt(short, long, help = "Attach to an existing remote session")]
         attach: Option<String>,
+        #[structopt(short, long, help = "The directory to mount as /data")]
+        data: Option<PathBuf>,   
     },
 
     #[structopt(name = "run", about = "Run a DSL script locally")]
     Run {
         #[structopt(name = "FILE", help = "Path to the file to run")]
         file: PathBuf,
+        #[structopt(short, long, help = "The directory to mount as /data")]
+        data: Option<PathBuf>,
     },
 
     #[structopt(name = "test", about = "Test a package locally")]
@@ -277,11 +281,12 @@ async fn run(options: Cli) -> Result<()> {
             clear,
             remote,
             attach,
+            data,
         } => {
-            repl::start(bakery, clear, remote, attach).await?;
+            repl::start(bakery, clear, remote, attach, data).await?;
         }
-        Run { file } => {
-            run::handle(file).await?;
+        Run { file, data } => {
+            run::handle(file, data).await?;
         }
         Test { name, version, data } => {
             test::handle(name, version, data).await?;

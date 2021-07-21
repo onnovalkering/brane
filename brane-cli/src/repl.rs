@@ -145,6 +145,7 @@ pub async fn start(
     clear: bool,
     remote: Option<String>,
     attach: Option<String>,
+    data: Option<PathBuf>,
 ) -> Result<()> {
     let config = Config::builder()
         .history_ignore_space(true)
@@ -175,7 +176,7 @@ pub async fn start(
     if let Some(remote) = remote {
         remote_repl(&mut rl, bakery, remote, attach).await?;
     } else {
-        local_repl(&mut rl, bakery).await?;
+        local_repl(&mut rl, bakery, data).await?;
     }
 
     rl.save_history(&history_file).unwrap();
@@ -270,6 +271,7 @@ async fn remote_repl(
 async fn local_repl(
     rl: &mut Editor<ReplHelper>,
     bakery: bool,
+    data: Option<PathBuf>,
 ) -> Result<()> {
     let compiler_options = if bakery {
         CompilerOptions::new(Lang::Bakery)
@@ -280,7 +282,7 @@ async fn local_repl(
     let package_index = registry::get_package_index().await?;
     let mut compiler = Compiler::new(compiler_options, package_index.clone());
 
-    let executor = DockerExecutor::default();
+    let executor = DockerExecutor::new(data);
     let options = VmOptions { clear_after_main: true, ..Default::default() };
     let mut vm = Vm::new_with(executor, Some(package_index), Some(options));
 
