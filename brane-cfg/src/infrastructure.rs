@@ -51,6 +51,15 @@ pub enum Location {
     },
 }
 
+impl Location {
+    pub fn get_address(self) -> String {
+        match self {
+            Location::Kube { address, ..} | Location::Vm { address, ..} | Location::Slurm { address, ..} => address.clone(),
+            Location::Local { .. } => String::from("127.0.0.1"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "mechanism", rename_all = "kebab-case")]
 pub enum LocationCredentials {

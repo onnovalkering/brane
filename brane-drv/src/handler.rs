@@ -3,6 +3,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use brane_bvm::vm::{VmOptions, VmState};
 use brane_bvm::{executor::VmExecutor, vm::Vm};
+use brane_cfg::Infrastructure;
 use brane_dsl::{Compiler, CompilerOptions, Lang};
 use brane_job::interface::{Command, CommandKind};
 use bytes::BytesMut;
@@ -32,6 +33,8 @@ pub struct DriverHandler {
     pub results: Arc<DashMap<String, Value>>,
     pub sessions: Arc<DashMap<String, VmState>>,
     pub states: Arc<DashMap<String, String>>,
+    pub locations: Arc<DashMap<String, String>>,
+    pub infra: Infrastructure,
 }
 
 #[tonic::async_trait]
@@ -68,6 +71,8 @@ impl grpc::DriverService for DriverHandler {
             session_uuid: request.uuid.clone(),
             states: self.states.clone(),
             results: self.results.clone(),
+            locations: self.locations.clone(),
+            infra: self.infra.clone(),
         };
 
         let vm_state = sessions.get(&request.uuid).as_deref().cloned();
@@ -122,6 +127,8 @@ struct JobExecutor {
     pub session_uuid: String,
     pub states: Arc<DashMap<String, String>>,
     pub results: Arc<DashMap<String, Value>>,
+    pub locations: Arc<DashMap<String, String>>,
+    pub infra: Infrastructure,
 }
 
 impl JobExecutor {
@@ -186,14 +193,37 @@ impl VmExecutor for JobExecutor {
             bail!("Failed to send command to '{}' topic.", self.command_topic);
         }
 
-        // TODO: await value to be in states & results.
-        let call = Call {
-            correlation_id: correlation_id.clone(),
-            states: self.states.clone(),
-            results: self.results.clone(),
-        };
+        if function.detached {
+            // Wait until "created" (address known ?)
+            let created = WaitUntil {
+                state: String::from("created"),
+                correlation_id: correlation_id.clone(),
+                states: self.states.clone(),
+            };
 
-        Ok(call.await)
+            created.await;
+
+            let location = self.locations.get(&correlation_id).map(|s| s.clone()).unwrap_or_default();
+            let location = self.infra.get_location_metadata(location)?;
+
+            let mut properties = HashMap::default();
+            properties.insert(String::from("identifier"), Value::Unicode(correlation_id));
+            properties.insert(String::from("address"), Value::Unicode(location.get_address()));
+
+            Ok(Value::Struct {
+                data_type: String::from("Service"),
+                properties
+            })
+        } else {
+            // TODO: await value to be in states & results (perf).
+            let call = Call {
+                correlation_id,
+                states: self.states.clone(),
+                results: self.results.clone(),
+            };
+
+            Ok(call.await)
+        }
     }
 
     ///
@@ -233,6 +263,35 @@ impl Future for Call {
 
             self.states.remove(&self.correlation_id);
             return Poll::Ready(value);
+        }
+
+        cx.waker().wake_by_ref();
+        Poll::Pending
+    }
+}
+
+struct WaitUntil {
+    state: String,
+    correlation_id: String,
+    states: Arc<DashMap<String, String>>,
+}
+
+impl Future for WaitUntil {
+    type Output = ();
+
+    fn poll(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Self::Output> {
+        let state = self.states.get(&self.correlation_id);
+        if state.is_none() {
+            cx.waker().wake_by_ref();
+            return Poll::Pending;
+        }
+
+        let state = state.unwrap().clone();
+        if state == self.state {
+            return Poll::Ready(());
         }
 
         cx.waker().wake_by_ref();

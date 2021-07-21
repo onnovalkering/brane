@@ -87,6 +87,8 @@ impl Slot {
                     i_properties.insert(name.clone(), Slot::from_value(value.clone(), globals, heap));
                 }
 
+                dbg!(&globals);
+
                 let i_class = globals.get(&data_type)
                     .unwrap_or_else(|| panic!("Expecting '{}' to be loaded as a global.", data_type))
                     .as_object()

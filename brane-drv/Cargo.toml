@@ -10,6 +10,7 @@ appdirs = "0.2"
 async-trait = "0.1"
 base64 = "0.12"
 brane-bvm = { path = "../brane-bvm" }
+brane-cfg = { path = "../brane-cfg" }
 brane-dsl = { path = "../brane-dsl" }
 brane-job = { path = "../brane-job" }
 bytes = "1"

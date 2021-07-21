@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use brane_bvm::vm::VmState;
+use brane_cfg::Infrastructure;
 use brane_drv::grpc::DriverServiceServer;
 use brane_drv::handler::DriverHandler;
 use brane_job::interface::{Event, EventKind};
@@ -51,6 +52,9 @@ struct Opts {
     /// Consumer group id
     #[clap(short, long, default_value = "brane-drv")]
     group_id: String,
+    /// Infra metadata store
+    #[clap(short, long, default_value = "./infra.yml", env = "INFRA")]
+    infra: String,    
 }
 
 #[tokio::main]
@@ -72,6 +76,9 @@ async fn main() -> Result<()> {
     let command_topic = opts.command_topic.clone();
     ensure_topics(vec![&command_topic, &opts.event_topic], &opts.brokers).await?;
 
+    let infra = Infrastructure::new(opts.infra.clone())?;
+    infra.validate()?;
+
     let producer: FutureProducer = ClientConfig::new()
         .set("bootstrap.servers", &opts.brokers)
         .set("message.timeout.ms", "5000")
@@ -81,6 +88,7 @@ async fn main() -> Result<()> {
     // Start event monitor in the background.
     let states: Arc<DashMap<String, String>> = Arc::new(DashMap::new());
     let results: Arc<DashMap<String, Value>> = Arc::new(DashMap::new());
+    let locations: Arc<DashMap<String, String>> = Arc::new(DashMap::new());
 
     tokio::spawn(start_event_monitor(
         opts.brokers.clone(),
@@ -88,6 +96,7 @@ async fn main() -> Result<()> {
         opts.event_topic.clone(),
         states.clone(),
         results.clone(),
+        locations.clone(),
     ));
 
     let package_index_url = opts.package_index_url.clone();
@@ -99,6 +108,8 @@ async fn main() -> Result<()> {
         results,
         sessions,
         states,
+        locations,
+        infra,
     };
 
     // Start gRPC server with callback service.
@@ -146,12 +157,16 @@ async fn ensure_topics(
     Ok(())
 }
 
+///
+///
+///
 async fn start_event_monitor(
     brokers: String,
     group_id: String,
     topic: String,
     states: Arc<DashMap<String, String>>,
     results: Arc<DashMap<String, Value>>,
+    locations: Arc<DashMap<String, String>>,
 ) -> Result<()> {
     let consumer: StreamConsumer = ClientConfig::new()
         .set("group.id", group_id)
@@ -186,6 +201,7 @@ async fn start_event_monitor(
             let owned_message = borrowed_message.detach();
             let owned_states = states.clone();
             let owned_results = results.clone();
+            let owned_locations = locations.clone();
 
             async move {
                 if let Some(payload) = owned_message.payload() {
@@ -203,7 +219,8 @@ async fn start_event_monitor(
                             owned_states.insert(correlation_id, String::from("unkown"));
                         }
                         EventKind::Created => {
-                            owned_states.insert(correlation_id, String::from("created"));
+                            owned_states.insert(correlation_id.clone(), String::from("created"));
+                            owned_locations.insert(correlation_id, event.location.clone());
                         }
                         EventKind::Ready => {
                             owned_states.insert(correlation_id, String::from("created"));

@@ -54,7 +54,7 @@ impl VmState {
     ) -> FnvHashMap<String, Slot> {
         let mut globals = FnvHashMap::default();
         for (name, value) in &self.globals {
-            let slot = Slot::from_value(value.clone(), &FnvHashMap::default(), heap);
+            let slot = Slot::from_value(value.clone(), &globals, heap);
             globals.insert(name.clone(), slot);
         }
 
