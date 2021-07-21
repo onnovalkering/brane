@@ -1,0 +1,99 @@
+name: arithmetic
+version: 1.0.0
+kind: compute
+base: alpine
+
+entrypoint:
+  kind: task
+  exec: run.py
+
+dependencies:
+  - python3
+  - py3-pip
+
+install:
+  - pip3 install pyyaml
+
+files:
+  - run.py
+
+actions:
+  add:
+    command:
+      args:
+        - add
+
+    pattern:
+      prefix: "add"
+      infix:
+        - "to"
+
+    input:
+      - name: a
+        type: integer
+      - name: b
+        type: integer
+
+    output:
+      - name: c
+        type: integer
+
+  substract:
+    command:
+      args:
+        - substract
+
+    pattern:
+      prefix: "substract"
+      infix:
+        - "from"
+
+    input:
+      - name: a
+        type: integer
+      - name: b
+        type: integer
+
+    output:
+      - name: c
+        type: integer
+
+  multiply:
+    command:
+      args:
+        - multiply
+
+    pattern:
+      prefix: "multiply"
+      infix:
+        - "by"
+
+    input:
+      - name: a
+        type: integer
+      - name: b
+        type: integer
+
+    output:
+      - name: c
+        type: integer
+
+  divide:
+    command:
+      args:
+        - divide
+
+    pattern:
+      prefix: "divide"
+      infix:
+        - "by"
+
+    input:
+      - name: a
+        type: integer
+      - name: b
+        type: integer
+
+    output:
+      - name: c
+        type: integer
