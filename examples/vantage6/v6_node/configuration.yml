@@ -1,0 +1,24 @@
+application:
+  api_key: PLC_API_KEY
+  api_path: /api
+  databases:
+    default: ''
+  encryption:
+    enabled: false
+    private_key: ''
+  logging:
+    backup_count: 5
+    datefmt: '%Y-%m-%d %H:%M:%S'
+    file: v6.log
+    format: '%(asctime)s - %(name)-14s - %(levelname)-8s - %(message)s'
+    level: DEBUG
+    max_size: 1024
+    use_console: true
+  port: "PLC_SERVER_PORT"
+  server_url: http://PLC_SERVER_HOST
+  task_dir: /usr/local/share/vantage6/node/v6
+environments:
+  acc: {}
+  dev: {}
+  prod: {}
+  test: {}

@@ -1,0 +1,43 @@
+name: v6_node
+version: 1.0.0
+kind: compute
+
+base: ubuntu:18.04
+docker: true
+
+entrypoint:
+  kind: service
+  exec: entrypoint.sh
+
+dependencies:
+  - python3
+  - python3-pip
+
+install:
+  - pip3 install Flask==1.1.1 
+  - pip3 install vantage6-node
+
+files:
+  - entrypoint.sh
+  - configuration.yml
+
+actions:
+  node:
+    command:
+      args: []
+      capture: prefixed
+
+    input:
+      - name: api_key
+        type: string
+
+      - name: server_host
+        type: string
+
+      - name: server_port
+        type: integer
+
+    output:
+      - name: output
+        type: string
+

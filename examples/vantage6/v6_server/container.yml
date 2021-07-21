@@ -1,0 +1,37 @@
+name: v6_server
+version: 1.0.0
+kind: compute
+
+base: ubuntu:18.04
+docker: true
+
+entrypoint:
+  kind: service
+  exec: entrypoint.sh
+
+dependencies:
+  - python3
+  - python3-pip
+
+install:
+  - pip3 install PyJWT==1.7.1
+  - pip3 install vantage6-server
+
+files:
+  - entrypoint.sh
+  - configuration.yml
+
+actions:
+  server:
+    command:
+      args: []
+      capture: prefixed
+
+    input:
+      - name: server_port
+        type: integer
+
+    output:
+      - name: output
+        type: string
+
