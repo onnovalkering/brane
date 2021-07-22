@@ -73,9 +73,15 @@ fn generate_package_info(container_info: &ContainerInfo) -> Result<PackageInfo> 
     // Construct function descriptions
     let mut functions = Map::<Function>::new();
     for (action_name, action) in &container_info.actions {
-        let arguments = action.input.clone();
+        let function_output = action.output.clone().unwrap_or_default();
+
+        let arguments = action.input.clone().unwrap_or_default();
         let pattern = action.pattern.clone();
-        let return_type = action.output[0].data_type.to_string();
+        let return_type = if let Some(output) = function_output.first() {
+            output.data_type.to_string()
+        } else {
+            String::from("unit")
+        };
 
         let function = Function::new(arguments, pattern, return_type);
         functions.insert(action_name.clone(), function);

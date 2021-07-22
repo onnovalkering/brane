@@ -55,8 +55,8 @@ pub struct Action {
     pub description: Option<String>,
     pub endpoint: Option<ActionEndpoint>,
     pub pattern: Option<CallPattern>,
-    pub input: Vec<Parameter>,
-    pub output: Vec<Parameter>,
+    pub input: Option<Vec<Parameter>>,
+    pub output: Option<Vec<Parameter>>,
 }
 
 #[skip_serializing_none]

@@ -27,7 +27,10 @@ pub async fn handle(
         .get(&function)
         .unwrap_or_else(|| panic!("Function '{}' not found", function));
 
-    assert_input(&function.input, &arguments)?;
+    let function_input = function.input.clone().unwrap_or_default();
+    let function_output = function.output.clone().unwrap_or_default();
+
+    assert_input(&function_input, &arguments)?;
 
     // Perform initialization.
     initialize(&working_dir)?;
@@ -48,9 +51,9 @@ pub async fn handle(
 
     // Output variables are captured from the stdout
     let stdout = execute(entrypoint, &command.args, &arguments, &working_dir)?;
-    let output = capture_output(stdout, &function.output, &command.capture, &container_info.types)?;
+    let output = capture_output(stdout, &function_output, &command.capture, &container_info.types)?;
 
-    if let Some(parameter) = function.output.first() {
+    if let Some(parameter) = function_output.first() {
         let value = output
             .get(&parameter.name)
             .with_context(|| format!("Output '{}' not found.", parameter.name))?;
