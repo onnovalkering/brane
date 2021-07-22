@@ -25,7 +25,6 @@ The following system dependencies must be installed (assuming Ubuntu 20.04):
 
 - build-essential
 - cmake
-- libcassandra (see [./contrib/datastax](https://github.com/onnovalkering/brane/tree/develop/contrib/datastax))
 - libpq-dev
 - libssl-dev
 - pkg-config

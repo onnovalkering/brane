@@ -1,22 +1,20 @@
 #[macro_use]
 extern crate anyhow;
 #[macro_use]
-extern crate cassandra_cpp;
-#[macro_use]
 extern crate log;
 #[macro_use]
 extern crate juniper;
 
-use cassandra_cpp::Session;
+use scylla::Session;
 use tokio::sync::watch::Receiver;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 pub mod ingestion;
 pub mod interface;
 pub mod schema;
 
 pub struct Context {
-    pub cassandra: Arc<RwLock<Session>>,
+    pub scylla: Arc<Session>,
     pub events_rx: Receiver<schema::Event>,
 }
 

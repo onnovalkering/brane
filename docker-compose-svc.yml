@@ -1,14 +1,14 @@
 version: '3.5'
 
 services:
-  cassandra:
-    image: cassandra:4.0
+  scylla:
+    image: scylladb/scylla:4.4.3
     ports:
       - "127.0.0.1:9042:9042"
     restart: always
 
   kafka:
-    image: confluentinc/cp-kafka:5.5.1
+    image: confluentinc/cp-kafka:6.2.0
     depends_on:
       - zookeeper
     ports:

@@ -71,7 +71,7 @@ services:
     environment:
         BROKERS: "kafka:29092"
         EVENT_TOPIC: job-evt
-        CASSANDRA: cassandra
+        SCYLLA: scylla
 
   brane-plr:
     build:
