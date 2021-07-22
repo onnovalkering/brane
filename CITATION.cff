@@ -1,0 +1,23 @@
+cff-version: 1.1.0
+message: "If you use this software, please cite it as below."
+
+title: Brane
+version: 0.3.0
+license: Apache-2.0
+
+doi: 10.5281/zenodo.3890928
+date-released: 2021-03-03
+repository-code: https://github.com/onnovalkering/brane
+
+authors:
+  - affiliation: University of Amsterdam
+    family-names: Valkering
+    given-names: Onno
+
+  - affiliation: University of Amsterdam
+    family-names: Cushing
+    given-names: Reginald
+
+  - affiliation: University of Amsterdam
+    family-names: Belloum
+    given-names: Adam
