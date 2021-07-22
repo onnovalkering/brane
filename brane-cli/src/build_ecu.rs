@@ -147,8 +147,8 @@ fn generate_dockerfile(
         writeln!(contents, "ADD branelet branelet")?;
     } else {
         writeln!(contents, "ADD {} branelet", BRANELET_URL)?;
-        writeln!(contents, "RUN chmod +x branelet")?;
     }
+    writeln!(contents, "RUN chmod +x branelet")?;
 
     writeln!(contents, "ADD {} juicefs.tar.gz", JUICE_URL)?;
     writeln!(
@@ -161,13 +161,18 @@ fn generate_dockerfile(
     writeln!(contents, "ADD wd.tar.gz /opt")?;
     writeln!(contents, "WORKDIR /opt/wd")?;
 
+    // Set execute bit
+    // TODO: validate path and canonicalize
+    let exec = ecu_document.entrypoint.exec.clone();
+    writeln!(contents, "RUN chmod +x /opt/wd/{}", exec)?;
+
     // Add installation
     if let Some(install) = &ecu_document.install {
         for line in install {
             writeln!(contents, "RUN {}", line)?;
         }
     }
-
+    
     writeln!(contents, "ENTRYPOINT [\"/branelet\"]")?;
 
     Ok(contents)
