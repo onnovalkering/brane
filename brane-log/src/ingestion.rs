@@ -3,7 +3,7 @@ use schema::KeyValuePair;
 use time::{Format, OffsetDateTime};
 use crate::schema;
 use crate::interface::{Event, EventKind};
-use cassandra_cpp::Session;
+use scylla::Session;
 use futures::stream::StreamExt;
 use log::info;
 use prost::Message;
@@ -15,35 +15,29 @@ use rdkafka::{
     Message as KafkaMesage, Offset, TopicPartitionList,
 };
 use tokio::sync::watch::Sender;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 ///
 ///
 ///
-pub async fn ensure_db_keyspace(cassandra: &Arc<RwLock<Session>>) -> Result<()> {
-    let query = stmt!(
-        r#"
+pub async fn ensure_db_keyspace(session: &Session) -> Result<()> {
+    let query = r#"
         CREATE KEYSPACE IF NOT EXISTS application_event
-            WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 3};
-    "#
-    );
+        WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 3};
+    "#;
 
-    cassandra
-        .read()
-        .unwrap()
-        .execute(&query)
+    session.query(query, &[])
         .await
-        .map(|_| ())
+        .map(|_| Ok(()))
         .map_err(|e| anyhow!("{:?}", e))
-        .context("Failed to create 'application_event' keyspace.")
+        .context("Failed to create 'application_event' keyspace.")?
 }
 
 ///
 ///
 ///
-pub async fn ensure_db_tables(cassandra: &Arc<RwLock<Session>>) -> Result<()> {
-    let query = stmt!(
-        r#"
+pub async fn ensure_db_tables(session: &Session) -> Result<()> {
+    let query = r#"
         CREATE TABLE IF NOT EXISTS application_event.events (
             application_id text,
             job_id text,
@@ -55,17 +49,13 @@ pub async fn ensure_db_tables(cassandra: &Arc<RwLock<Session>>) -> Result<()> {
             timestamp timestamp,
             PRIMARY KEY ((application_id), job_id, location_id, category, event_id)
         )
-    "#
-    );
+    "#;
 
-    cassandra
-        .read()
-        .unwrap()
-        .execute(&query)
+    session.query(query, &[])
         .await
-        .map(|_| ())
+        .map(|_| Ok(()))
         .map_err(|e| anyhow!("{:?}", e))
-        .context("Failed to create 'application_event.events' table.")
+        .context("Failed to create 'application_event.events' table.")?
 }
 
 ///
@@ -76,7 +66,7 @@ pub async fn start_worker(
     group_id: String,
     event_topics: Vec<String>,
     events_tx: Sender<schema::Event>,
-    cassandra: Arc<RwLock<Session>>,
+    scylla: Arc<Session>,
 ) -> Result<()> {
     let consumer: StreamConsumer = ClientConfig::new()
         .set("bootstrap.servers", &brokers)
@@ -115,7 +105,7 @@ pub async fn start_worker(
     while let Some(message) = message_stream.next().await {
         match message {
             Ok(borrowed_message) => {
-                if let Err(error) = process_message(borrowed_message.detach(), &events_tx, &cassandra) {
+                if let Err(error) = process_message(borrowed_message.detach(), &events_tx, &scylla).await {
                     error!("An error occured while processing a kafka message: {:?}", error);
                 }
             }
@@ -129,10 +119,10 @@ pub async fn start_worker(
 ///
 ///
 ///
-fn process_message(
+async fn process_message(
     message: OwnedMessage,
     events_tx: &Sender<schema::Event>,
-    cassandra: &Arc<RwLock<Session>>,
+    session: &Arc<Session>,
 ) -> Result<()> {
     let payload = match message.payload() {
         Some(payload) => payload,
@@ -181,31 +171,26 @@ fn process_message(
     let information_str = serde_json::to_string(&information)?;
 
     // Insert event
-    let mut insert = stmt!(
-        r#"
+    let query = session.prepare(r#"
         INSERT INTO application_event.events (application_id, job_id, location_id, category, event_id, kind, information, timestamp)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    "#
+    "#).await?;
+
+    let values = (
+        event.application.as_str(),
+        event.identifier.as_str(),
+        event.location.as_str(),
+        event.category.as_str(),
+        event.order as i32,
+        kind.as_str(),
+        information_str.as_str(),
+        event.timestamp
     );
 
-    insert.bind_string(0, event.application.as_str()).unwrap();
-    insert.bind_string(1, event.identifier.as_str()).unwrap();
-    insert.bind_string(2, event.location.as_str()).unwrap();
-    insert.bind_string(3, event.category.as_str()).unwrap();
-    insert.bind_int32(4, event.order as i32).unwrap();
-    insert.bind_string(5, kind.as_str()).unwrap();
-    insert.bind_string(6, information_str.as_str()).unwrap();
-    insert.bind_int64(7, event.timestamp).unwrap();
-
-    cassandra
-        .read()
-        .unwrap()
-        .execute(&insert)
-        .wait() // TODO: use .await, however this won't compile in the current configuration.
-        .map(|_| ())
-        .map_err(|e| anyhow!("{:?}", e))
-        .with_context(|| format!("Failed to insert event: {:?}", event))
-        .unwrap();
+    session
+        .execute(&query, values)
+        .await
+        .with_context(|| format!("Failed to insert event: {:?}", event))?;
 
     let event = schema::Event {
         application: event.application.clone(),

@@ -27,9 +27,6 @@ jobs:
             override: true
             components: rustfmt, clippy
 
-      - name: Build and install `libcassandra`
-        run: cd ./contrib/datastax && sudo make
-
       - name: Build project
         run: cargo build -v
 
@@ -47,9 +44,6 @@ jobs:
 
   #     - name: Install dependencies
   #       run: sudo apt-get install -y libpq-dev libssl-dev
-
-  #     - name: Build and install `libcassandra`
-  #       run: cd ./contrib/datastax && sudo make
 
   #     - name: Setup environment
   #       run: docker-compose up -d

@@ -3,7 +3,8 @@ use futures::FutureExt;
 use brane_log::ingestion;
 use brane_log::{Context, Schema};
 use brane_log::schema::{Query, Event, Subscription};
-use cassandra_cpp::Cluster;
+use scylla::transport::Compression;
+use scylla::{Session, SessionBuilder};
 use clap::Clap;
 use dotenv::dotenv;
 use juniper::{self, EmptyMutation};
@@ -14,7 +15,6 @@ use std::sync::Arc;
 use tokio::sync::watch;
 use warp::Filter;
 use warp::ws::Ws;
-use std::sync::RwLock;
 use std::net::SocketAddr;
 
 #[derive(Clap)]
@@ -23,9 +23,9 @@ struct Opts {
     #[clap(short, long, default_value = "127.0.0.1:8081", env = "ADDRESS")]
     /// Service address
     address: String,
-    /// Cassandra endpoint
-    #[clap(short, long, default_value = "127.0.0.1", env = "CASSANDRA")]
-    cassandra: String,
+    /// Scylla endpoint
+    #[clap(short, long, default_value = "127.0.0.1", env = "SCYLLA")]
+    scylla: String,
     /// Kafka brokers
     #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
     brokers: String,
@@ -58,23 +58,18 @@ async fn main() -> Result<()> {
     // Configure internal event watcher (used for subscriptions).
     let (events_tx, events_rx) = watch::channel(Event::default());
 
-    // Configure Cassandra cluster connection.
-    let mut cassanda_cluster = Cluster::default();
-    cassanda_cluster.set_load_balance_round_robin();
-    cassanda_cluster
-        .set_contact_points(&opts.cassandra)
-        .map_err(|_| anyhow::anyhow!("Failed to append Cassandra contact point."))?;
+    // Configure Scylla cluster connection.
+    let scylla_session: Session = SessionBuilder::new()
+        .known_node(opts.scylla)
+        .compression(Some(Compression::Snappy))
+        .build()
+        .await?;
 
-    let cassandra_session = cassanda_cluster
-        .connect_async()
-        .await
-        .map(RwLock::new)
-        .map(Arc::new)
-        .map_err(|_| anyhow::anyhow!("Failed to create Cassandra session connection."))?;
+    // Ensure Scylla keyspace and table.
+    ingestion::ensure_db_keyspace(&scylla_session).await?;
+    ingestion::ensure_db_tables(&scylla_session).await?;
 
-    // Ensure Cassandra keyspace and table.
-    ingestion::ensure_db_keyspace(&cassandra_session).await?;
-    ingestion::ensure_db_tables(&cassandra_session).await?;
+    let scylla_session = Arc::new(scylla_session);
 
     // Spawn a single event ingestion worker.
     tokio::spawn(ingestion::start_worker(
@@ -82,20 +77,19 @@ async fn main() -> Result<()> {
         opts.group_id.clone(),
         opts.event_topics.clone(),
         events_tx,
-        cassandra_session.clone(),
+        scylla_session.clone(),
     ));
 
-    let cassandra_arc = cassandra_session.clone();
     let events = events_rx.clone();
 
     // Configure Wrap web server.
     let log = warp::log("warp_server");
     let schema = Schema::new(Query {}, EmptyMutation::new(), Subscription {});
 
-    let context_cassandra = cassandra_session.clone();
+    let context_scylla = scylla_session.clone();
     let context_events_rx = events_rx.clone();
     let context = warp::any().map(move || Context {
-        cassandra: context_cassandra.clone(),
+        scylla: context_scylla.clone(),
         events_rx: context_events_rx.clone(),
     });
 
@@ -107,11 +101,11 @@ async fn main() -> Result<()> {
         .map(move |ws: Ws| {
             let root_node = root_node.clone();
             let events = events.clone();
-            let cass = cassandra_arc.clone();
+            let scylla = scylla_session.clone();
 
             ws.on_upgrade(move |websocket| async move {
                 serve_graphql_ws(websocket, root_node, ConnectionConfig::new(
-                    Context { cassandra: cass, events_rx: events }
+                    Context { scylla, events_rx: events }
                 ))
                 .map(|r| {
                     if let Err(e) = r {
