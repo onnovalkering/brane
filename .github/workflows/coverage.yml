@@ -1,5 +1,6 @@
 name: Coverage
 on:
+  pull_request:    
   push:
     branches:
       - master
@@ -26,4 +27,5 @@ jobs:
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@master
         with:
+          path-to-lcov: ./lcov.info
           github-token: ${{ secrets.GITHUB_TOKEN }}
