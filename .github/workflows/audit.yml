@@ -4,7 +4,7 @@ on:
     - cron: '0 0 * * *'
 
 jobs:
-  audit:
+  security:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -14,3 +14,29 @@ jobs:
         uses: actions-rs/audit-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+  
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: clippy, rustfmt
+
+      - name: Run linter (clippy)
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
+
+      - name: Run formatter (rustfmt)
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check

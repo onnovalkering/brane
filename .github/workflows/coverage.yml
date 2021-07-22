@@ -23,7 +23,7 @@ jobs:
           args: '--avoid-cfg-tarpaulin --workspace'
           out-type: 'Lcov'
 
-      - name: Coveralls
+      - name: Upload to Coveralls
         uses: coverallsapp/github-action@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
