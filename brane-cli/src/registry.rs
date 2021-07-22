@@ -277,6 +277,11 @@ pub async fn get_package_index() -> Result<PackageIndex> {
             for version in versions {
                 let path = version?.path();
                 let package_file = path.join("package.yml");
+                let lock_file = path.join(".lock");
+                
+                if !path.is_dir() || !package_file.exists() || lock_file.exists() {
+                    continue;
+                }
 
                 if let Ok(package_info) = PackageInfo::from_path(package_file) {
                     package_infos.push(package_info);

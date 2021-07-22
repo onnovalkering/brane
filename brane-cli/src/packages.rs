@@ -122,8 +122,9 @@ pub fn list() -> Result<()> {
         for version in versions {
             let path = version?.path();
             let package_file = path.join("package.yml");
+            let lock_file = path.join(".lock");
 
-            if !path.is_dir() || !package_file.exists() {
+            if !path.is_dir() || !package_file.exists() || lock_file.exists() {
                 continue;
             }
 

@@ -1,4 +1,4 @@
-use crate::packages;
+use crate::{docker, packages};
 use anyhow::{Context, Result};
 use console::style;
 use fs_extra::dir::CopyOptions;
@@ -25,7 +25,7 @@ const JUICE_URL: &str =
 ///
 ///
 ///
-pub fn handle(
+pub async fn handle(
     context: PathBuf,
     file: PathBuf,
     branelet_path: Option<PathBuf>,
@@ -55,13 +55,34 @@ pub fn handle(
 
     // Build Docker image
     let tag = format!("{}:{}", package_info.name, package_info.version);
-    build_docker_image(&package_dir, tag)?;
+    let result = build_docker_image(&package_dir, tag);
 
-    println!(
-        "Successfully built version {} of container (ECU) package {}.",
-        style(&package_info.version).bold().cyan(),
-        style(&package_info.name).bold().cyan(),
-    );
+    if result.is_ok() {
+        println!(
+            "Successfully built version {} of container (ECU) package {}.",
+            style(&package_info.version).bold().cyan(),
+            style(&package_info.name).bold().cyan(),
+        );
+
+        // Check if previous build is still loaded in Docker
+        let image_name = format!("{}:{}", package_info.name, package_info.version);
+        docker::remove_image(&image_name).await?;
+
+        let image_name = format!("localhost:5000/library/{}", image_name);
+        docker::remove_image(&image_name).await?;
+
+        fs::remove_file(package_dir.join(".lock"))
+            .context("Failed to delete '.lock' file in package directory.")?;
+    } else {
+        println!(
+            "Failed to built version {} of container (ECU) package {}. See error output above.",
+            style(&package_info.version).bold().cyan(),
+            style(&package_info.name).bold().cyan(),
+        );
+
+        fs::remove_dir_all(package_dir)
+            .context("Failed to delete package directory after failed build.")?;
+    }
 
     Ok(())
 }
@@ -192,6 +213,9 @@ fn prepare_directory(
 ) -> Result<()> {
     fs::create_dir_all(&package_dir)?;
     debug!("Created {:?} as package directory", package_dir);
+
+    File::create(&package_dir.join(".lock"))
+        .context("Failed to create '.lock' file inside package directory")?;
 
     // Write container.yml to package directory.
     let mut buffer = File::create(&package_dir.join("container.yml"))?;
