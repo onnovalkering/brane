@@ -10,7 +10,6 @@ use clap::Clap;
 use dotenv::dotenv;
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
-use grpcio::{Channel, ChannelBuilder, EnvBuilder};
 use log::LevelFilter;
 use log::{debug, error, info, warn};
 use prost::Message;
@@ -24,7 +23,6 @@ use rdkafka::{
     util::Timeout,
     Message as KafkaMesage, Offset, TopicPartitionList,
 };
-use std::sync::Arc;
 use tokio::task::JoinHandle;
 
 #[derive(Clap)]
@@ -90,10 +88,6 @@ async fn main() -> Result<()> {
     let secrets = Secrets::new(opts.secrets.clone())?;
     secrets.validate()?;
 
-    // Prepare Xenon gRPC channel.
-    let xenon_env = Arc::new(EnvBuilder::new().build());
-    let xenon_channel = ChannelBuilder::new(xenon_env).connect(&opts.xenon);
-
     // Spawn workers, using Tokio tasks and thread pool.
     let workers = (0..opts.num_workers)
         .map(|i| {
@@ -105,7 +99,7 @@ async fn main() -> Result<()> {
                 opts.event_topic.clone(),
                 infra.clone(),
                 secrets.clone(),
-                xenon_channel.clone(),
+                opts.xenon.clone(),
             ));
 
             info!("Spawned asynchronous worker #{}.", i + 1);
@@ -175,7 +169,7 @@ async fn start_worker(
     evt_topic: String,
     infra: Infrastructure,
     secrets: Secrets,
-    xenon_channel: Channel,
+    xenon_endpoint: String,
 ) -> Result<()> {
     let output_topic = evt_topic.as_ref();
 
@@ -229,7 +223,7 @@ async fn start_worker(
         let owned_producer = producer.clone();
         let owned_infra = infra.clone();
         let owned_secrets = secrets.clone();
-        let owned_xenon_channel = xenon_channel.clone();
+        let owned_xenon_endpoint = xenon_endpoint.clone();
         let clb_topic = clb_topic.clone();
         let cmd_topic = cmd_topic.clone();
 
@@ -255,7 +249,7 @@ async fn start_worker(
             let events = if topic == clb_topic {
                 handle_clb_message(msg_key, msg_payload)
             } else if topic == cmd_topic {
-                handle_cmd_message(msg_key, msg_payload, owned_infra, owned_secrets, owned_xenon_channel).await
+                handle_cmd_message(msg_key, msg_payload, owned_infra, owned_secrets, owned_xenon_endpoint).await
             } else {
                 unreachable!()
             };
@@ -323,7 +317,7 @@ async fn handle_cmd_message(
     payload: &[u8],
     infra: Infrastructure,
     secrets: Secrets,
-    xenon_channel: Channel,
+    xenon_endpoint: String,
 ) -> Result<Vec<(String, Event)>> {
     // Decode payload into a command message.
     let command = Command::decode(payload).unwrap();
@@ -340,7 +334,7 @@ async fn handle_cmd_message(
 
     // Dispatch command message to appropriate handlers.
     match kind {
-        CommandKind::Create => cmd_create::handle(&key, command, infra, secrets, xenon_channel).await,
+        CommandKind::Create => cmd_create::handle(&key, command, infra, secrets, xenon_endpoint).await,
         CommandKind::Stop => unimplemented!(),
         CommandKind::Unknown => unreachable!(),
     }

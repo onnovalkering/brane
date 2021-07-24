@@ -7,7 +7,6 @@ use bollard::Docker;
 use brane_cfg::infrastructure::{Location, LocationCredentials};
 use brane_cfg::{Infrastructure, Secrets};
 use futures_util::stream::TryStreamExt;
-use grpcio::Channel;
 use k8s_openapi::api::batch::v1::Job;
 use k8s_openapi::api::core::v1::Namespace;
 use kube::api::{Api, PostParams};
@@ -38,7 +37,7 @@ pub async fn handle(
     command: Command,
     infra: Infrastructure,
     secrets: Secrets,
-    xenon_channel: Channel,
+    xenon_endpoint: String,
 ) -> Result<Vec<(String, Event)>> {
     let context = || format!("CREATE command failed or is invalid (key: {}).", key);
 
@@ -120,8 +119,8 @@ pub async fn handle(
                 address,
                 runtime,
                 credentials,
-                xenon_channel,
-            )?
+                xenon_endpoint,
+            ).await?
         }
         Location::Vm {
             address,
@@ -149,8 +148,8 @@ pub async fn handle(
                 address,
                 runtime,
                 credentials,
-                xenon_channel,
-            )?
+                xenon_endpoint,
+            ).await?
         }
     };
 
@@ -428,59 +427,59 @@ async fn ensure_image(
 ///
 ///
 ///
-fn handle_slurm(
+async fn handle_slurm(
     command: Command,
     job_id: &str,
     environment: HashMap<String, String>,
     address: String,
     runtime: String,
     credentials: LocationCredentials,
-    xenon_channel: Channel,
+    xenon_endpoint: String,
 ) -> Result<()> {
     let credentials = match credentials {
         LocationCredentials::SshCertificate {
             username,
             certificate,
             passphrase,
-        } => Credential::new_certificate(certificate, username, passphrase),
+        } => Credential::new_certificate(certificate, username, passphrase.unwrap_or_default()),
         LocationCredentials::SshPassword { username, password } => Credential::new_password(username, password),
         LocationCredentials::Config { .. } => unreachable!(),
     };
 
-    let scheduler = create_xenon_scheduler(address, "slurm", credentials, xenon_channel)?;
-    handle_xenon(command, job_id, environment, runtime, scheduler)
+    let scheduler = create_xenon_scheduler("slurm", address, credentials, xenon_endpoint).await?;
+    handle_xenon(command, job_id, environment, runtime, scheduler).await
 }
 
 ///
 ///
 ///
-fn handle_vm(
+async fn handle_vm(
     command: Command,
     job_id: &str,
     environment: HashMap<String, String>,
     address: String,
     runtime: String,
     credentials: LocationCredentials,
-    xenon_channel: Channel,
+    xenon_endpoint: String,
 ) -> Result<()> {
     let credentials = match credentials {
         LocationCredentials::SshCertificate {
             username,
             certificate,
             passphrase,
-        } => Credential::new_certificate(certificate, username, passphrase),
+        } => Credential::new_certificate(certificate, username, passphrase.unwrap_or_default()),
         LocationCredentials::SshPassword { username, password } => Credential::new_password(username, password),
         LocationCredentials::Config { .. } => unreachable!(),
     };
 
-    let scheduler = create_xenon_scheduler(address, "ssh", credentials, xenon_channel)?;
-    handle_xenon(command, job_id, environment, runtime, scheduler)
+    let scheduler = create_xenon_scheduler("ssh", address, credentials, xenon_endpoint).await?;
+    handle_xenon(command, job_id, environment, runtime, scheduler).await
 }
 
 ///
 ///
 ///
-fn handle_xenon(
+async fn handle_xenon(
     command: Command,
     job_id: &str,
     environment: HashMap<String, String>,
@@ -493,8 +492,8 @@ fn handle_xenon(
         _ => unreachable!(),
     };
 
-    let _job = scheduler.submit_batch_job(job_description)?;
-    scheduler.close()?;
+    let _ = scheduler.submit_batch_job(job_description).await?;
+    scheduler.close().await?;
 
     Ok(())
 }
@@ -502,27 +501,32 @@ fn handle_xenon(
 ///
 ///
 ///
-fn create_xenon_scheduler<S1: Into<String>, S2: Into<String>>(
-    address: S1,
+async fn create_xenon_scheduler<S1, S2, S3>(
     adaptor: S2,
-    xenon_credential: Credential,
-    xenon_channel: Channel,
-) -> Result<Scheduler> {
-    let address = address.into();
+    location: S1,
+    credential: Credential,
+    xenon_endpoint: S3,
+) -> Result<Scheduler> 
+    where
+        S1: Into<String>,
+        S2: Into<String>,
+        S3: Into<String>,
+{
     let adaptor = adaptor.into();
+    let location = location.into();
 
     let properties = hashmap! {
-        "xenon.adaptors.schedulers.ssh.strictHostKeyChecking" => "false"
+        String::from("xenon.adaptors.schedulers.ssh.strictHostKeyChecking") => String::from("false")
     };
 
     // A SLURM scheduler requires the protocol scheme in the address.
-    let address = if adaptor == *"slurm" {
-        format!("ssh://{}", address)
+    let location = if adaptor == *"slurm" {
+        format!("ssh://{}", location)
     } else {
-        address
+        location
     };
 
-    let scheduler = Scheduler::create(adaptor, xenon_channel, xenon_credential, address, Some(properties))?;
+    let scheduler = Scheduler::create(adaptor, location, credential, xenon_endpoint, Some(properties)).await?;
 
     Ok(scheduler)
 }
