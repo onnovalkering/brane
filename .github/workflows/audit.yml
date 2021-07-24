@@ -28,6 +28,12 @@ jobs:
 
       - name: Run DevSkim scanner
         uses: microsoft/DevSkim-Action@v1
+
+      - name: Upload result as build artifact
+        uses: actions/upload-artifact@v2
+        with: 
+          name: devskim-results
+          path: devskim-results.sarif   
         
       - name: Upload results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v1
