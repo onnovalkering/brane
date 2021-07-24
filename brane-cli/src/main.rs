@@ -212,8 +212,8 @@ async fn run(options: Cli) -> Result<()> {
             };
 
             match kind.as_str() {
-                "ecu" => build_ecu::handle(context, file, init)?,
-                "oas" => build_oas::handle(context, file, init)?,
+                "ecu" => build_ecu::handle(context, file, init).await?,
+                "oas" => build_oas::handle(context, file, init).await?,
                 _ => println!("Unsupported package kind: {}", kind),
             }
         }
@@ -246,8 +246,8 @@ async fn run(options: Cli) -> Result<()> {
             };
 
             match kind.as_str() {
-                "ecu" => build_ecu::handle(context, file, init)?,
-                "oas" => build_oas::handle(context, file, init)?,
+                "ecu" => build_ecu::handle(context, file, init).await?,
+                "oas" => build_oas::handle(context, file, init).await?,
                 _ => println!("Unsupported package kind: {}", kind),
             }
         }
