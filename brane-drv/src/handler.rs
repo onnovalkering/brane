@@ -16,7 +16,7 @@ use rdkafka::{
     producer::{FutureProducer, FutureRecord},
     util::Timeout,
 };
-use specifications::common::{Value, FunctionExt};
+use specifications::common::{FunctionExt, Value};
 use specifications::package::PackageIndex;
 use std::sync::Arc;
 use std::{collections::HashMap, time::Duration};
@@ -106,7 +106,10 @@ impl grpc::DriverService for DriverHandler {
             let mut vm = if let Some(vm_state) = vm_state {
                 Vm::new_with_state(executor, Some(package_index), vm_state)
             } else {
-                let options = VmOptions { clear_after_main: true, ..Default::default() };
+                let options = VmOptions {
+                    clear_after_main: true,
+                    ..Default::default()
+                };
                 Vm::new_with(executor, Some(package_index), Some(options))
             };
 
@@ -203,7 +206,11 @@ impl VmExecutor for JobExecutor {
 
             created.await;
 
-            let location = self.locations.get(&correlation_id).map(|s| s.clone()).unwrap_or_default();
+            let location = self
+                .locations
+                .get(&correlation_id)
+                .map(|s| s.clone())
+                .unwrap_or_default();
             let location = self.infra.get_location_metadata(location)?;
 
             let mut properties = HashMap::default();
@@ -212,7 +219,7 @@ impl VmExecutor for JobExecutor {
 
             Ok(Value::Struct {
                 data_type: String::from("Service"),
-                properties
+                properties,
             })
         } else {
             // TODO: await value to be in states & results (perf).
@@ -229,7 +236,11 @@ impl VmExecutor for JobExecutor {
     ///
     ///
     ///
-    async fn wait_until(&self, _service: String, _state: brane_bvm::executor::ServiceState) -> Result<()> {
+    async fn wait_until(
+        &self,
+        _service: String,
+        _state: brane_bvm::executor::ServiceState,
+    ) -> Result<()> {
         Ok(())
     }
 }

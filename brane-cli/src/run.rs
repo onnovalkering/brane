@@ -9,8 +9,8 @@ use std::path::PathBuf;
 ///
 ///
 pub async fn handle(
-    file: PathBuf, 
-    data: Option<PathBuf>
+    file: PathBuf,
+    data: Option<PathBuf>,
 ) -> Result<()> {
     let source_code = fs::read_to_string(&file)?;
 

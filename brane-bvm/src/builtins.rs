@@ -1,5 +1,8 @@
 use crate::objects::{Class, Object};
-use crate::{executor::{ServiceState, VmExecutor}, stack::Slot};
+use crate::{
+    executor::{ServiceState, VmExecutor},
+    stack::Slot,
+};
 use broom::Heap;
 use fnv::FnvHashMap;
 use specifications::common::Value;
@@ -12,11 +15,13 @@ const BUILTIN_WAIT_UNTIL_DONE_CODE: u8 = 0x03;
 
 const BUILTIN_SERVICE_NAME: &str = "Service";
 
-
 ///
 ///
 ///
-pub fn register(globals: &mut FnvHashMap<String, Slot>, heap: &mut Heap<Object>) {
+pub fn register(
+    globals: &mut FnvHashMap<String, Slot>,
+    heap: &mut Heap<Object>,
+) {
     // Classes
     let service = heap.insert(class(BUILTIN_SERVICE_NAME.to_string())).into_handle();
     globals.insert(BUILTIN_SERVICE_NAME.to_string(), Slot::Object(service));
@@ -57,7 +62,10 @@ where
         BUILTIN_WAIT_UNTIL_STARTED_CODE => {
             let instance = arguments.first().unwrap();
             if let Value::Struct { properties, .. } = arguments.first().unwrap() {
-                let identifier = properties.get("identifier").expect("Missing `identifier` property.").to_string();
+                let identifier = properties
+                    .get("identifier")
+                    .expect("Missing `identifier` property.")
+                    .to_string();
                 executor.wait_until(identifier, ServiceState::Started).await.unwrap();
             } else {
                 dbg!(&instance);
@@ -69,7 +77,10 @@ where
         BUILTIN_WAIT_UNTIL_DONE_CODE => {
             let instance = arguments.first().unwrap();
             if let Value::Struct { properties, .. } = arguments.first().unwrap() {
-                let identifier = properties.get("identifier").expect("Missing `identifier` property.").to_string();
+                let identifier = properties
+                    .get("identifier")
+                    .expect("Missing `identifier` property.")
+                    .to_string();
                 executor.wait_until(identifier, ServiceState::Done).await.unwrap();
             } else {
                 dbg!(&instance);

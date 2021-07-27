@@ -6,8 +6,8 @@ extern crate log;
 extern crate juniper;
 
 use scylla::Session;
-use tokio::sync::watch::Receiver;
 use std::sync::Arc;
+use tokio::sync::watch::Receiver;
 
 pub mod ingestion;
 pub mod interface;

@@ -54,7 +54,7 @@ struct Opts {
     group_id: String,
     /// Infra metadata store
     #[clap(short, long, default_value = "./infra.yml", env = "INFRA")]
-    infra: String,    
+    infra: String,
 }
 
 #[tokio::main]

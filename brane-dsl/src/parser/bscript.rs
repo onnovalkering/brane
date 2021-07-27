@@ -179,13 +179,21 @@ pub fn declare_class_stmt<'a, E: ParseError<Tokens<'a>> + ContextError<Tokens<'a
 
             for stmt in body.iter() {
                 match stmt {
-                    Stmt::Property { ident, class } => { properties.insert(ident.clone(), class.clone()); }
-                    Stmt::DeclareFunc { ident, .. } => { methods.insert(ident.clone(), stmt.clone()); }
-                    _ => unreachable!()
+                    Stmt::Property { ident, class } => {
+                        properties.insert(ident.clone(), class.clone());
+                    }
+                    Stmt::DeclareFunc { ident, .. } => {
+                        methods.insert(ident.clone(), stmt.clone());
+                    }
+                    _ => unreachable!(),
                 }
             }
 
-            Stmt::DeclareClass { ident, properties, methods }
+            Stmt::DeclareClass {
+                ident,
+                properties,
+                methods,
+            }
         },
     )
     .parse(input)

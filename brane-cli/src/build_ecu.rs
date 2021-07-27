@@ -71,8 +71,7 @@ pub async fn handle(
         let image_name = format!("localhost:5000/library/{}", image_name);
         docker::remove_image(&image_name).await?;
 
-        fs::remove_file(package_dir.join(".lock"))
-            .context("Failed to delete '.lock' file in package directory.")?;
+        fs::remove_file(package_dir.join(".lock")).context("Failed to delete '.lock' file in package directory.")?;
     } else {
         println!(
             "Failed to built version {} of container (ECU) package {}. See error output above.",
@@ -80,8 +79,7 @@ pub async fn handle(
             style(&package_info.name).bold().cyan(),
         );
 
-        fs::remove_dir_all(package_dir)
-            .context("Failed to delete package directory after failed build.")?;
+        fs::remove_dir_all(package_dir).context("Failed to delete package directory after failed build.")?;
     }
 
     Ok(())
@@ -193,7 +191,7 @@ fn generate_dockerfile(
             writeln!(contents, "RUN {}", line)?;
         }
     }
-    
+
     writeln!(contents, "ENTRYPOINT [\"/branelet\"]")?;
 
     Ok(contents)
@@ -214,8 +212,7 @@ fn prepare_directory(
     fs::create_dir_all(&package_dir)?;
     debug!("Created {:?} as package directory", package_dir);
 
-    File::create(&package_dir.join(".lock"))
-        .context("Failed to create '.lock' file inside package directory")?;
+    File::create(&package_dir.join(".lock")).context("Failed to create '.lock' file inside package directory")?;
 
     // Write container.yml to package directory.
     let mut buffer = File::create(&package_dir.join("container.yml"))?;

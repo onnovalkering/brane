@@ -297,7 +297,7 @@ fn print_output(value: &Value) {
                 println!("{}:", style(name).bold().cyan());
                 println!("{}\n", style(value).cyan());
             }
-        },
+        }
         Value::Function(_) => println!("TODO function."),
         Value::FunctionExt(_) => println!("TODO FunctionExt."),
         Value::Class(_) => println!("TODO class."),

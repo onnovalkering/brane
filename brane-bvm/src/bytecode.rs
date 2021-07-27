@@ -1,13 +1,13 @@
 use crate::objects::{self, Class, Object};
-use crate::Function;
 use crate::stack::Slot;
+use crate::Function;
 use anyhow::Result;
 use broom::Heap;
 use bytes::{BufMut, Bytes, BytesMut};
 use fnv::FnvHashMap;
+use specifications::common::{Bytecode, SpecClass, SpecFunction, Value};
 use std::collections::HashMap;
 use std::fmt::Write;
-use specifications::common::{Bytecode, SpecClass, SpecFunction, Value};
 
 pub mod opcodes {
     pub const OP_ADD: u8 = 0x01;
@@ -23,7 +23,7 @@ pub mod opcodes {
     pub const OP_FALSE: u8 = 0x0B;
     pub const OP_GET_GLOBAL: u8 = 0x0C;
     pub const OP_GET_LOCAL: u8 = 0x0D;
-    pub const OP_GET_METHOD: u8 = 0x26;    
+    pub const OP_GET_METHOD: u8 = 0x26;
     pub const OP_GET_PROPERTY: u8 = 0x27;
     pub const OP_GREATER: u8 = 0x0E;
     pub const OP_IMPORT: u8 = 0x0F;
@@ -51,7 +51,6 @@ pub mod opcodes {
     pub const OP_UNIT: u8 = 0x24;
 }
 
-
 #[derive(Clone)]
 pub struct ClassMut {
     pub name: String,
@@ -68,7 +67,7 @@ impl ClassMut {
         Self {
             name,
             properties,
-            methods
+            methods,
         }
     }
 
@@ -79,13 +78,17 @@ impl ClassMut {
         self,
         heap: &mut Heap<Object>,
     ) -> Class {
-        let methods = self.methods.into_iter().map(|(k, v)| {
-            let function = v.freeze(heap);
-            let handle = heap.insert(Object::Function(function)).into_handle();
-            let slot = Slot::Object(handle);
+        let methods = self
+            .methods
+            .into_iter()
+            .map(|(k, v)| {
+                let function = v.freeze(heap);
+                let handle = heap.insert(Object::Function(function)).into_handle();
+                let slot = Slot::Object(handle);
 
-            (k, slot)
-        }).collect();
+                (k, slot)
+            })
+            .collect();
 
         Class {
             name: self.name,
@@ -130,7 +133,7 @@ impl From<FunctionMut> for SpecFunction {
             bytecode: Bytecode {
                 code: f.chunk.code[..].to_vec(),
                 constants: f.chunk.constants,
-            }
+            },
         }
     }
 }
@@ -319,11 +322,11 @@ impl Chunk {
                 OP_GET_METHOD => {
                     constant_instruction("OP_GET_METHOD", &self, offset, &mut result);
                     skip = 1;
-                }                   
+                }
                 OP_GET_PROPERTY => {
                     constant_instruction("OP_GET_PROPERTY", &self, offset, &mut result);
                     skip = 1;
-                }                                     
+                }
                 OP_SET_GLOBAL => {
                     byte_instruction("OP_SET_GLOBAL", &self, offset, &mut result);
                     skip = 1;
@@ -472,7 +475,7 @@ impl ChunkMut {
                         methods.insert(name, Slot::Object(handle));
                     }
 
-                    let class = Class { 
+                    let class = Class {
                         name: c.name.clone(),
                         methods,
                     };

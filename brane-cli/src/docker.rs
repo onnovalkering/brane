@@ -15,7 +15,7 @@ use futures_util::StreamExt;
 use hyper::Body;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use specifications::common::{Value, FunctionExt};
+use specifications::common::{FunctionExt, Value};
 use specifications::package::PackageInfo;
 use std::env;
 use std::path::PathBuf;
@@ -34,14 +34,12 @@ lazy_static! {
 
 #[derive(Clone, Default)]
 pub struct DockerExecutor {
-    pub data: Option<PathBuf>
+    pub data: Option<PathBuf>,
 }
 
 impl DockerExecutor {
     pub fn new(data: Option<PathBuf>) -> Self {
-        Self {
-            data
-        }
+        Self { data }
     }
 }
 
@@ -109,7 +107,7 @@ impl VmExecutor for DockerExecutor {
 
             Ok(Value::Struct {
                 data_type: String::from("Service"),
-                properties
+                properties,
             })
         } else {
             let (stdout, stderr) = run_and_wait(exec).await?;
@@ -120,14 +118,18 @@ impl VmExecutor for DockerExecutor {
             decode_b64(output).or_else(|err| {
                 error!("{:?}", err);
                 Ok(Value::Unit)
-            })            
+            })
         }
     }
 
     ///
     ///
     ///
-    async fn wait_until(&self, name: String, state: brane_bvm::executor::ServiceState) -> Result<()> {
+    async fn wait_until(
+        &self,
+        name: String,
+        state: brane_bvm::executor::ServiceState,
+    ) -> Result<()> {
         if let brane_bvm::executor::ServiceState::Started = state {
             return Ok(());
         }
@@ -139,7 +141,7 @@ impl VmExecutor for DockerExecutor {
             .await?;
 
         Ok(())
-    }    
+    }
 }
 
 ///
@@ -413,7 +415,11 @@ pub async fn get_container_address(name: &str) -> Result<String> {
     let docker = Docker::connect_with_local_defaults()?;
 
     let container = docker.inspect_container(name, None).await?;
-    let networks = container.network_settings.map(|n| n.networks).flatten().unwrap_or_default();
+    let networks = container
+        .network_settings
+        .map(|n| n.networks)
+        .flatten()
+        .unwrap_or_default();
 
     let address = if let Some(network) = networks.values().next() {
         let ip = network.ip_address.clone().unwrap_or_default();

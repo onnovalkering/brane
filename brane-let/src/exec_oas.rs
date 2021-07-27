@@ -110,9 +110,7 @@ fn capture_output(
 
     let c_types = c_types.clone().unwrap_or_default();
     let output = match &output {
-        Value::Array { .. } | Value::Struct { .. } => {
-            Some(as_type(&output, return_type, &c_types))
-        }
+        Value::Array { .. } | Value::Struct { .. } => Some(as_type(&output, return_type, &c_types)),
         Value::Unit => None,
         _ => Some(output),
     };
@@ -123,7 +121,11 @@ fn capture_output(
 ///
 ///
 ///
-fn as_type(object: &Value, c_type: &str, c_types: &Map<Type>) -> Value {
+fn as_type(
+    object: &Value,
+    c_type: &str,
+    c_types: &Map<Type>,
+) -> Value {
     let mut filtered = Map::<Value>::new();
 
     match object {
@@ -146,7 +148,7 @@ fn as_type(object: &Value, c_type: &str, c_types: &Map<Type>) -> Value {
             } else {
                 object.clone()
             }
-        },
+        }
         Value::Array { entries, .. } => {
             let element_type = c_type.strip_suffix("[]").unwrap();
 
@@ -155,7 +157,7 @@ fn as_type(object: &Value, c_type: &str, c_types: &Map<Type>) -> Value {
                 entries,
                 data_type: c_type.to_string(),
             }
-        },
-        _ => object.clone()
+        }
+        _ => object.clone(),
     }
 }

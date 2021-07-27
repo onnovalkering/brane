@@ -1,9 +1,6 @@
-use anyhow::{Context as AContext, Result};
-use schema::KeyValuePair;
-use time::{Format, OffsetDateTime};
-use crate::schema;
 use crate::interface::{Event, EventKind};
-use scylla::Session;
+use crate::schema;
+use anyhow::{Context as AContext, Result};
 use futures::stream::StreamExt;
 use log::info;
 use prost::Message;
@@ -14,8 +11,11 @@ use rdkafka::{
     util::Timeout,
     Message as KafkaMesage, Offset, TopicPartitionList,
 };
-use tokio::sync::watch::Sender;
+use schema::KeyValuePair;
+use scylla::Session;
 use std::sync::Arc;
+use time::{Format, OffsetDateTime};
+use tokio::sync::watch::Sender;
 
 ///
 ///
@@ -26,7 +26,8 @@ pub async fn ensure_db_keyspace(session: &Session) -> Result<()> {
         WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 3};
     "#;
 
-    session.query(query, &[])
+    session
+        .query(query, &[])
         .await
         .map(|_| Ok(()))
         .map_err(|e| anyhow!("{:?}", e))
@@ -51,7 +52,8 @@ pub async fn ensure_db_tables(session: &Session) -> Result<()> {
         )
     "#;
 
-    session.query(query, &[])
+    session
+        .query(query, &[])
         .await
         .map(|_| Ok(()))
         .map_err(|e| anyhow!("{:?}", e))
@@ -163,7 +165,7 @@ async fn process_message(
                 value: bytes_ba.to_string(),
             });
         }
-        _ => {},
+        _ => {}
     }
 
     // Prepare for insertion.
@@ -184,7 +186,7 @@ async fn process_message(
         event.order as i32,
         kind.as_str(),
         information_str.as_str(),
-        event.timestamp
+        event.timestamp,
     );
 
     session

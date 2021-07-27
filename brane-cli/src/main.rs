@@ -117,7 +117,7 @@ enum SubCommand {
         #[structopt(short, long, help = "Attach to an existing remote session")]
         attach: Option<String>,
         #[structopt(short, long, help = "The directory to mount as /data")]
-        data: Option<PathBuf>,   
+        data: Option<PathBuf>,
     },
 
     #[structopt(name = "run", about = "Run a DSL script locally")]

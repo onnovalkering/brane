@@ -60,7 +60,7 @@ impl Slot {
                 let handle = heap.insert(string).into_handle();
 
                 Slot::Object(handle)
-            },
+            }
             Value::Boolean(b) => match b {
                 false => Slot::False,
                 true => Slot::True,
@@ -89,7 +89,8 @@ impl Slot {
 
                 dbg!(&globals);
 
-                let i_class = globals.get(&data_type)
+                let i_class = globals
+                    .get(&data_type)
                     .unwrap_or_else(|| panic!("Expecting '{}' to be loaded as a global.", data_type))
                     .as_object()
                     .unwrap();
@@ -101,12 +102,15 @@ impl Slot {
                 Slot::Object(handle)
             }
             Value::Array { entries, .. } => {
-                let entries = entries.into_iter().map(|e| Slot::from_value(e, globals, heap)).collect();
+                let entries = entries
+                    .into_iter()
+                    .map(|e| Slot::from_value(e, globals, heap))
+                    .collect();
                 let array = Object::Array(Array::new(entries));
                 let handle = heap.insert(array).into_handle();
 
                 Slot::Object(handle)
-            },
+            }
             todo => {
                 dbg!(&todo);
                 todo!();
@@ -126,7 +130,7 @@ impl Slot {
                 // panic!("Cannot convert built-in to value.")
 
                 Value::Unit
-            },
+            }
             Slot::ConstMinusOne => Value::Integer(-1),
             Slot::ConstMinusTwo => Value::Integer(-2),
             Slot::ConstOne => Value::Integer(1),
@@ -142,16 +146,13 @@ impl Slot {
                     let data_type = a.element_type.clone();
                     let entries = a.elements.iter().map(|s| s.into_value(heap)).collect();
 
-                    Value::Array {
-                        data_type,
-                        entries
-                    }
+                    Value::Array { data_type, entries }
                 }
                 Object::Class(c) => {
                     let class = c.clone().unfreeze(heap);
                     let class: SpecClass = class.into();
                     Value::Class(class.into())
-                },
+                }
                 Object::Function(_) => panic!("Cannot convert function to value."),
                 Object::FunctionExt(f) => Value::FunctionExt(f.clone()),
                 Object::Instance(i) => {
@@ -164,11 +165,8 @@ impl Slot {
                         properties.insert(name.clone(), slot.clone().into_value(heap));
                     }
 
-                    Value::Struct {
-                        data_type,
-                        properties
-                    }
-                },
+                    Value::Struct { data_type, properties }
+                }
                 Object::String(s) => Value::Unicode(s.clone()),
             },
         }

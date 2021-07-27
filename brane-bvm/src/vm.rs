@@ -1,3 +1,4 @@
+use crate::frames::CallFrame;
 use crate::objects::Class;
 use crate::stack::{Slot, Stack};
 use crate::{
@@ -7,14 +8,13 @@ use crate::{
     objects::Object,
     objects::{Array, Instance},
 };
-use crate::{frames::CallFrame};
 use broom::{Handle, Heap};
+use fnv::FnvHashMap;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use smallvec::SmallVec;
-use specifications::common::{Value, FunctionExt};
+use specifications::common::{FunctionExt, Value};
 use specifications::package::PackageIndex;
 use tokio::runtime::Runtime;
-use fnv::FnvHashMap;
 
 #[derive(Clone, Default, Debug)]
 pub struct VmOptions {
@@ -561,7 +561,10 @@ where
 
         if let Slot::Object(handle) = identifier {
             if let Some(Object::String(identifier)) = self.heap.get(handle) {
-                let value = *self.globals.get(identifier).unwrap_or_else(|| panic!("Failed to retreive global: {}", identifier));
+                let value = *self
+                    .globals
+                    .get(identifier)
+                    .unwrap_or_else(|| panic!("Failed to retreive global: {}", identifier));
                 self.stack.push(value);
 
                 return;
@@ -601,7 +604,7 @@ where
                 if let Some(Object::Class(class)) = self.heap.get(instance.class) {
                     let method = if class.name == *"Service" {
                         match method.as_str() {
-                            // Quickfix :( 
+                            // Quickfix :(
                             "waitUntilStarted" => Slot::BuiltIn(0x02),
                             "waitUntilDone" => Slot::BuiltIn(0x03),
                             _ => panic!("expecting method."),
@@ -644,7 +647,7 @@ where
         }
 
         panic!("invalid");
-    }    
+    }
 
     ///
     ///
@@ -966,7 +969,10 @@ where
     ///
     ///
     #[inline]
-    pub fn op_set_global(&mut self, create_if_not_exists: bool) {
+    pub fn op_set_global(
+        &mut self,
+        create_if_not_exists: bool,
+    ) {
         let identifier = *self.frame().read_constant().expect("Failed to read constant.");
 
         let value = self.stack.pop();

@@ -53,7 +53,7 @@ impl Trace<Self> for Object {
             Object::Array(a) => a.trace(tracer),
             Object::Class(c) => c.trace(tracer),
             Object::Function(f) => f.trace(tracer),
-            Object::FunctionExt(_f) => {},
+            Object::FunctionExt(_f) => {}
             Object::Instance(i) => i.trace(tracer),
             Object::String(_) => {}
         }
@@ -99,14 +99,18 @@ impl Class {
         self,
         heap: &Heap<Object>,
     ) -> ClassMut {
-        let methods = self.methods.into_iter().map(|(k, v)| {
-            let function = v.as_object().unwrap();
-            let function = heap.get(function).unwrap();
-            let function = function.as_function().unwrap();
-            let function = function.clone().unfreeze(heap);
+        let methods = self
+            .methods
+            .into_iter()
+            .map(|(k, v)| {
+                let function = v.as_object().unwrap();
+                let function = heap.get(function).unwrap();
+                let function = function.as_function().unwrap();
+                let function = function.clone().unfreeze(heap);
 
-            (k, function)
-        }).collect();
+                (k, function)
+            })
+            .collect();
 
         ClassMut {
             name: self.name.clone(),

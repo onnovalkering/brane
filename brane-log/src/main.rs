@@ -1,21 +1,21 @@
 use anyhow::Result;
-use futures::FutureExt;
 use brane_log::ingestion;
+use brane_log::schema::{Event, Query, Subscription};
 use brane_log::{Context, Schema};
-use brane_log::schema::{Query, Event, Subscription};
-use scylla::transport::Compression;
-use scylla::{Session, SessionBuilder};
 use clap::Clap;
 use dotenv::dotenv;
+use futures::FutureExt;
 use juniper::{self, EmptyMutation};
 use juniper_graphql_ws::ConnectionConfig;
 use juniper_warp::{playground_filter, subscriptions::serve_graphql_ws};
 use log::LevelFilter;
+use scylla::transport::Compression;
+use scylla::{Session, SessionBuilder};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::watch;
-use warp::Filter;
 use warp::ws::Ws;
-use std::net::SocketAddr;
+use warp::Filter;
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
@@ -96,36 +96,37 @@ async fn main() -> Result<()> {
     let graphql_filter = juniper_warp::make_graphql_filter(schema, context.boxed());
     let root_node = Arc::new(Schema::new(Query {}, EmptyMutation::new(), Subscription {}));
 
-    let routes = (warp::path("subscriptions")
-        .and(warp::ws())
-        .map(move |ws: Ws| {
-            let root_node = root_node.clone();
-            let events = events.clone();
-            let scylla = scylla_session.clone();
+    let routes = (warp::path("subscriptions").and(warp::ws()).map(move |ws: Ws| {
+        let root_node = root_node.clone();
+        let events = events.clone();
+        let scylla = scylla_session.clone();
 
-            ws.on_upgrade(move |websocket| async move {
-                serve_graphql_ws(websocket, root_node, ConnectionConfig::new(
-                    Context { scylla, events_rx: events }
-                ))
-                .map(|r| {
-                    if let Err(e) = r {
-                        println!("Websocket error: {}", e);
-                    }
-                })
-                .await
+        ws.on_upgrade(move |websocket| async move {
+            serve_graphql_ws(
+                websocket,
+                root_node,
+                ConnectionConfig::new(Context {
+                    scylla,
+                    events_rx: events,
+                }),
+            )
+            .map(|r| {
+                if let Err(e) = r {
+                    println!("Websocket error: {}", e);
+                }
             })
-        }))
-        .map(|reply| {
-            // TODO#584: remove this workaround
-            warp::reply::with_header(reply, "Sec-WebSocket-Protocol", "graphql-ws")
+            .await
         })
-        .or(warp::post()
-            .and(warp::path("graphql"))
-            .and(graphql_filter))
-        .or(warp::get()
-            .and(warp::path("playground"))
-            .and(playground_filter("/graphql", Some("/subscriptions"))))
-        .with(log);
+    }))
+    .map(|reply| {
+        // TODO#584: remove this workaround
+        warp::reply::with_header(reply, "Sec-WebSocket-Protocol", "graphql-ws")
+    })
+    .or(warp::post().and(warp::path("graphql")).and(graphql_filter))
+    .or(warp::get()
+        .and(warp::path("playground"))
+        .and(playground_filter("/graphql", Some("/subscriptions"))))
+    .with(log);
 
     let address: SocketAddr = opts.address.clone().parse()?;
     warp::serve(routes).run(address).await;

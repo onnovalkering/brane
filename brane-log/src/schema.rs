@@ -1,9 +1,9 @@
 use crate::Context;
-use juniper::{EmptyMutation, GraphQLObject, RootNode, FieldError};
-use std::pin::Pin;
-use futures::Stream;
 use async_stream::stream;
+use futures::Stream;
+use juniper::{EmptyMutation, FieldError, GraphQLObject, RootNode};
 use serde::{Deserialize, Serialize};
+use std::pin::Pin;
 
 pub type Schema = RootNode<'static, Query, EmptyMutation<Context>, Subscription>;
 
@@ -98,7 +98,7 @@ impl Query {
         // events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
         // events
-        
+
         todo!()
     }
 }
@@ -113,7 +113,7 @@ impl Subscription {
         application: String,
         job: Option<String>,
         kind: Option<String>,
-        context: &Context
+        context: &Context,
     ) -> EventStream {
         let mut events_rx = context.events_rx.clone();
 

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::parser::ast::*;
 use anyhow::Result;
 use brane_bvm::bytecode::{opcodes::*, ChunkMut, FunctionMut};
-use specifications::common::{SpecFunction, Value, SpecClass};
+use specifications::common::{SpecClass, SpecFunction, Value};
 
 #[derive(Debug, Clone)]
 pub struct Local {
@@ -82,19 +82,27 @@ pub fn stmt_to_opcodes(
             methods,
         } => {
             let properties = properties.into_iter().map(|(Ident(k), Ident(v))| (k, v)).collect();
-            let methods: HashMap<String, SpecFunction> = methods.into_iter().map(|(Ident(k), stmt)| {
-                if let Stmt::DeclareFunc { ident: Ident(ident), params, body } = stmt {
-                    let method: FunctionMut = compile_function(body, 1, &params, ident).unwrap();
-                    let method: SpecFunction = method.into();
-                    
-                    (k, method)
-                } else {
-                    unreachable!()
-                }
-            }).collect();
+            let methods: HashMap<String, SpecFunction> = methods
+                .into_iter()
+                .map(|(Ident(k), stmt)| {
+                    if let Stmt::DeclareFunc {
+                        ident: Ident(ident),
+                        params,
+                        body,
+                    } = stmt
+                    {
+                        let method: FunctionMut = compile_function(body, 1, &params, ident).unwrap();
+                        let method: SpecFunction = method.into();
+
+                        (k, method)
+                    } else {
+                        unreachable!()
+                    }
+                })
+                .collect();
 
             let class = Value::Class(SpecClass::new(ident.clone(), properties, methods));
-            
+
             let class = chunk.add_constant(class);
             chunk.write_pair(OP_CLASS, class);
 
@@ -266,7 +274,7 @@ pub fn stmt_to_opcodes(
             expr_to_opcodes(expr, chunk, locals, scope);
             chunk.write(OP_POP);
         }
-        Stmt::Property { ..} => {
+        Stmt::Property { .. } => {
             unreachable!()
         }
         Stmt::Return(expr) => {
@@ -292,7 +300,7 @@ pub fn stmt_to_opcodes(
             let ident = chunk.add_constant(ident.into());
             chunk.write_pair(OP_DEFINE_GLOBAL, ident);
         }
-        
+
         // TODO: merge with block statement?
         Stmt::On { location, block } => {
             // Create a new scope (shadow).
@@ -386,8 +394,11 @@ pub fn expr_to_opcodes(
                         let property = chunk.add_constant(ident.clone().into());
                         chunk.write_pair(OP_GET_PROPERTY, property);
                         return;
-                    },
-                    Expr::Call { function: Ident(ident), arguments } => {
+                    }
+                    Expr::Call {
+                        function: Ident(ident),
+                        arguments,
+                    } => {
                         // Put method on the stack.
                         let method = chunk.add_constant(ident.clone().into());
                         chunk.write_pair(OP_GET_METHOD, method);
@@ -397,12 +408,12 @@ pub fn expr_to_opcodes(
                         for argument in arguments.iter().skip(1) {
                             expr_to_opcodes(argument.clone(), chunk, locals, scope);
                         }
-            
+
                         chunk.write_pair(OP_CALL, arguments_n);
 
                         return;
                     }
-                    _ => unreachable!()
+                    _ => unreachable!(),
                 }
             }
 

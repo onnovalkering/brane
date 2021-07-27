@@ -120,7 +120,8 @@ pub async fn handle(
                 runtime,
                 credentials,
                 xenon_endpoint,
-            ).await?
+            )
+            .await?
         }
         Location::Vm {
             address,
@@ -149,7 +150,8 @@ pub async fn handle(
                 runtime,
                 credentials,
                 xenon_endpoint,
-            ).await?
+            )
+            .await?
         }
     };
 
@@ -506,11 +508,11 @@ async fn create_xenon_scheduler<S1, S2, S3>(
     location: S1,
     credential: Credential,
     xenon_endpoint: S3,
-) -> Result<Scheduler> 
-    where
-        S1: Into<String>,
-        S2: Into<String>,
-        S3: Into<String>,
+) -> Result<Scheduler>
+where
+    S1: Into<String>,
+    S2: Into<String>,
+    S3: Into<String>,
 {
     let adaptor = adaptor.into();
     let location = location.into();

@@ -184,7 +184,11 @@ impl SpecClass {
         properties: HashMap<String, String>,
         methods: HashMap<String, SpecFunction>,
     ) -> Self {
-        Self { name, properties, methods }
+        Self {
+            name,
+            properties,
+            methods,
+        }
     }
 }
 
@@ -291,7 +295,6 @@ impl From<()> for Value {
     }
 }
 
-
 impl Value {
     ///
     ///
@@ -343,7 +346,7 @@ impl Value {
             Unit => "unit",
             Function(_) => "function",
             Class(_) => "class",
-            FunctionExt(_) => "FunctionExt"
+            FunctionExt(_) => "FunctionExt",
         }
     }
 

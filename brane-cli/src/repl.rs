@@ -283,7 +283,10 @@ async fn local_repl(
     let mut compiler = Compiler::new(compiler_options, package_index.clone());
 
     let executor = DockerExecutor::new(data);
-    let options = VmOptions { clear_after_main: true, ..Default::default() };
+    let options = VmOptions {
+        clear_after_main: true,
+        ..Default::default()
+    };
     let mut vm = Vm::new_with(executor, Some(package_index), Some(options));
 
     let mut count: u32 = 1;
