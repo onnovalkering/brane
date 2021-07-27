@@ -4,9 +4,6 @@ info:
   version: 1.0.0
   description: The Vantage6 API.
 
-servers:
-  - url: http://localhost:5000/api
-
 paths:
   "/collaboration":
     get:
