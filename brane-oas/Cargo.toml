@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1"
+backoff = { version = "0.3", features = ["tokio"] }
 cookie = "0.15"
 cookie_store = { version = "0.13", features = ["reqwest_impl"] }
 log = "0.4"

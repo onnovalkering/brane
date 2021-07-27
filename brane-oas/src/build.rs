@@ -24,10 +24,10 @@ pub fn build_oas_functions(oas_document: &OpenAPI) -> Result<FunctionsAndTypes> 
     let mut types = Map::<Type>::new();
 
     // Wrap building into re-usable (mutable) closure.
-    let mut try_build = |generated_id, operation, components| -> Result<()> {
+    let mut try_build = |generated_id, operation, components, server_known| -> Result<()> {
         if let Some(ref o) = operation {
             let operation_id = get_operation_id(o, Some(generated_id))?;
-            let (f, t) = build_oas_function(operation_id, o, components)?;
+            let (f, t) = build_oas_function(operation_id, o, components, server_known)?;
 
             // Bookkeeping
             functions.extend(f);
@@ -41,15 +41,56 @@ pub fn build_oas_functions(oas_document: &OpenAPI) -> Result<FunctionsAndTypes> 
     let components = oas_document.components.clone();
     for (url_path, path) in oas_document.paths.iter() {
         let path = resolver::resolve_path_item(path)?;
+        let server_known = !oas_document.servers.is_empty() || !path.servers.is_empty();
 
-        try_build(generate_operation_id("delete", url_path), path.delete, &components)?;
-        try_build(generate_operation_id("get", url_path), path.get, &components)?;
-        try_build(generate_operation_id("head", url_path), path.head, &components)?;
-        try_build(generate_operation_id("options", url_path), path.options, &components)?;
-        try_build(generate_operation_id("patch", url_path), path.patch, &components)?;
-        try_build(generate_operation_id("post", url_path), path.post, &components)?;
-        try_build(generate_operation_id("put", url_path), path.put, &components)?;
-        try_build(generate_operation_id("trace", url_path), path.trace, &components)?;
+        try_build(
+            generate_operation_id("delete", url_path),
+            path.delete,
+            &components,
+            server_known,
+        )?;
+        try_build(
+            generate_operation_id("get", url_path),
+            path.get,
+            &components,
+            server_known,
+        )?;
+        try_build(
+            generate_operation_id("head", url_path),
+            path.head,
+            &components,
+            server_known,
+        )?;
+        try_build(
+            generate_operation_id("options", url_path),
+            path.options,
+            &components,
+            server_known,
+        )?;
+        try_build(
+            generate_operation_id("patch", url_path),
+            path.patch,
+            &components,
+            server_known,
+        )?;
+        try_build(
+            generate_operation_id("post", url_path),
+            path.post,
+            &components,
+            server_known,
+        )?;
+        try_build(
+            generate_operation_id("put", url_path),
+            path.put,
+            &components,
+            server_known,
+        )?;
+        try_build(
+            generate_operation_id("trace", url_path),
+            path.trace,
+            &components,
+            server_known,
+        )?;
     }
 
     Ok((functions, types))
@@ -117,8 +158,9 @@ pub fn build_oas_function(
     operation_id: String,
     operation: &Operation,
     components: &Option<Components>,
+    server_known: bool,
 ) -> Result<FunctionsAndTypes> {
-    let (input, i_types) = build_oas_function_input(&operation_id, operation, components)?;
+    let (input, i_types) = build_oas_function_input(&operation_id, operation, components, server_known)?;
     let (output, o_types) = build_oas_function_output(&operation_id, operation, components)?;
 
     // Build function
@@ -143,6 +185,7 @@ fn build_oas_function_input(
     operation_id: &str,
     operation: &Operation,
     components: &Option<Components>,
+    server_known: bool,
 ) -> Result<(Vec<Parameter>, Map<Type>)> {
     let mut input_properties = Vec::<Property>::new();
     let mut input_types = Map::<Type>::new();
@@ -153,24 +196,6 @@ fn build_oas_function_input(
         let mut properties = parameter_to_properties(&parameter, components, &mut input_types)?;
 
         input_properties.append(&mut properties);
-    }
-
-    // Determine input from security schemes.
-    if let Some(security_scheme) = &operation.security.get(0) {
-        if let Some(security_scheme) = security_scheme.keys().next() {
-            let item = ReferenceOr::Reference::<SecurityScheme> {
-                reference: format!("#/components/schemas/{}", security_scheme),
-            };
-
-            let security_scheme = resolver::resolve_security_scheme(&item, components)?;
-            let property = match security_scheme {
-                SecurityScheme::APIKey { name, .. } => Property::new_quick(&name, "string"),
-                SecurityScheme::HTTP { .. } => Property::new_quick("token", "string"),
-                _ => todo!(),
-            };
-
-            input_properties.push(property);
-        }
     }
 
     // Determine input from request body.
@@ -192,15 +217,37 @@ fn build_oas_function_input(
         }
     }
 
+    // Determine if server url is needed
+    if !server_known && operation.servers.is_empty() {
+        let property = Property::new_quick("server", "string");
+        input_properties.push(property);
+    }
+
+    // Determine input from security schemes.
+    if let Some(security_scheme) = &operation.security.get(0) {
+        if let Some(security_scheme) = security_scheme.keys().next() {
+            let item = ReferenceOr::Reference::<SecurityScheme> {
+                reference: format!("#/components/schemas/{}", security_scheme),
+            };
+
+            let security_scheme = resolver::resolve_security_scheme(&item, components)?;
+            let property = match security_scheme {
+                SecurityScheme::APIKey { name, .. } => Property::new_quick(&name, "string"),
+                SecurityScheme::HTTP { .. } => Property::new_quick("token", "string"),
+                _ => todo!(),
+            };
+
+            input_properties.push(property);
+        }
+    }
+
     // Convert input properties to parameters.
     let input_parameters = if input_properties.len() > 3 {
         let type_name = uppercase_first_letter(&operation_id);
         let input_data_type = format!("{}Input", type_name);
 
         debug!("Grouping input into a single object: {}", input_data_type);
-        let (token, input_properties) = input_properties
-            .into_iter()
-            .partition(|p| p.name == *"token");
+        let (token, input_properties) = input_properties.into_iter().partition(|p| p.name == *"token");
 
         let input_type = Type {
             name: input_data_type.clone(),
@@ -263,7 +310,7 @@ fn build_oas_function_output(
 
     // Special treatment for array types.
     if output_properties.len() == 1 {
-        if let Some(Property { data_type, ..}) = output_properties.first() {
+        if let Some(Property { data_type, .. }) = output_properties.first() {
             if data_type.ends_with("[]") {
                 return Ok((data_type.clone(), output_types));
             }
@@ -370,7 +417,10 @@ fn any_schema_to_properties(
                 ref_name.clone()
             } else {
                 let random_id = get_random_identifier();
-                info!("Couldn't determine name for {}'s type, using a random one: {}", name, random_id);
+                info!(
+                    "Couldn't determine name for {}'s type, using a random one: {}",
+                    name, random_id
+                );
 
                 random_id
             };
@@ -431,7 +481,10 @@ fn type_schema_to_properties(
                         ref_name
                     } else {
                         let random_id = get_random_identifier();
-                        info!("Couldn't properly determine array item type name (AnySchema), using a random one: {}", random_id);
+                        info!(
+                            "Couldn't properly determine array item type name (AnySchema), using a random one: {}",
+                            random_id
+                        );
 
                         random_id
                     };

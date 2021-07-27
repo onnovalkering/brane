@@ -1,0 +1,18 @@
+openapi: 3.1.0
+info:
+  title: servers-operation
+  version: 1.0.0
+
+paths:
+  '/servers-operation':
+    get:
+      operationId: operation
+      servers:
+        - url: https://example.org
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object

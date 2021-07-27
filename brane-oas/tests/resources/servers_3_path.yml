@@ -1,0 +1,18 @@
+openapi: 3.1.0
+info:
+  title: servers-path
+  version: 1.0.0
+
+paths:
+  '/servers-path':
+    servers:
+      - url: https://example.org
+    get:
+      operationId: path
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object

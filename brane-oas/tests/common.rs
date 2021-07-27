@@ -32,15 +32,20 @@ pub fn build_oas_function_resp(
 ///
 ///
 ///
-fn build_oas_function(
+pub fn build_oas_function(
     path: &str,
     operation_id: &str,
     file: &str,
 ) -> Result<FunctionAndTypes> {
     let oas = parse_oas_file(format!("tests/resources/{}", file))?;
     let path_item = resolver::resolve_path_item(oas.paths.get(path).unwrap())?;
-    let (functions, types) =
-        build::build_oas_function(operation_id.to_string(), &path_item.get.unwrap(), &oas.components)?;
+    let server_known = !oas.servers.is_empty() || !path_item.servers.is_empty();
+    let (functions, types) = build::build_oas_function(
+        operation_id.to_string(),
+        &path_item.get.unwrap(),
+        &oas.components,
+        server_known,
+    )?;
 
     // Unwrap first (and only) function.
     let function = functions.iter().next().unwrap().1.clone();

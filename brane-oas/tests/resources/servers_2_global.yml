@@ -1,0 +1,19 @@
+openapi: 3.1.0
+info:
+  title: servers-global
+  version: 1.0.0
+
+servers:
+  - url: https://example.org
+  
+paths:
+  '/servers-global':
+    get:
+      operationId: global
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object

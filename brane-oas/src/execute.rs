@@ -1,9 +1,11 @@
 use crate::{build, resolver};
 use anyhow::Result;
+use backoff::{retry, Error, ExponentialBackoff};
 use cookie::Cookie as RawCookie;
 use cookie_store::{Cookie, CookieStore, CookieStoreRwLock};
 use openapiv3::{OpenAPI, Operation, Parameter as OParameter, ReferenceOr, SecurityScheme};
 use reqwest::Url;
+use reqwest::blocking::{RequestBuilder};
 use specifications::common::Value;
 use std::{collections::HashMap, sync::Arc};
 
@@ -30,19 +32,33 @@ pub async fn execute(
     }
 
     let components = oas_document.components.clone();
-    let base_url = &oas_document
-        .servers
-        .first()
-        .expect("OAS document requires a server.")
-        .url;
-
     let (path, method, operation) = get_operation(operation_id, &oas_document)?;
+
+    // Prioritize server:
+    // 1. argument
+    // 2. operation 
+    // 3. path
+    // 4. global (document)
+    let base_url: Url = arguments
+        .get(&String::from("server"))
+        .map(|v| v.as_string().unwrap())
+        .or_else(|| operation.servers.first().map(|s| s.url.clone()))
+        .or_else(|| {
+            resolver::resolve_path_item(oas_document.paths.get(&path).unwrap())
+                .unwrap()
+                .servers
+                .first()
+                .map(|s| s.url.clone())
+        })
+        .or_else(|| oas_document.servers.first().map(|s| s.url.clone()))
+        .expect("The `server` property is not provided and can't be deduced from OAS document.")
+        .parse()?;
+
     let mut operation_url = format!("{}{}", base_url, path);
     let mut cookies = CookieStore::default();
     let mut headers = vec![];
     let mut query = vec![];
 
-    let base_url = Url::parse(base_url)?;
     for parameter in &operation.parameters {
         let parameter = resolver::resolve_parameter(parameter, &components)?;
         match parameter {
@@ -113,7 +129,7 @@ pub async fn execute(
     }
 
     // Build the client.
-    let client = reqwest::Client::builder()
+    let client = reqwest::blocking::Client::builder()
         .cookie_provider(Arc::new(CookieStoreRwLock::new(cookies)))
         .user_agent("HTTPie/2.2.0")
         .build()?;
@@ -158,11 +174,20 @@ pub async fn execute(
         }
     }
 
+    perform_request(client).await.map_err(|_| anyhow!("a"))
+}
+
+async fn perform_request(client: RequestBuilder) -> Result<String, Error<reqwest::Error>> {
     dbg!(&client);
 
-    // Perform the request.
-    let response = client.send().await?.text().await?;
-    Ok(response)
+    let op = || {
+        let client = client.try_clone().unwrap();
+        let response = client.send()?.text()?;
+        Ok(response)
+    };
+
+    let backoff = ExponentialBackoff::default();
+    retry(backoff, op)
 }
 
 ///

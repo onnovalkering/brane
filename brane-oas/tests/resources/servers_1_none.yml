@@ -1,0 +1,16 @@
+openapi: 3.1.0
+info:
+  title: servers_none
+  version: 1.0.0
+
+paths:
+  '/servers-none':
+    get:
+      operationId: none
+      responses:
+        '200':
+          description: x
+          content:
+            application/json:
+              schema:
+                type: object
