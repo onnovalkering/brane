@@ -373,6 +373,24 @@ where
             (Slot::Integer(lhs), Slot::Real(rhs)) => self.stack.push_real(lhs as f64 + rhs),
             (Slot::Real(lhs), Slot::Real(rhs)) => self.stack.push_real(lhs + rhs),
             (Slot::Real(lhs), Slot::Integer(rhs)) => self.stack.push_real(lhs + rhs as f64),
+            (Slot::Object(lsh), Slot::Object(rhs)) => {
+                let lhs = self.heap.get(lsh).unwrap().as_string();
+                let rhs = self.heap.get(rhs).unwrap().as_string();
+
+                match (lhs, rhs) {
+                    (Some(lhs), Some(rhs)) => {
+                        let mut new = lhs.clone();
+                        new.push_str(rhs);
+
+                        let object = self.heap.insert(Object::String(new));
+                        let object = object.into_handle();
+
+                        self.stack.push_object(object);
+                    },
+                    _ => unreachable!()
+                }
+
+            }
             _ => unreachable!(),
         };
     }
