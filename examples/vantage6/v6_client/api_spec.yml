@@ -5,7 +5,7 @@ info:
   description: The Vantage6 API.
 
 paths:
-  "/collaboration":
+  "/api/collaboration":
     get:
       operationId: get_collaborations
       security:
@@ -44,7 +44,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/Collaboration"
 
-  "/node":
+  "/api/node":
     get:
       operationId: get_nodes
       security:
@@ -80,7 +80,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/Node"               
                       
-  "/token/user":
+  "/api/token/user":
     post:
       operationId: login
       requestBody:

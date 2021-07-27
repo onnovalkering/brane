@@ -2,15 +2,17 @@ import v6_client;
 import v6_node;
 import v6_server;
 
-let s := server(5000);
-s.waitUntilStarted();
+let server := start_server(5000);
+server.waitUntilStarted();
 
-let session := login("root", "root");
+let server_url := "http://" + server.address + ":5000";
+
+let session := login("root", "root", server_url);
 let token := session.access_token;
 
-let collaboration := create_collaboration(token, "collab", "1");
-let node := create_node(token, collaboration.id);
+let collaboration := create_collaboration("collab", "1", server_url, token);
+let node_info := create_node(collaboration.id, server_url, token);
 
-let n := node(node.api_key, s.address, 5000);
-n.waitUntilStarted();
+let node := start_node(node_info.api_key, server.address, 5000);
+node.waitUntilStarted();
 

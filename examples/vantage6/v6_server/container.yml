@@ -22,7 +22,7 @@ files:
   - configuration.yml
 
 actions:
-  server:
+  start_server:
     command:
       args: []
       capture: prefixed

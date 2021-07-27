@@ -22,7 +22,7 @@ files:
   - configuration.yml
 
 actions:
-  node:
+  start_node:
     command:
       args: []
       capture: prefixed
