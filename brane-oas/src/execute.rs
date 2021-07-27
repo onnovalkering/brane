@@ -54,7 +54,7 @@ pub async fn execute(
         .expect("The `server` property is not provided and can't be deduced from OAS document.")
         .parse()?;
 
-    let mut operation_url = format!("{}{}", base_url, path);
+    let mut operation_url = base_url.join(&path)?.as_str().to_string();
     let mut cookies = CookieStore::default();
     let mut headers = vec![];
     let mut query = vec![];

@@ -242,7 +242,7 @@ fn build_oas_function_input(
     }
 
     // Convert input properties to parameters.
-    let input_parameters = if input_properties.len() > 3 {
+    let input_parameters = if input_properties.len() > 4 {
         let type_name = uppercase_first_letter(&operation_id);
         let input_data_type = format!("{}Input", type_name);
 
