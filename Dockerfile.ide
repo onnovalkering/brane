@@ -1,5 +1,5 @@
 # 584f43f06586: JupyterLab 3.0.14
-FROM jupyter/minimal-notebook:584f43f06586
+FROM jupyter/minimal-notebook:lab-3.0.16
 
 USER root
 WORKDIR /
