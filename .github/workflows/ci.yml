@@ -7,24 +7,20 @@ jobs:
   unit-tests:
     name: Unit Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.experimental }}
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest]
-        experimental: [false]
-        include:
-          - os: windows-latest
-            experimental: true
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-
+      
       - name: Build project
         run: cargo build -v
-
+      
       - name: Run unit tests
         run: cargo test -v --lib
+
 
   # integration-tests:
   #   name: Integration Tests
