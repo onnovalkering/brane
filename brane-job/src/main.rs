@@ -29,10 +29,10 @@ use tokio::task::JoinHandle;
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
     /// Topic to receive callbacks from
-    #[clap(short, long = "clb-topic", env = "CALLBACK_TOPIC")]
+    #[clap(short, long = "clb-topic", default_value = "clb", env = "CALLBACK_TOPIC")]
     callback_topic: String,
     /// Topic to receive commands from
-    #[clap(short = 'o', long = "cmd-topic", env = "COMMAND_TOPIC")]
+    #[clap(short = 'o', long = "cmd-topic", default_value = "plr-cmd", env = "COMMAND_TOPIC")]
     command_topic: String,
     /// Kafka brokers
     #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
@@ -41,7 +41,7 @@ struct Opts {
     #[clap(short, long, env = "DEBUG", takes_value = false)]
     debug: bool,
     /// Topic to send events to
-    #[clap(short, long = "evt-topic", env = "EVENT_TOPIC")]
+    #[clap(short, long = "evt-topic", default_value = "job-evt", env = "EVENT_TOPIC")]
     event_topic: String,
     /// Consumer group id
     #[clap(short, long, default_value = "brane-job", env = "GROUP_ID")]
@@ -56,7 +56,7 @@ struct Opts {
     #[clap(short, long, default_value = "./secrets.yml", env = "SECRETS")]
     secrets: String,
     /// Xenon gRPC endpoint
-    #[clap(short, long, default_value = "localhost:50051", env = "XENON")]
+    #[clap(short, long, default_value = "http://localhost:50051", env = "XENON")]
     xenon: String,
 }
 

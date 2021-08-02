@@ -15,11 +15,12 @@ use kube::{Client as KubeClient, Config as KubeConfig};
 use rand::distributions::Alphanumeric;
 use rand::{self, Rng};
 use serde_json::{json, Value as JValue};
+use xenon::storage::{FileSystem, FileSystemPath};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::iter;
 use xenon::compute::{JobDescription, Scheduler};
-use xenon::credentials::Credential;
+use xenon::credentials::{CertificateCredential, Credential};
 
 // Names of environment variables.
 const BRANE_APPLICATION_ID: &str = "BRANE_APPLICATION_ID";
@@ -494,8 +495,8 @@ async fn handle_xenon(
         _ => unreachable!(),
     };
 
-    let _ = scheduler.submit_batch_job(job_description).await?;
-    scheduler.close().await?;
+    let job = scheduler.submit_batch_job(job_description).await?;
+    dbg!(&job);
 
     Ok(())
 }
@@ -516,6 +517,7 @@ where
 {
     let adaptor = adaptor.into();
     let location = location.into();
+    let xenon_endpoint = xenon_endpoint.into();
 
     let properties = hashmap! {
         String::from("xenon.adaptors.schedulers.ssh.strictHostKeyChecking") => String::from("false")
@@ -526,6 +528,20 @@ where
         format!("ssh://{}", location)
     } else {
         location
+    };
+
+    let credential = if let Credential::Certificate(CertificateCredential { username, certificate, passphrase }) = credential {
+        let certificate = base64::decode(certificate.replace("\n", ""))?;
+
+        let mut local = FileSystem::create_local(xenon_endpoint.clone()).await?;
+        let certificate_file = format!("/keys/{}", get_random_identifier());
+        
+        let path = FileSystemPath::new(&certificate_file);
+        local.write_to_file(certificate, &path).await?;
+
+        Credential::new_certificate(certificate_file, username, passphrase)
+    } else {
+        credential
     };
 
     let scheduler = Scheduler::create(adaptor, location, credential, xenon_endpoint, Some(properties)).await?;
@@ -570,11 +586,13 @@ fn create_docker_job_description(
         arguments.push(String::from("apparmor:unconfined"));
     }
 
+    arguments.push(String::from("--network"));
     if let Some(network) = network {
-        arguments.push(String::from("--network"));
         arguments.push(network);
         arguments.push(String::from("--hostname"));
         arguments.push(job_id.to_string());
+    } else {
+        arguments.push(String::from("host"));
     }
 
     // Add environment variables
