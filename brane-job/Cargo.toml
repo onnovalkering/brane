@@ -10,6 +10,7 @@ base64 = "0.13"
 bincode = "1.3"
 bollard = "0.10"
 brane-cfg = { path = "../brane-cfg" }
+brane-shr = { path = "../brane-shr" }
 bytes = "1"
 clap = "3.0.0-beta.2"
 dotenv = "0.15"

@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use brane_cfg::{Infrastructure, Secrets};
+use brane_shr::utilities;
 use brane_job::{
     clb_heartbeat, clb_lifecycle,
     interface::{Callback, CallbackKind, Command, CommandKind},
@@ -88,6 +89,8 @@ async fn main() -> Result<()> {
     let secrets = Secrets::new(opts.secrets.clone())?;
     secrets.validate()?;
 
+    let xenon_endpoint = utilities::ensure_http_schema(&opts.xenon, !opts.debug)?;
+
     // Spawn workers, using Tokio tasks and thread pool.
     let workers = (0..opts.num_workers)
         .map(|i| {
@@ -99,7 +102,7 @@ async fn main() -> Result<()> {
                 opts.event_topic.clone(),
                 infra.clone(),
                 secrets.clone(),
-                opts.xenon.clone(),
+                xenon_endpoint.clone(),
             ));
 
             info!("Spawned asynchronous worker #{}.", i + 1);
