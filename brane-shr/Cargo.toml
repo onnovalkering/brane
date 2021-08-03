@@ -1,0 +1,10 @@
+[package]
+name = "brane-shr"
+version = "0.4.0"
+authors = ["Onno Valkering"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1"
+url = "2.2"
+regex = "1.5"

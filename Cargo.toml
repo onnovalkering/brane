@@ -13,8 +13,6 @@ members = [
     "brane-net",
     "brane-oas",
     "brane-plr",
+    "brane-shr",
     "specifications",
-]
-
-exclude = [
 ]
