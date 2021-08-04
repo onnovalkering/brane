@@ -13,13 +13,18 @@ dependencies:
   - python3
   - python3-pip
 
+environment:
+  LC_ALL: C.UTF-8
+  LANG: C.UTF-8
+
 install:
-  - pip3 install PyJWT==1.7.1
-  - pip3 install vantage6-server
+  - pip3 install pipenv PyJWT==1.7.1 vantage6-server==2.1.1
+  - pipenv install vantage6-server==1.2.3
 
 files:
-  - entrypoint.sh
   - configuration.yml
+  - entrypoint.sh
+  - fixtures.yml
 
 actions:
   start_server:

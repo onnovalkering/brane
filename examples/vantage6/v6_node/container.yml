@@ -5,6 +5,10 @@ kind: compute
 base: ubuntu:18.04
 docker: true
 
+environment:
+  LC_ALL: C.UTF-8
+  LANG: C.UTF-8
+
 entrypoint:
   kind: service
   exec: entrypoint.sh
@@ -14,8 +18,7 @@ dependencies:
   - python3-pip
 
 install:
-  - pip3 install Flask==1.1.1 
-  - pip3 install vantage6-node
+  - pip3 install Flask==1.1.1 vantage6-node==2.1.0
 
 files:
   - entrypoint.sh
