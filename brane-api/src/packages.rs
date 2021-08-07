@@ -1,411 +1,169 @@
-use crate::models::{Config, NewPackage, Package};
-use crate::schema::{self, packages::dsl as db};
-use actix_files::NamedFile;
-use actix_multipart::Multipart;
-use actix_web::Scope;
-use actix_web::{web, HttpRequest, HttpResponse};
-use chrono::{DateTime, Utc};
-use crc32fast::Hasher;
-use diesel::prelude::*;
-use diesel::{r2d2, r2d2::ConnectionManager};
+use anyhow::{Result, Context as _};
+use bytes::Bytes;
 use flate2::read::GzDecoder;
-use futures::{StreamExt, TryStreamExt};
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+use scylla::Session;
 use specifications::package::PackageInfo;
-use std::fs::{self, File};
-use std::io::Write;
-use std::path::PathBuf;
-use std::process::Command;
 use tar::Archive;
-use uuid::Uuid;
-
-type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
-type FResult<T> = Result<T, failure::Error>;
-type Map<T> = std::collections::HashMap<String, T>;
-type Query = web::Query<Map<String>>;
-
-const MSG_NO_CHECKSUM: &str = "Checksum not provided.";
-const MSG_NAME_CONFLICT: &str = "Package with the same name and version already exists.";
-const MSG_NO_PACKAGE_INFO: &str = "Package doesn't contain a (valid) package.yml file.";
-const MSG_INFO_MISMATCH: &str = "Package information doesn't match the HTTP request.";
-const MSG_FAILED_TO_PUSH: &str = "Failed to push Docker image to (local) Docker registry.";
+use tokio::process::Command;
+use warp::{Rejection, Reply, http::{HeaderValue, StatusCode}, hyper::HeaderMap};
+use std::sync::Arc;
+use crate::Context;
 
 ///
 ///
 ///
-pub fn scope() -> Scope {
-    web::scope("/packages")
-        .route("", web::get().to(get_packages))
-        .route("/{name}", web::get().to(get_package))
-        .route("/{name}/{version}", web::post().to(upload_package))
-        .route("/{name}/{version}", web::get().to(get_package_version))
-        .route("/{name}/{version}", web::delete().to(delete_package_version))
-        .route("/{name}/{version}/archive", web::get().to(download_package_archive))
-        .route("/{name}/{version}/source", web::get().to(get_package_source))
-}
+pub async fn ensure_db_table(scylla: &Session) -> Result<()> {
+    let query = r#"
+        CREATE TABLE IF NOT EXISTS brane.packages (
+              created timestamp
+            , description text
+            , detached boolean
+            , functions_as_json text
+            , id uuid
+            , kind text
+            , name text
+            , owners list<text>
+            , types_as_json text
+            , version text
+            , PRIMARY KEY (name, version)
+        );
+    "#;
 
-impl Package {
-    fn as_info(&self) -> PackageInfo {
-        let functions_json = self.functions_json.clone();
-        let types_json = self.types_json.clone();
-
-        let id = Uuid::parse_str(&self.uuid).unwrap();
-        let created = DateTime::<Utc>::from_utc(self.created, Utc);
-        let functions = serde_json::from_str(&functions_json.unwrap_or_else(|| String::from("{}"))).unwrap();
-        let types = serde_json::from_str(&types_json.unwrap_or_else(|| String::from("{}"))).unwrap();
-
-        PackageInfo {
-            id,
-            created,
-            description: self.description.clone(),
-            detached: self.detached,
-            functions: Some(functions),
-            kind: self.kind.clone(),
-            name: self.name.clone(),
-            types: Some(types),
-            version: self.version.clone(),
-        }
-    }
+    scylla
+        .query(query, &[])
+        .await
+        .map(|_| Ok(()))
+        .map_err(|e| anyhow!("{:?}", e))
+        .context("Failed to create 'brane.packages' table.")?
 }
 
 ///
 ///
 ///
-async fn get_packages(
-    _req: HttpRequest,
-    pool: web::Data<DbPool>,
-    web::Query(query): Query,
-) -> HttpResponse {
-    let conn = pool.get().expect("Couldn't get connection from db pool.");
-    let term = query.get("t").map(String::from).unwrap_or_default();
+pub async fn upload(
+    headers: HeaderMap<HeaderValue>, 
+    package_archive: Bytes,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    println!("{:?}", headers);
 
-    let packages = db::packages
-        .filter(db::name.like(format!("%{}%", term)))
-        .load::<Package>(&conn);
+    // Create temporary file for uploaded package archive.
+    let temp_file = tempfile::NamedTempFile::new().map_err(|e| {
+        error!("An error occured while create a temporary file: {}", e);
+        warp::reject::reject()
+    })?;
 
-    if let Ok(packages) = packages {
-        let package_infos: Vec<PackageInfo> = packages.iter().map(|p| p.as_info()).collect();
-        HttpResponse::Ok().json(package_infos)
-    } else {
-        HttpResponse::InternalServerError().body("")
-    }
-}
+    let (temp_file, temp_file_path) = temp_file.keep().unwrap();
+    println!("{}", temp_file_path.display());
 
-///
-///
-///
-async fn upload_package(
-    _req: HttpRequest,
-    pool: web::Data<DbPool>,
-    config: web::Data<Config>,
-    path: web::Path<(String, String)>,
-    web::Query(query): Query,
-    mut payload: Multipart,
-) -> HttpResponse {
-    let conn = pool.get().expect("Couldn't get connection from db pool.");
-    let config = config.get_ref().clone();
-    let registry_host = config.registry_host;
-    let packages_dir = config.packages_dir;
-    let temporary_dir = config.temporary_dir;
-    let name = path.0.clone();
-    let version = path.1.clone();
+    tokio::fs::write(&temp_file_path, package_archive).await.map_err(|e| {
+        error!("An error occured while writing to a temporary file: {}", e);
+        warp::reject::reject()
+    })?;
 
-    // Validate request
-    let checksum = if let Some(checksum) = query.get("checksum") {
-        checksum.parse::<u32>().unwrap()
-    } else {
-        return upload_badrequest(MSG_NO_CHECKSUM, temporary_dir, None);
-    };
+    // Unpack package archive to temporary working directory.
+    let temp_dir = tempfile::tempdir().map_err(|e| {
+        error!("An error occured while create a temporary directory: {}", e);
+        warp::reject::reject()
+    })?;
 
-    // TODO: validate name
-    // TODO: validate version
-
-    let package_exists = diesel::select(diesel::dsl::exists(
-        db::packages.filter(db::name.eq(&name)).filter(db::version.eq(&version)),
-    ))
-    .get_result(&conn)
-    .unwrap_or(true);
-
-    if package_exists {
-        return upload_badrequest(MSG_NAME_CONFLICT, temporary_dir, None);
-    }
-
-    // Generate identifier unique to this upload
-    let upload_id: String = thread_rng().sample_iter(&Alphanumeric).take(12).collect();
-
-    // Write uploaded file to temporary dir
-    let mut crc32_hasher = Hasher::new();
-    let temp_filename = format!("{}.tar.gz", &upload_id);
-    let temp_filepath = temporary_dir.join(&temp_filename);
-    while let Ok(Some(mut field)) = payload.try_next().await {
-        let filepath = temp_filepath.clone();
-
-        // Filesystem operations are blocking, thus we use threadpool
-        let mut f = web::block(|| std::fs::File::create(filepath)).await.unwrap();
-        while let Some(chunk) = field.next().await {
-            let data = chunk.unwrap();
-            crc32_hasher.update(&data);
-
-            f = web::block(move || f.write_all(&data).map(|_| f)).await.unwrap();
-        }
-    }
-
-    // Check if file has been uploaded correctly
-    let upload_checksum = crc32_hasher.finalize();
-    if checksum != upload_checksum {
-        let message = "Checksums don't match.";
-        return upload_badrequest(message, temporary_dir, Some(upload_id));
-    }
-
-    // Unpack package to temporary working dir
-    let temp_workdir = temporary_dir.join(&upload_id);
-    let tar = GzDecoder::new(File::open(&temp_filepath).unwrap());
-    Archive::new(tar).unpack(&temp_workdir).unwrap();
+    let tar = GzDecoder::new(&temp_file);
+    Archive::new(tar).unpack(&temp_dir).map_err(|e| {
+        error!("An error occured while extracting a package archive: {}", e);
+        warp::reject::reject()
+    })?;
 
     // Parse package information
-    let package_info_file = temp_workdir.join("package.yml");
-    let mut new_package = if let Ok(info) = PackageInfo::from_path(package_info_file) {
-        NewPackage::from_info(info, upload_checksum, temp_filename.clone())
-    } else {
-        return upload_badrequest(MSG_NO_PACKAGE_INFO, temporary_dir, Some(upload_id));
-    };
+    let package_info_file = temp_dir.path().join("package.yml");
+    let package_info = PackageInfo::from_path(package_info_file).map_err(|e| {
+        error!("An error occured while parsing package information: {}", e);
+        warp::reject::reject()
+    })?;
 
-    if new_package.name != name || new_package.version != version {
-        return upload_badrequest(MSG_INFO_MISMATCH, temporary_dir, Some(upload_id));
-    }
-
-    match new_package.kind.as_str() {
-        "dsl" => {
-            let instructions = temp_workdir.join("instructions.yml");
-            if instructions.exists() {
-                new_package.source = Some(fs::read_to_string(instructions).unwrap());
-            }
+    let name = &package_info.name;
+    let version = &package_info.version;
+    
+    match package_info.kind.as_str() {
+        "cwl" => {
+            todo!();
         }
-        "cwl" | "ecu" | "oas" => {
+        "dsl" => {
+            todo!();
+        }
+        "ecu" | "oas" => {
             // In the case of a container package, store image in Docker registry
             // TODO: make seperate function
-            let image_tar = temp_workdir.join("image.tar");
+            let image_tar = temp_dir.path().join("image.tar");
             if image_tar.exists() {
                 let image_tar = image_tar.into_os_string().into_string().unwrap();
                 let image_label = format!("{}:{}", name, version);
 
-                let push = web::block(move || {
-                    Command::new("skopeo")
+                let push = Command::new("skopeo")
                         .arg("copy")
                         .arg("--dest-tls-verify=false")
                         .arg(format!("docker-archive:{}", image_tar))
-                        .arg(format!("docker://{}/library/{}", registry_host, image_label))
-                        .status()
-                })
-                .await;
+                        .arg(format!("docker://{}/library/{}", context.registry, image_label))
+                        .status();
 
-                if push.is_err() {
-                    return HttpResponse::InternalServerError().body(MSG_FAILED_TO_PUSH);
-                }
+                push.await.map_err(|e| {
+                    error!("An error occured while pushing the image to the registry: {}", e);
+                    warp::reject::reject()
+                })?;
             }
         }
         _ => unreachable!(),
     }
 
-    // Store package information in database and the archive in the packages dir
-    let result = web::block(move || {
-        fs::copy(temp_filepath, packages_dir.join(temp_filename)).unwrap();
-        // upload_cleanup(temporary_dir, upload_id).unwrap();
+    insert_package_into_scyla(&package_info, &context.scylla).await.map_err(|e| {
+        error!("An error occured while pushing the image to the registry: {}", e);
+        warp::reject::reject()
+    })?;
 
-        diesel::insert_into(schema::packages::table)
-            .values(&new_package)
-            .execute(&conn)
-    })
-    .await;
+    debug!("{:?}", package_info);
 
-    if result.is_ok() {
-        HttpResponse::Ok().body("")
-    } else {
-        HttpResponse::InternalServerError().body("")
-    }
+    Ok(StatusCode::OK)
 }
 
 ///
 ///
 ///
-fn upload_badrequest(
-    message: &str,
-    temporary_dir: PathBuf,
-    upload_id: Option<String>,
-) -> HttpResponse {
-    if let Some(upload_id) = upload_id {
-        if upload_cleanup(temporary_dir, upload_id).is_err() {
-            return HttpResponse::InternalServerError().body("");
-        }
-    }
+async fn insert_package_into_scyla(package: &PackageInfo, scylla: &Arc<Session>) -> Result<()> {
+    let query = scylla.prepare(r#"
+        INSERT INTO brane.packages (
+              created
+            , description
+            , detached
+            , functions_as_json
+            , id
+            , kind
+            , name
+            , owners
+            , types_as_json
+            , version
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    "#).await?;
 
-    HttpResponse::BadRequest().body(String::from(message))
-}
+    let functions_as_json = serde_json::to_string(&package.functions)?;
+    let types_as_json = serde_json::to_string(&package.types)?;
 
-///
-///
-///
-fn upload_cleanup(
-    temporary_dir: PathBuf,
-    upload_id: String,
-) -> FResult<()> {
-    let temp_filepath = temporary_dir.join(format!("{}.tar.gz", &upload_id));
-    let temp_workdir = temporary_dir.join(&upload_id);
+    let values = (
+        package.created.timestamp_millis(),
+        &package.description,
+        package.detached,
+        functions_as_json,
+        package.id,
+        &package.kind,
+        &package.name,
+        &package.owners,
+        types_as_json,
+        &package.version,
+    );
 
-    fs::remove_file(temp_filepath)?;
-    fs::remove_dir_all(temp_workdir)?;
+    scylla
+        .execute(&query, values)
+        .await
+        .with_context(|| format!("Failed to insert package into database: {:?}", package))?;
 
     Ok(())
-}
-
-///
-///
-///
-async fn get_package(
-    _req: HttpRequest,
-    pool: web::Data<DbPool>,
-    path: web::Path<(String,)>,
-) -> HttpResponse {
-    let conn = pool.get().expect("Couldn't get connection from db pool.");
-    let name = &path.0;
-
-    let packages = db::packages.filter(db::name.eq(name)).load::<Package>(&conn);
-
-    if let Ok(packages) = packages {
-        if !packages.is_empty() {
-            let package_infos: Vec<PackageInfo> = packages.iter().map(|p| p.as_info()).collect();
-            HttpResponse::Ok().json(package_infos)
-        } else {
-            HttpResponse::NotFound().body("")
-        }
-    } else {
-        HttpResponse::InternalServerError().body("")
-    }
-}
-
-///
-///
-///
-async fn get_package_version(
-    _req: HttpRequest,
-    pool: web::Data<DbPool>,
-    path: web::Path<(String, String)>,
-) -> HttpResponse {
-    let conn = pool.get().expect("Couldn't get connection from db pool.");
-    let name = &path.0;
-    let version = &path.1;
-
-    let packages = db::packages
-        .filter(db::name.eq(name))
-        .filter(db::version.eq(version))
-        .load::<Package>(&conn);
-
-    if let Ok(packages) = packages {
-        if packages.len() == 1 {
-            let package_info: PackageInfo = packages.first().unwrap().as_info();
-            HttpResponse::Ok().json(package_info)
-        } else {
-            HttpResponse::NotFound().body("")
-        }
-    } else {
-        HttpResponse::InternalServerError().body("")
-    }
-}
-
-///
-///
-///
-async fn delete_package_version(
-    _req: HttpRequest,
-    pool: web::Data<DbPool>,
-    config: web::Data<Config>,
-    path: web::Path<(String, String)>,
-) -> HttpResponse {
-    let conn = pool.get().expect("Couldn't get connection from db pool.");
-    let packages_dir = &config.get_ref().packages_dir;
-    let name = &path.0;
-    let version = &path.1;
-
-    let package = db::packages
-        .filter(db::name.eq(name))
-        .filter(db::version.eq(version))
-        .first::<Package>(&conn)
-        .optional()
-        .unwrap();
-
-    if package.is_none() {
-        return HttpResponse::NotFound().body("");
-    }
-
-    let package = package.unwrap();
-    if fs::remove_file(packages_dir.join(&package.filename)).is_err() {
-        return HttpResponse::InternalServerError().body("Failed to delete package archive.");
-    }
-
-    if diesel::delete(&package).execute(&conn).is_ok() {
-        HttpResponse::Ok().body("")
-    } else {
-        HttpResponse::InternalServerError().body("")
-    }
-}
-
-///
-///
-///
-async fn download_package_archive(
-    req: HttpRequest,
-    pool: web::Data<DbPool>,
-    config: web::Data<Config>,
-    path: web::Path<(String, String)>,
-) -> HttpResponse {
-    let conn = pool.get().expect("Couldn't get connection from db pool.");
-    let packages_dir = &config.get_ref().packages_dir;
-    let name = &path.0;
-    let version = &path.1;
-
-    let package = db::packages
-        .filter(db::name.eq(name))
-        .filter(db::version.eq(version))
-        .first::<Package>(&conn)
-        .optional()
-        .unwrap();
-
-    if package.is_none() {
-        return HttpResponse::NotFound().body("");
-    }
-
-    let package = package.unwrap();
-    let package_file = packages_dir.join(package.filename);
-    if !package_file.exists() {
-        return HttpResponse::InternalServerError().body("Package exists, but archive is missing.");
-    }
-
-    NamedFile::open(package_file).unwrap().into_response(&req).unwrap()
-}
-
-///
-///
-///
-async fn get_package_source(
-    _req: HttpRequest,
-    pool: web::Data<DbPool>,
-    path: web::Path<(String, String)>,
-) -> HttpResponse {
-    let conn = pool.get().expect("Couldn't get connection from db pool.");
-    let name = &path.0;
-    let version = &path.1;
-
-    let package = db::packages
-        .filter(db::name.eq(name))
-        .filter(db::version.eq(version))
-        .first::<Package>(&conn)
-        .optional()
-        .unwrap();
-
-    if let Some(Some(source)) = package.map(|p| p.source) {
-        HttpResponse::Ok().content_type("application/yaml").body(source)
-    } else {
-        HttpResponse::NotFound().body("")
-    }
 }

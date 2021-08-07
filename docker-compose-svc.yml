@@ -5,6 +5,7 @@ services:
     image: scylladb/scylla:4.4.3
     ports:
       - "127.0.0.1:9042:9042"
+    command: --smp 2   
     restart: always
 
   kafka:
@@ -36,14 +37,6 @@ services:
       MINIO_ROOT_PASSWORD: minio123
     volumes:
       - data:/data
-
-  postgres:
-    image: postgres:12
-    ports:
-      - "127.0.0.1:5432:5432"
-    restart: always
-    environment:
-      POSTGRES_PASSWORD: postgres
 
   redis:
     image: redis:6-alpine

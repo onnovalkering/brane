@@ -10,7 +10,7 @@ use flate2::Compression;
 use indicatif::{ProgressBar, ProgressStyle};
 use prettytable::format::FormatBuilder;
 use prettytable::Table;
-use reqwest::{self, multipart::Form, multipart::Part, Body, Client};
+use reqwest::{self, Body, Client};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JValue};
 use serde_with::skip_serializing_none;
@@ -179,28 +179,32 @@ pub async fn push(
     tar.into_inner()?;
 
     // Calcualte checksum
-    let checksum = utils::calculate_crc32(&archive_filepath)?;
 
     progress.finish();
 
     // Upload file
-    let url = get_registry_endpoint(format!("/{}/{}?checksum={}", name, version, checksum))?;
+    // format!("/{}/{}?checksum={}", name, version, checksum)
+    let url = get_registry_endpoint(String::new())?;
     let request = Client::new().post(&url);
 
     let file = TokioFile::open(&archive_filepath).await?;
     let file = FramedRead::new(file, BytesCodec::new());
     let reader = Body::wrap_stream(file);
+    let request = request.body(reader);
 
-    let mut form = Form::new();
-    form = form.part("file", Part::stream(reader).file_name(archive_filename));
+    // let mut form = Form::new();
+    // form = form.part("file", Part::stream(reader).file_name(archive_filename));
 
-    let progress = ProgressBar::new(0);
-    progress.set_style(ProgressStyle::default_bar().template("Uploading...   [{elapsed_precise}]"));
-    progress.enable_steady_tick(250);
+    // let progress = ProgressBar::new(0);
+    // progress.set_style(ProgressStyle::default_bar().template("Uploading...   [{elapsed_precise}]"));
+    // progress.enable_steady_tick(250);
 
-    let request = request.multipart(form);
+    let request = request.header("Content-Type", "application/gzip");
+    let request = request.header("Content-Length", archive_filepath.metadata().unwrap().len());
+
+    // let request = request.multipart(form);
+    
     let response = request.send().await?;
-
     let response_status = response.status();
 
     progress.finish();
@@ -241,8 +245,7 @@ pub async fn search(term: String) -> Result<()> {
         let name = pad_str(&package.name, 20, Alignment::Left, Some(".."));
         let version = pad_str(&package.version, 10, Alignment::Left, Some(".."));
         let kind = pad_str(&package.kind, 10, Alignment::Left, Some(".."));
-        let description = &package.description.unwrap_or_default();
-        let description = pad_str(description, 50, Alignment::Left, Some(".."));
+        let description = pad_str(&package.description, 50, Alignment::Left, Some(".."));
 
         table.add_row(row![name, version, kind, description]);
     }

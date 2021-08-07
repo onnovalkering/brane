@@ -1,61 +1,58 @@
-table! {
-    invocations (id) {
-        id -> Int4,
-        session -> Int4,
-        created -> Timestamp,
-        name -> Nullable<Varchar>,
-        started -> Nullable<Timestamp>,
-        stopped -> Nullable<Timestamp>,
-        uuid -> Varchar,
-        instructions_json -> Text,
-        status -> Varchar,
-        return_json -> Nullable<Varchar>,
-    }
+use chrono::{DateTime, Utc};
+use juniper::{EmptyMutation, EmptySubscription, GraphQLObject, RootNode};
+use uuid::Uuid;
+use crate::Context;
+
+pub type Schema = RootNode<'static, Query, EmptyMutation<Context>, EmptySubscription<Context>>;
+// pub type Stream<T> = std::pin::Pin<Box<dyn futures::Stream<Item = Result<T, juniper::FieldError>> + Send>>;
+
+impl juniper::Context for Context {}
+
+#[derive(Clone, Debug, GraphQLObject)]
+pub struct Package {
+    pub created: DateTime<Utc>,
+    pub description: Option<String>,
+    pub detached: bool,
+    pub owners: Vec<String>,
+    pub id: Uuid,
+    pub kind: String,
+    pub name: String,
+    pub version: String,
+    pub functions_as_json: Option<String>,
+    pub types_as_json: Option<String>,
 }
 
-table! {
-    packages (id) {
-        id -> Int4,
-        created -> Timestamp,
-        kind -> Varchar,
-        name -> Varchar,
-        uploaded -> Timestamp,
-        uuid -> Varchar,
-        version -> Varchar,
-        description -> Nullable<Varchar>,
-        detached -> Bool,
-        functions_json -> Nullable<Text>,
-        source -> Nullable<Text>,
-        types_json -> Nullable<Text>,
-        checksum -> Int8,
-        filename -> Varchar,
+pub struct Query;
+
+#[graphql_object(context = Context)]
+impl Query {
+    ///
+    ///
+    ///
+    async fn apiVersion() -> &str {
+        env!("CARGO_PKG_VERSION")
+    }
+
+    ///
+    ///
+    ///
+    async fn packages(
+        name: Option<String>,
+        version: Option<String>,
+        _term: Option<String>,
+        _context: &Context,
+    ) -> Vec<Package> {
+        vec![Package {
+            created: Utc::now(),
+            description: Some(String::new()),
+            detached: false,
+            owners: vec![],
+            id: Uuid::new_v4(),
+            kind: String::new(),
+            name: name.unwrap_or_default(),
+            version: version.unwrap_or_default(),
+            functions_as_json: None,
+            types_as_json: None,
+        }]
     }
 }
-
-table! {
-    sessions (id) {
-        id -> Int4,
-        created -> Timestamp,
-        uuid -> Varchar,
-        parent -> Nullable<Int4>,
-        status -> Varchar,
-    }
-}
-
-table! {
-    variables (id) {
-        id -> Int4,
-        session -> Int4,
-        created -> Timestamp,
-        updated -> Nullable<Timestamp>,
-        name -> Varchar,
-        #[sql_name = "type"]
-        type_ -> Varchar,
-        content_json -> Nullable<Text>,
-    }
-}
-
-joinable!(invocations -> sessions (session));
-joinable!(variables -> sessions (session));
-
-allow_tables_to_appear_in_same_query!(invocations, packages, sessions, variables,);

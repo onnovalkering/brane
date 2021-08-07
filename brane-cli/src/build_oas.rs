@@ -84,7 +84,7 @@ pub async fn handle(
 fn create_package_info(oas_document: &OpenAPI) -> Result<PackageInfo> {
     let name = oas_document.info.title.to_lowercase().replace(" ", "-");
     let version = oas_document.info.version.clone();
-    let description = oas_document.info.description.clone();
+    let description = oas_document.info.description.clone().unwrap_or_default();
 
     let (functions, types) = build::build_oas_functions(&oas_document)?;
 
@@ -94,6 +94,7 @@ fn create_package_info(oas_document: &OpenAPI) -> Result<PackageInfo> {
         description,
         false,
         String::from("oas"),
+        vec!(),
         Some(functions),
         Some(types),
     );

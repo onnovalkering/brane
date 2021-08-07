@@ -110,9 +110,10 @@ fn generate_package_info(container_info: &ContainerInfo) -> Result<PackageInfo> 
     let package_info = PackageInfo::new(
         container_info.name.clone(),
         container_info.version.clone(),
-        container_info.description.clone(),
+        container_info.description.clone().unwrap_or_default(),
         container_info.entrypoint.kind == *"service",
         String::from("ecu"),
+        vec!(),
         Some(functions),
         container_info.types.clone(),
     );

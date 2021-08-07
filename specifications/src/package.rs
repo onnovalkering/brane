@@ -18,12 +18,13 @@ type Map<T> = std::collections::HashMap<String, T>;
 #[serde(rename_all = "camelCase")]
 pub struct PackageInfo {
     pub created: DateTime<Utc>,
-    pub description: Option<String>,
+    pub description: String,
     pub detached: bool,
     pub functions: Option<Map<Function>>,
     pub id: Uuid,
     pub kind: String,
     pub name: String,
+    pub owners: Vec<String>,
     pub types: Option<Map<Type>>,
     pub version: String,
 }
@@ -33,9 +34,10 @@ impl PackageInfo {
     pub fn new(
         name: String,
         version: String,
-        description: Option<String>,
+        description: String,
         detached: bool,
         kind: String,
+        owners: Vec<String>,
         functions: Option<Map<Function>>,
         types: Option<Map<Type>>,
     ) -> PackageInfo {
@@ -50,6 +52,7 @@ impl PackageInfo {
             id,
             kind,
             name,
+            owners,
             types,
             version,
         }

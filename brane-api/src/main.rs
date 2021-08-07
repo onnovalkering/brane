@@ -1,130 +1,114 @@
 #[macro_use]
 extern crate anyhow;
 #[macro_use]
-extern crate diesel;
+extern crate log;
 #[macro_use]
-extern crate diesel_migrations;
-#[macro_use]
-extern crate lazy_static;
+extern crate juniper;
 
-use actix_cors::Cors;
-use actix_web::middleware;
-use actix_web::{App, HttpServer};
-use diesel::pg::PgConnection;
-use diesel::r2d2::ConnectionManager;
-use dotenv::dotenv;
-use log::LevelFilter;
-use rdkafka::config::ClientConfig;
-use rdkafka::producer::FutureProducer;
-use redis::Client;
-use std::env;
-use std::fs;
-use std::path::PathBuf;
-use structopt::StructOpt;
-
-mod callback;
-mod health;
-mod models;
 mod packages;
 mod schema;
-mod vault;
 
-embed_migrations!();
+use anyhow::{Result, Context as _};
+use schema::{Query, Schema};
+use clap::Clap;
+use dotenv::dotenv;
+use juniper::{EmptyMutation, EmptySubscription};
+use log::LevelFilter;
+use scylla::{Session, SessionBuilder};
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::Duration;
+use warp::Filter;
 
-const DEF_DATABASE_URL: &str = "postgres://postgres:postgres@postgres/postgres";
-const DEF_KAFKA_BROKERS: &str = "kafka:9092";
-const DEF_PACKAGES_DIR: &str = "./packages";
-const DEF_REDIS_URL: &str = "redis://redis";
-const DEF_REGISTRY_HOST: &str = "registry:5000";
-const DEF_TEMPORARY_DIR: &str = "./temporary";
-
-#[derive(StructOpt)]
-#[structopt(name = "brane-api", about = "The Brane API service.")]
-struct Cli {
-    #[structopt(short, long, help = "Enable debug mode", env = "DEBUG")]
+#[derive(Clap)]
+#[clap(version = env!("CARGO_PKG_VERSION"))]
+struct Opts {
+    #[clap(short, long, default_value = "127.0.0.1:8080", env = "ADDRESS")]
+    /// Service address
+    address: String,
+    /// Scylla endpoint
+    #[clap(short, long, default_value = "127.0.0.1:9042", env = "SCYLLA")]
+    scylla: String,
+    /// Print debug info
+    #[clap(short, long, env = "DEBUG", takes_value = false)]
     debug: bool,
-    #[structopt(short = "o", long, help = "Host to bind", default_value = "127.0.0.1", env = "HOST")]
-    host: String,
-    #[structopt(short, long, help = "Port to bind", default_value = "8080", env = "PORT")]
-    port: u16,
+    /// Print debug info
+    #[clap(short, long, default_value = "registry:5000", env = "REGISTRY")]
+    registry: String,
 }
 
-#[actix_rt::main]
-async fn main() -> std::io::Result<()> {
-    dotenv().ok();
+#[derive(Clone)]
+pub struct Context {
+    pub registry: String,
+    pub scylla: Arc<Session>,
+}
 
+#[tokio::main]
+async fn main() -> Result<()> {
+    dotenv().ok();
+    let opts = Opts::parse();
+
+    // Configure logger.
     let mut logger = env_logger::builder();
     logger.format_module_path(false);
 
-    let options = Cli::from_args();
-    if options.debug {
+    if opts.debug {
         logger.filter_level(LevelFilter::Debug).init();
     } else {
         logger.filter_level(LevelFilter::Info).init();
     }
 
-    // Prepare the filesystem
-    let packages_dir: PathBuf = env::var("PACKAGES_DIR")
-        .unwrap_or_else(|_| String::from(DEF_PACKAGES_DIR))
-        .into();
-    let temporary_dir: PathBuf = env::var("TEMPORARY_DIR")
-        .unwrap_or_else(|_| String::from(DEF_TEMPORARY_DIR))
-        .into();
-    fs::create_dir_all(&temporary_dir)?;
-    fs::create_dir_all(&packages_dir)?;
+    // Configure Scylla.
+    let scylla = SessionBuilder::new()
+        .known_node(&opts.scylla)
+        .connection_timeout(Duration::from_secs(3))
+        .build()
+        .await?;
 
-    // Create a database pool
-    let db_url = env::var("DATABASE_URL").unwrap_or_else(|_| String::from(DEF_DATABASE_URL));
-    let db_manager = ConnectionManager::<PgConnection>::new(db_url);
-    let db_pool = r2d2::Pool::builder()
-        .build(db_manager)
-        .expect("Failed to create DB connection pool.");
+    ensure_db_keyspace(&scylla).await?;
+    packages::ensure_db_table(&scylla).await?;
 
-    // Create a Redis connection pool
-    let rd_url = env::var("REDIS_URL").unwrap_or_else(|_| String::from(DEF_REDIS_URL));
-    let rd_manager = Client::open(rd_url).unwrap();
-    let rd_pool = r2d2::Pool::builder()
-        .build(rd_manager)
-        .expect("Failed to create Redis connection pool.");
+    let scylla = Arc::new(scylla);
+    let registry = opts.registry.clone();
 
-    // Run database migrations
-    let conn = db_pool.get().expect("Couldn't get connection from db pool.");
-    embedded_migrations::run(&conn).expect("Failed to run database migrations.");
-
-    // Create Kafka producer
-    let kafka_brokers = env::var("KAFKA_BROKERS").unwrap_or_else(|_| String::from(DEF_KAFKA_BROKERS));
-    let producer: FutureProducer = ClientConfig::new()
-        .set("bootstrap.servers", &kafka_brokers)
-        .set("message.timeout.ms", "5000")
-        .create()
-        .expect("Couldn't create a Kafka producer.");
-
-    // Prepare configuration
-    let registry_host = env::var("REGISTRY_HOST").unwrap_or_else(|_| String::from(DEF_REGISTRY_HOST));
-    let config = models::Config {
-        packages_dir,
-        registry_host,
-        temporary_dir,
-    };
-
-    // Configure the HTTP server
-    let server = HttpServer::new(move || {
-        let cors = Cors::new().finish();
-
-        App::new()
-            .wrap(cors)
-            .wrap(middleware::Logger::default())
-            .wrap(middleware::NormalizePath)
-            .data(config.clone())
-            .data(db_pool.clone())
-            .data(rd_pool.clone())
-            .data(producer.clone())
-            .service(callback::scope())
-            .service(health::scope())
-            .service(packages::scope())
-            .service(vault::scope())
+    // Configure Juniper.
+    let context = warp::any().map(move || Context {
+        registry: registry.clone(),
+        scylla: scylla.clone(),
     });
 
-    let address = format!("{}:{}", options.host, options.port);
-    server.bind(address)?.run().await
+    let schema = Schema::new(Query {}, EmptyMutation::new(), EmptySubscription::new());
+    let graphql_filter = juniper_warp::make_graphql_filter(schema, context.clone().boxed());
+    let graphql = warp::path("graphql").and(graphql_filter);
+
+    // Configure Warp.
+    let package_upload = warp::path("packages")
+        .and(warp::post())
+        .and(warp::filters::header::headers_cloned())
+        .and(warp::filters::body::bytes())
+        .and(context)
+        .and_then(packages::upload);
+
+    let routes = graphql.or(package_upload).with(warp::log("brane-api"));
+    let address: SocketAddr = opts.address.clone().parse()?;
+    warp::serve(routes).run(address).await;
+
+    Ok(())
+}
+
+///
+///
+///
+pub async fn ensure_db_keyspace(scylla: &Session) -> Result<()> {
+    let query = r#"
+        CREATE KEYSPACE IF NOT EXISTS brane
+        WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 3};
+    "#;
+
+    scylla
+        .query(query, &[])
+        .await
+        .map(|_| Ok(()))
+        .map_err(|e| anyhow!("{:?}", e))
+        .context("Failed to create 'brane' keyspace.")?
 }
