@@ -8,12 +8,12 @@ extern crate juniper;
 mod packages;
 mod schema;
 
-use anyhow::{Result, Context as _};
-use schema::{Query, Schema};
+use anyhow::{Context as _, Result};
 use clap::Clap;
 use dotenv::dotenv;
 use juniper::{EmptyMutation, EmptySubscription};
 use log::LevelFilter;
+use schema::{Query, Schema};
 use scylla::{Session, SessionBuilder};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -82,14 +82,14 @@ async fn main() -> Result<()> {
     let graphql = warp::path("graphql").and(graphql_filter);
 
     // Configure Warp.
-    let package_upload = warp::path("packages")
+    let publish_package = warp::path("packages")
         .and(warp::post())
         .and(warp::filters::header::headers_cloned())
         .and(warp::filters::body::bytes())
         .and(context)
-        .and_then(packages::upload);
+        .and_then(packages::publish);
 
-    let routes = graphql.or(package_upload).with(warp::log("brane-api"));
+    let routes = graphql.or(publish_package).with(warp::log("brane-api"));
     let address: SocketAddr = opts.address.clone().parse()?;
     warp::serve(routes).run(address).await;
 
@@ -102,7 +102,7 @@ async fn main() -> Result<()> {
 pub async fn ensure_db_keyspace(scylla: &Session) -> Result<()> {
     let query = r#"
         CREATE KEYSPACE IF NOT EXISTS brane
-        WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 3};
+        WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 1};
     "#;
 
     scylla

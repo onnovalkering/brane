@@ -1,47 +1,128 @@
-use anyhow::{Result, Context as _};
+use crate::Context;
+use anyhow::{Context as _, Result};
 use bytes::Bytes;
 use flate2::read::GzDecoder;
+use scylla::cql_to_rust::FromCqlVal;
+use scylla::macros::{FromUserType, IntoUserType};
 use scylla::Session;
 use specifications::package::PackageInfo;
+use std::convert::{TryFrom, TryInto};
+use std::sync::Arc;
 use tar::Archive;
 use tokio::process::Command;
-use warp::{Rejection, Reply, http::{HeaderValue, StatusCode}, hyper::HeaderMap};
-use std::sync::Arc;
-use crate::Context;
+use uuid::Uuid;
+use warp::{
+    http::{HeaderValue, StatusCode},
+    hyper::HeaderMap,
+    Rejection, Reply,
+};
 
-///
-///
-///
-pub async fn ensure_db_table(scylla: &Session) -> Result<()> {
-    let query = r#"
-        CREATE TABLE IF NOT EXISTS brane.packages (
-              created timestamp
-            , description text
-            , detached boolean
-            , functions_as_json text
-            , id uuid
-            , kind text
-            , name text
-            , owners list<text>
-            , types_as_json text
-            , version text
-            , PRIMARY KEY (name, version)
-        );
-    "#;
+#[derive(Clone, IntoUserType, FromUserType)]
+pub struct PackageUdt {
+    pub created: i64,
+    pub description: String,
+    pub detached: bool,
+    pub functions_as_json: String,
+    pub id: Uuid,
+    pub kind: String,
+    pub name: String,
+    pub owners: Vec<String>,
+    pub types_as_json: String,
+    pub version: String,
+}
 
-    scylla
-        .query(query, &[])
-        .await
-        .map(|_| Ok(()))
-        .map_err(|e| anyhow!("{:?}", e))
-        .context("Failed to create 'brane.packages' table.")?
+impl TryFrom<PackageInfo> for PackageUdt {
+    type Error = anyhow::Error;
+
+    fn try_from(package: PackageInfo) -> Result<Self> {
+        let functions_as_json = serde_json::to_string(&package.functions.clone().unwrap_or_default())?;
+        let types_as_json = serde_json::to_string(&package.types.clone().unwrap_or_default())?;
+
+        Ok(Self {
+            created: package.created.timestamp_millis(),
+            description: package.description,
+            detached: package.detached,
+            functions_as_json,
+            id: package.id,
+            kind: package.kind,
+            name: package.name,
+            owners: package.owners,
+            types_as_json,
+            version: package.version,
+        })
+    }
 }
 
 ///
 ///
 ///
-pub async fn upload(
-    headers: HeaderMap<HeaderValue>, 
+pub async fn ensure_db_table(scylla: &Session) -> Result<()> {
+    scylla
+        .query(
+            "CREATE TYPE IF NOT EXISTS brane.package (
+                  created bigint
+                , description text
+                , detached boolean
+                , functions_as_json text
+                , id uuid
+                , kind text
+                , name text
+                , owners list<text>
+                , types_as_json text
+                , version text
+            )",
+            &[],
+        )
+        .await
+        .context("Failed to create 'brane.package' type.")?;
+
+    scylla
+        .query(
+            "CREATE TABLE IF NOT EXISTS brane.packages (
+                  name text
+                , package frozen<package>
+                , version text
+                , PRIMARY KEY (name, version)
+            )",
+            &[],
+        )
+        .await
+        .context("Failed to create 'brane.packages' table.")?;
+
+    Ok(())
+}
+
+///
+///
+///
+async fn insert_package_into_db(
+    package: &PackageInfo,
+    scylla: &Arc<Session>,
+) -> Result<()> {
+    let package: PackageUdt = package.clone().try_into()?;
+
+    scylla
+        .query(
+            "INSERT INTO brane.packages (
+                  name
+                , package
+                , version
+            ) VALUES(?, ?, ?)
+            ",
+            (&package.name, &package, &package.version),
+        )
+        .await
+        .context("Failed to insert package into database.")?;
+
+    Ok(())
+}
+
+
+///
+///
+///
+pub async fn publish(
+    headers: HeaderMap<HeaderValue>,
     package_archive: Bytes,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
@@ -82,7 +163,7 @@ pub async fn upload(
 
     let name = &package_info.name;
     let version = &package_info.version;
-    
+
     match package_info.kind.as_str() {
         "cwl" => {
             todo!();
@@ -99,11 +180,11 @@ pub async fn upload(
                 let image_label = format!("{}:{}", name, version);
 
                 let push = Command::new("skopeo")
-                        .arg("copy")
-                        .arg("--dest-tls-verify=false")
-                        .arg(format!("docker-archive:{}", image_tar))
-                        .arg(format!("docker://{}/library/{}", context.registry, image_label))
-                        .status();
+                    .arg("copy")
+                    .arg("--dest-tls-verify=false")
+                    .arg(format!("docker-archive:{}", image_tar))
+                    .arg(format!("docker://{}/library/{}", context.registry, image_label))
+                    .status();
 
                 push.await.map_err(|e| {
                     error!("An error occured while pushing the image to the registry: {}", e);
@@ -114,56 +195,14 @@ pub async fn upload(
         _ => unreachable!(),
     }
 
-    insert_package_into_scyla(&package_info, &context.scylla).await.map_err(|e| {
-        error!("An error occured while pushing the image to the registry: {}", e);
-        warp::reject::reject()
-    })?;
+    insert_package_into_db(&package_info, &context.scylla)
+        .await
+        .map_err(|e| {
+            error!("An error occured while pushing the image to the registry: {}", e);
+            warp::reject::reject()
+        })?;
 
     debug!("{:?}", package_info);
 
     Ok(StatusCode::OK)
-}
-
-///
-///
-///
-async fn insert_package_into_scyla(package: &PackageInfo, scylla: &Arc<Session>) -> Result<()> {
-    let query = scylla.prepare(r#"
-        INSERT INTO brane.packages (
-              created
-            , description
-            , detached
-            , functions_as_json
-            , id
-            , kind
-            , name
-            , owners
-            , types_as_json
-            , version
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    "#).await?;
-
-    let functions_as_json = serde_json::to_string(&package.functions)?;
-    let types_as_json = serde_json::to_string(&package.types)?;
-
-    let values = (
-        package.created.timestamp_millis(),
-        &package.description,
-        package.detached,
-        functions_as_json,
-        package.id,
-        &package.kind,
-        &package.name,
-        &package.owners,
-        types_as_json,
-        &package.version,
-    );
-
-    scylla
-        .execute(&query, values)
-        .await
-        .with_context(|| format!("Failed to insert package into database: {:?}", package))?;
-
-    Ok(())
 }
