@@ -52,6 +52,8 @@ start-services:
 stop-services:
 	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-svc.yml down
 
+restart-services: stop-services start-services
+
 start-brane:
 	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-brn.yml up -d
 
