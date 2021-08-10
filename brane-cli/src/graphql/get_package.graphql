@@ -1,0 +1,14 @@
+query GetPackage($name: String!, $version: String!) {
+    packages(name: $name, version: $version) {
+        created,
+        description,
+        detached,
+        functionsAsJson,
+        id,
+        kind,
+        name,
+        owners,
+        typesAsJson,
+        version
+    }
+}

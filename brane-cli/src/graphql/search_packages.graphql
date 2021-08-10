@@ -1,0 +1,14 @@
+query SearchPackages($term: String) {
+    packages(term: $term) {
+        created,
+        description,
+        detached,
+        functionsAsJson,
+        id,
+        kind,
+        name,
+        owners,
+        typesAsJson,
+        version
+    }
+}

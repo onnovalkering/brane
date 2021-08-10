@@ -1,5 +1,5 @@
 use crate::docker::DockerExecutor;
-use crate::registry;
+use crate::packages;
 use anyhow::Result;
 use brane_bvm::vm::{Vm, VmOptions};
 use brane_drv::grpc::{CreateSessionRequest, DriverServiceClient, ExecuteRequest};
@@ -279,7 +279,7 @@ async fn local_repl(
         CompilerOptions::new(Lang::BraneScript)
     };
 
-    let package_index = registry::get_package_index().await?;
+    let package_index = packages::get_package_index()?;
     let mut compiler = Compiler::new(compiler_options, package_index.clone());
 
     let executor = DockerExecutor::new(data);

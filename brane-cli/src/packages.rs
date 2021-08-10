@@ -1,17 +1,21 @@
-use crate::docker;
 use anyhow::Result;
+use bollard::Docker;
 use bollard::errors::Error;
 use bollard::image::ImportImageOptions;
-use bollard::Docker;
+use bollard::image::TagImageOptions;
+use bollard::models::BuildInfo;
 use chrono::Utc;
 use console::{pad_str, Alignment};
+use crate::docker;
 use dialoguer::Confirm;
 use futures_util::stream::TryStreamExt;
 use hyper::Body;
 use indicatif::HumanDuration;
-use prettytable::format::FormatBuilder;
 use prettytable::Table;
+use prettytable::format::FormatBuilder;
 use semver::Version;
+use serde_json::json;
+use specifications::package::PackageIndex;
 use specifications::package::PackageInfo;
 use std::fs;
 use std::path::PathBuf;
@@ -19,17 +23,6 @@ use std::time::Duration;
 use tokio::fs::File as TFile;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
-
-const PACKAGE_NOT_FOUND: &str = "Package not found.";
-
-///
-///
-///
-pub fn get_packages_dir() -> PathBuf {
-    appdirs::user_data_dir(Some("brane"), None, false)
-        .expect("Couldn't determine Brane data directory.")
-        .join("packages")
-}
 
 ///
 ///
@@ -68,6 +61,50 @@ pub fn get_package_dir(
     };
 
     Ok(package_dir.join(version))
+}
+
+///
+///
+///
+pub fn get_packages_dir() -> PathBuf {
+    appdirs::user_data_dir(Some("brane"), None, false)
+        .expect("Couldn't determine Brane data directory.")
+        .join("packages")
+}
+
+///
+///
+///
+pub fn get_package_index() -> Result<PackageIndex> {
+    let packages_dir = get_packages_dir();
+    if !packages_dir.exists() {
+        return Ok(PackageIndex::empty());
+    }
+
+    let mut packages = vec!();
+    for package in fs::read_dir(packages_dir)? {
+        let package_path = package?.path();
+        if !package_path.is_dir() {
+            continue;
+        }
+
+        let versions = fs::read_dir(package_path)?;
+        for version in versions {
+            let path = version?.path();
+            let package_file = path.join("package.yml");
+            let lock_file = path.join(".lock");
+
+            if !path.is_dir() || !package_file.exists() || lock_file.exists() {
+                continue;
+            }
+
+            if let Ok(package_info) = PackageInfo::from_path(package_file) {
+                packages.push(package_info);
+            }
+        }
+    }
+
+    PackageIndex::from_value(json!(packages))
 }
 
 ///
@@ -160,7 +197,7 @@ pub async fn load(
     let version_or_latest = version.unwrap_or_else(|| String::from("latest"));
     let package_dir = get_package_dir(&name, Some(&version_or_latest))?;
     if !package_dir.exists() {
-        return Err(anyhow!(PACKAGE_NOT_FOUND));
+        return Err(anyhow!("Package not found."));
     }
 
     let package_info = PackageInfo::from_path(package_dir.join("package.yml"))?;
@@ -185,7 +222,18 @@ pub async fn load(
     });
 
     let body = Body::wrap_stream(byte_stream);
-    docker.import_image(options, body, None).try_collect::<Vec<_>>().await?;
+    let result = docker.import_image(options, body, None).try_collect::<Vec<_>>().await?;
+    if let Some(BuildInfo { stream: Some(stream), .. }) = result.first() {
+        let (_, image_hash) = stream.trim().split_once("sha256:").expect("Expected image hash in load output.");
+        debug!("Imported image: {}", image_hash);
+
+        let options = TagImageOptions {
+            repo: &package_info.name,
+            tag: &package_info.version,
+        };
+
+        docker.tag_image(image_hash, Some(options)).await?;
+    }
 
     Ok(())
 }

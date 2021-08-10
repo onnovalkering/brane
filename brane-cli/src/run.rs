@@ -1,4 +1,4 @@
-use crate::{docker::DockerExecutor, registry};
+use crate::{docker::DockerExecutor, packages};
 use anyhow::Result;
 use brane_bvm::vm::Vm;
 use brane_dsl::{Compiler, CompilerOptions, Lang};
@@ -15,7 +15,7 @@ pub async fn handle(
     let source_code = fs::read_to_string(&file)?;
 
     let compiler_options = CompilerOptions::new(Lang::BraneScript);
-    let package_index = registry::get_package_index().await?;
+    let package_index = packages::get_package_index()?;
     let mut compiler = Compiler::new(compiler_options, package_index.clone());
 
     let executor = DockerExecutor::new(data);

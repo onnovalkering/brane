@@ -1,0 +1,3 @@
+mutation UnpublishPackage($name: String!, $version: String!) {
+    unpublishPackage(name: $name, version: $version)
+}

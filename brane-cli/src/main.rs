@@ -141,7 +141,7 @@ enum SubCommand {
     #[structopt(name = "search", about = "Search a registry for packages")]
     Search {
         #[structopt(name = "TERM", help = "Term to use as search criteria")]
-        term: String,
+        term: Option<String>,
     },
 
     #[structopt(name = "unpublish", about = "Remove a package from a registry")]
