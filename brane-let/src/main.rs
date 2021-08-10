@@ -13,7 +13,6 @@ use specifications::common::Value;
 use std::path::PathBuf;
 use std::process::Command;
 use std::{future::Future, process};
-use tokio_compat_02::FutureExt;
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
@@ -111,7 +110,7 @@ async fn main() -> Result<()> {
     let callback = callback_to.map(|callback_to| Callback::new(application_id, location_id, job_id, callback_to));
 
     // Wrap actual execution, so we can always log errors.
-    match run(opts.sub_command, callback).compat().await {
+    match run(opts.sub_command, callback).await {
         Ok(_) => process::exit(0),
         Err(error) => {
             eprintln!("{:?}", error);

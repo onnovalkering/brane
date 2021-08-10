@@ -14,7 +14,7 @@ brane-shr = { path = "../brane-shr" }
 bytes = "1"
 clap = "3.0.0-beta.2"
 dotenv = "0.15"
-env_logger = "0.8"
+env_logger = "0.9"
 futures = "0.3"
 futures-util = "0.3"
 k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_20"] }

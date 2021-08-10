@@ -16,7 +16,7 @@ rayon = "1.5"
 smallvec = "1.6"
 fnv = "1.0"
 specifications = { path = "../specifications" }
-tokio = { version = "1.6", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["full"] }
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["async", "async_futures"] }
