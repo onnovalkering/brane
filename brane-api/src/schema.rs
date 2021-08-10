@@ -1,11 +1,11 @@
 use crate::packages::PackageUdt;
 use crate::Context;
 use chrono::{DateTime, TimeZone, Utc};
-use juniper::{EmptyMutation, EmptySubscription, FieldResult, GraphQLObject, RootNode};
+use juniper::{EmptySubscription, FieldResult, GraphQLObject, RootNode};
 use scylla::IntoTypedRows;
 use uuid::Uuid;
 
-pub type Schema = RootNode<'static, Query, EmptyMutation<Context>, EmptySubscription<Context>>;
+pub type Schema = RootNode<'static, Query, Mutations, EmptySubscription<Context>>;
 impl juniper::Context for Context {}
 
 #[derive(Clone, Debug, GraphQLObject)]
@@ -88,5 +88,37 @@ impl Query {
         }
 
         Ok(packages)
+    }
+}
+
+pub struct Mutations;
+
+#[graphql_object(context = Context)]
+impl Mutations {
+    ///
+    ///
+    ///
+    async fn login(
+        _username: String, 
+        _password: String,
+        _context: &Context,
+    ) -> FieldResult<String> {
+        todo!();
+    }
+
+    ///
+    ///
+    ///
+    async fn unpublish_package(
+        name: String,
+        version: String,
+        context: &Context,
+    ) -> FieldResult<&str> {
+        let scylla = context.scylla.clone();
+
+        let query = "DELETE FROM brane.packages WHERE name = ? AND version = ?";
+        scylla.query(query, &(&name, &version)).await?;
+
+        Ok("OK!")
     }
 }

@@ -11,9 +11,9 @@ mod schema;
 use anyhow::{Context as _, Result};
 use clap::Clap;
 use dotenv::dotenv;
-use juniper::{EmptyMutation, EmptySubscription};
+use juniper::EmptySubscription;
 use log::LevelFilter;
-use schema::{Query, Schema};
+use schema::{Query, Schema, Mutations};
 use scylla::{Session, SessionBuilder};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
         scylla: scylla.clone(),
     });
 
-    let schema = Schema::new(Query {}, EmptyMutation::new(), EmptySubscription::new());
+    let schema = Schema::new(Query {}, Mutations { }, EmptySubscription::new());
     let graphql_filter = juniper_warp::make_graphql_filter(schema, context.clone().boxed());
     let graphql = warp::path("graphql").and(graphql_filter);
 
