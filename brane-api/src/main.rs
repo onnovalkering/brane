@@ -13,7 +13,7 @@ use clap::Clap;
 use dotenv::dotenv;
 use juniper::EmptySubscription;
 use log::LevelFilter;
-use schema::{Query, Schema, Mutations};
+use schema::{Mutations, Query, Schema};
 use scylla::{Session, SessionBuilder};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -77,19 +77,27 @@ async fn main() -> Result<()> {
         scylla: scylla.clone(),
     });
 
-    let schema = Schema::new(Query {}, Mutations { }, EmptySubscription::new());
+    let schema = Schema::new(Query {}, Mutations {}, EmptySubscription::new());
     let graphql_filter = juniper_warp::make_graphql_filter(schema, context.clone().boxed());
     let graphql = warp::path("graphql").and(graphql_filter);
 
     // Configure Warp.
-    let publish_package = warp::path("packages")
-        .and(warp::post())
-        .and(warp::filters::header::headers_cloned())
-        .and(warp::filters::body::bytes())
-        .and(context)
-        .and_then(packages::publish);
+    let download_package = warp::path("packages")
+        .and(warp::get())
+        .and(warp::path::param())
+        .and(warp::path::param())
+        .and(context.clone())
+        .and_then(packages::download);
 
-    let routes = graphql.or(publish_package).with(warp::log("brane-api"));
+    let upload_package = warp::path("packages")
+        .and(warp::post())
+        .and(warp::filters::body::bytes())
+        .and(context.clone())
+        .and_then(packages::upload);
+
+    let packages = download_package.or(upload_package);
+    let routes = graphql.or(packages).with(warp::log("brane-api"));
+
     let address: SocketAddr = opts.address.clone().parse()?;
     warp::serve(routes).run(address).await;
 

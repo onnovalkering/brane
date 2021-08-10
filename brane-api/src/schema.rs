@@ -99,7 +99,7 @@ impl Mutations {
     ///
     ///
     async fn login(
-        _username: String, 
+        _username: String,
         _password: String,
         _context: &Context,
     ) -> FieldResult<String> {

@@ -9,13 +9,14 @@ use specifications::package::PackageInfo;
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 use tar::Archive;
+use tokio::fs::File as TokioFile;
 use tokio::process::Command;
+use tokio_util::codec::{BytesCodec, FramedRead};
 use uuid::Uuid;
-use warp::{
-    http::{HeaderValue, StatusCode},
-    hyper::HeaderMap,
-    Rejection, Reply,
-};
+use warp::http::HeaderValue;
+use warp::hyper::Body;
+use warp::reply::Response;
+use warp::{http::StatusCode, Rejection, Reply};
 
 #[derive(Clone, IntoUserType, FromUserType)]
 pub struct PackageUdt {
@@ -117,27 +118,58 @@ async fn insert_package_into_db(
     Ok(())
 }
 
-
 ///
 ///
 ///
-pub async fn publish(
-    headers: HeaderMap<HeaderValue>,
-    package_archive: Bytes,
+pub async fn download(
+    name: String,
+    version: String,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
-    println!("{:?}", headers);
+    let image_tar = tempfile::NamedTempFile::new().expect("Failed to create temporary file.");
+    let image_tar_str = image_tar.path().to_string_lossy().to_string();
+    let image_label = format!("{}:{}", name, version);
 
-    // Create temporary file for uploaded package archive.
-    let temp_file = tempfile::NamedTempFile::new().map_err(|e| {
-        error!("An error occured while create a temporary file: {}", e);
+    let pull = Command::new("skopeo")
+        .arg("copy")
+        .arg("--src-tls-verify=false")
+        .arg(format!("docker://{}/library/{}", context.registry, image_label))
+        .arg(format!("docker-archive:{}", &image_tar_str))
+        .status();
+
+    pull.await.map_err(|e| {
+        error!("An error occured while pulling the image from the registry: {}", e);
         warp::reject::reject()
     })?;
 
-    let (temp_file, temp_file_path) = temp_file.keep().unwrap();
-    println!("{}", temp_file_path.display());
+    let file = TokioFile::open(&image_tar).await.expect("Failed to open/read temporary file.");
+    let file = FramedRead::new(file, BytesCodec::new());
 
-    tokio::fs::write(&temp_file_path, package_archive).await.map_err(|e| {
+    let mut response = Response::new(Body::wrap_stream(file));
+
+    response.headers_mut().insert(
+        "Content-Disposition",
+        HeaderValue::from_static("attachment; filename=image.tar"),
+    );
+
+    response.headers_mut().insert(
+        "Content-Length",
+        HeaderValue::from(image_tar.path().metadata().unwrap().len()),
+    );
+
+    Ok(response)
+}
+
+///
+///
+///
+pub async fn upload(
+    package_archive: Bytes,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    let temp_file = tempfile::NamedTempFile::new().expect("Failed to create temporary file.");
+
+    tokio::fs::write(&temp_file.path(), package_archive).await.map_err(|e| {
         error!("An error occured while writing to a temporary file: {}", e);
         warp::reject::reject()
     })?;
