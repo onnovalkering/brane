@@ -247,7 +247,9 @@ fn build_oas_function_input(
         let input_data_type = format!("{}Input", type_name);
 
         debug!("Grouping input into a single object: {}", input_data_type);
-        let (token, input_properties) = input_properties.into_iter().partition(|p| p.name == *"token");
+        let (specials, input_properties) = input_properties
+            .into_iter()
+            .partition(|p| p.name == *"token" || p.name == *"server");
 
         let input_type = Type {
             name: input_data_type.clone(),
@@ -257,8 +259,8 @@ fn build_oas_function_input(
         input_types.insert(input_data_type.clone(), input_type);
         let mut input_parameters = vec![Parameter::new(String::from("input"), input_data_type, None, None, None)];
 
-        if let Some(token) = token.first().cloned() {
-            input_parameters.push(token.into_parameter())
+        for special in specials {
+            input_parameters.push(special.into_parameter());
         }
 
         input_parameters
