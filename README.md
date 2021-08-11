@@ -25,8 +25,8 @@ The following system dependencies must be installed (assuming Ubuntu 20.04):
 
 - build-essential
 - cmake
-- libpq-dev
 - libssl-dev
+- musl-tools
 - pkg-config
 
 ### Compiling
