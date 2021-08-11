@@ -21,7 +21,7 @@ jobs:
       - name: Build (optimized) binaries
         run: |
           cargo build -v --release --package brane-cli
-          mv target/release/brane-cli target/release/brane-darwin
+          mv target/release/brane target/release/brane-darwin
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
@@ -52,7 +52,7 @@ jobs:
       - name: Build (optimized) binaries
         run: |
           cargo build -v --release --package brane-cli
-          mv target/release/brane-cli target/release/brane-linux
+          mv target/release/brane target/release/brane-linux
 
           cargo build -v --release --package brane-let --target x86_64-unknown-linux-musl
 
