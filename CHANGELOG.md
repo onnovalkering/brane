@@ -12,7 +12,7 @@ All notable changes to the Brane framework will be documented in this file.
 - Optional flag to keep temporary package build files.
 - Automatically add `token` and `server` arguments for OAS functions. 
 
-## Changed
+### Changed
 - Use seperate service for scheduling functions: `brane-job`.
 - Use seperate library for OpenAPI support: `brane-oas`.
 - REPL is now based on the `rustyline` library.
@@ -21,7 +21,7 @@ All notable changes to the Brane framework will be documented in this file.
 - DSL implementation is based on parser combinatorics, with `nom`.
 - Switched from `actix` to `warp` as the framework for `brane-api`.
 
-## Fixed
+### Fixed
 - Minor fixes for the word count quickstart.
 - Correctly convert between DSL values and specification values.
 
