@@ -14,6 +14,7 @@ RUN cargo build --release
 
 # Define final image
 FROM ubuntu:20.04
+LABEL org.opencontainers.image.source https://github.com/onnovalkering/brane
 
 RUN apt-get update && apt-get install -y \
     libssl1.1 \

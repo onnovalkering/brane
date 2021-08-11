@@ -97,35 +97,35 @@ jobs:
         with:
           file: Dockerfile.clb
           push: true
-          tags: brane-clb:${{ steps.meta.outputs.tag }}
+          tags: ghcr.io/onnovalkering/brane/brane-clb:${{ steps.meta.outputs.tag }}
 
       - name: Build and push 'brane-drv'
         uses: docker/build-push-action@v2
         with:
           file: Dockerfile.drv
           push: true
-          tags: brane-drv:${{ steps.meta.outputs.tag }}
+          tags: ghcr.io/onnovalkering/brane/brane-drv:${{ steps.meta.outputs.tag }}
 
       - name: Build and push 'brane-job'
         uses: docker/build-push-action@v2
         with:
           file: Dockerfile.job
           push: true
-          tags: brane-job:${{ steps.meta.outputs.tag }}
+          tags: ghcr.io/onnovalkering/brane/brane-job:${{ steps.meta.outputs.tag }}
 
       - name: Build and push 'brane-log'
         uses: docker/build-push-action@v2
         with:
           file: Dockerfile.log
           push: true
-          tags: brane-log:${{ steps.meta.outputs.tag }}
+          tags: ghcr.io/onnovalkering/brane/brane-log:${{ steps.meta.outputs.tag }}
 
       - name: Build and push 'brane-plr'
         uses: docker/build-push-action@v2
         with:
           file: Dockerfile.plr
           push: true
-          tags: brane-plr:${{ steps.meta.outputs.tag }}                                               
+          tags: ghcr.io/onnovalkering/brane/brane-plr:${{ steps.meta.outputs.tag }}                                             
 
   create-release:
     runs-on: ubuntu-latest

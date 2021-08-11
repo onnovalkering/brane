@@ -13,6 +13,7 @@ RUN cargo build --release
 
 # Define final image
 FROM ubuntu:20.04
+LABEL org.opencontainers.image.source https://github.com/onnovalkering/brane
 
 # Copy `brane-clb` from build stage
 COPY --from=build /brane-clb/target/release/brane-clb .
