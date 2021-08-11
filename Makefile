@@ -1,37 +1,47 @@
-build: build-binaries build-docker
+build: build-binaries build-services
 
-# Build release binaries
-build-binaries: build-cli build-let
+# Build release versions of the binaries.
+build-binaries: \
+	build-cli \
+	build-let
 
 build-cli:
 	cargo build --release --package brane-cli
 
 build-let:
+	rustup target add x86_64-unknown-linux-musl
 	cargo build --release --package brane-let --target x86_64-unknown-linux-musl
 
-# Build Docker images
-build-images: api clb drv ide job log plr
+# build release versions of the serivces.
+build-services: \
+	build-api-image \
+	build-clb-image \
+	build-drv-image \
+	build-ide-image \
+	build-job-image \
+	build-log-image \
+	build-plr-image
 
 build-api-image:
-	docker build -t onnovalkering/brane-api -f Dockerfile.api .
+	docker build -t brane_brane-api -f Dockerfile.api .
 
 build-clb-image:
-	docker build -t onnovalkering/brane-clb -f Dockerfile.clb .
+	docker build -t brane_brane-clb -f Dockerfile.clb .
 
 build-drv-image:
-	docker build -t onnovalkering/brane-drv -f Dockerfile.drv .
+	docker build -t brane_brane-drv -f Dockerfile.drv .
 
 build-ide-image:
-	docker build -t onnovalkering/brane-ide -f Dockerfile.ide .
+	docker build -t brane_brane-ide -f Dockerfile.ide .
 
 build-job-image:
-	docker build -t onnovalkering/brane-job -f Dockerfile.job .
+	docker build -t brane_brane-job -f Dockerfile.job .
 
 build-log-image:
-	docker build -t onnovalkering/brane-log -f Dockerfile.log .
+	docker build -t brane_brane-log -f Dockerfile.log .
 
 build-plr-image:
-	docker build -t onnovalkering/brane-plr -f Dockerfile.plr .
+	docker build -t brane_brane-plr -f Dockerfile.plr .
 
 # Development setup
 start-instance: \
@@ -66,6 +76,26 @@ start-ide:
 stop-ide:
 	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-ide.yml down
 
+# Configuration
+
+ensure-configuration:
+	touch infra.yml && \
+	touch secrets.yml
+
+# JuiceFS
+
+format-dfs:
+	docker run --network kind onnovalkering/juicefs \
+		format \
+		--access-key minio \
+		--secret-key minio123 \
+		--storage minio \
+		--bucket http://minio:9000/data \
+		redis \
+		brane
+
+# TODO: move below to contrib / seperate repository
+
 # Kubernetes in Docker (kind)
 
 install-kind:
@@ -86,12 +116,6 @@ delete-kind-cluster:
 kind-cluster-config:
 	@kind get kubeconfig --internal --name brane | base64
 
-# Configuration
-
-ensure-configuration:
-	touch infra.yml && \
-	touch secrets.yml
-
 # Slurm
 
 start-slurm: create-kind-network
@@ -101,18 +125,6 @@ start-slurm: create-kind-network
 		--name slurm \
 		-p 127.0.0.1:10022:22 \
 		onnovalkering/slurm
-
-# JuiceFS
-
-format-dfs:
-	docker run --network kind onnovalkering/juicefs \
-		format \
-		--access-key minio \
-		--secret-key minio123 \
-		--storage minio \
-		--bucket http://minio:9000/data \
-		redis \
-		brane
 
 # JupyterLab IDE
 
