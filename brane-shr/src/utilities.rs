@@ -47,5 +47,5 @@ mod tests {
 
         let url = ensure_http_schema("https://localhost", false).unwrap();
         assert_eq!(url, "https://localhost");
-    } 
+    }
 }

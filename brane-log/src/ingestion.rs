@@ -14,7 +14,8 @@ use rdkafka::{
 use schema::KeyValuePair;
 use scylla::Session;
 use std::sync::Arc;
-use time::{Format, OffsetDateTime};
+use time::format_description::well_known::Rfc3339;
+use time::OffsetDateTime;
 use tokio::sync::watch::Sender;
 
 ///
@@ -82,7 +83,7 @@ pub async fn start_worker(
     // Restore previous topic/partition offset.
     let mut tpl = TopicPartitionList::new();
     for topic in event_topics.iter() {
-        tpl.add_partition(&topic, 0);
+        tpl.add_partition(topic, 0);
     }
 
     let committed_offsets = consumer.committed_offsets(tpl.clone(), Timeout::Never)?;
@@ -90,8 +91,8 @@ pub async fn start_worker(
     for topic in event_topics.iter() {
         if let Some(offset) = committed_offsets.get(&(topic.clone(), 0)) {
             match offset {
-                Offset::Invalid => tpl.set_partition_offset(&topic, 0, Offset::Beginning)?,
-                offset => tpl.set_partition_offset(&topic, 0, offset.clone())?,
+                Offset::Invalid => tpl.set_partition_offset(topic, 0, Offset::Beginning)?,
+                offset => tpl.set_partition_offset(topic, 0, *offset)?,
             };
         }
     }
@@ -194,6 +195,7 @@ async fn process_message(
         .await
         .with_context(|| format!("Failed to insert event: {:?}", event))?;
 
+    let timestamp = OffsetDateTime::from_unix_timestamp(event.timestamp)?.format(&Rfc3339)?;
     let event = schema::Event {
         application: event.application.clone(),
         job: event.identifier.clone(),
@@ -202,7 +204,7 @@ async fn process_message(
         order: event.order as i32,
         kind,
         information,
-        timestamp: OffsetDateTime::from_unix_timestamp(event.timestamp.clone()).format(Format::Rfc3339),
+        timestamp,
     };
 
     events_tx.send(event)?;

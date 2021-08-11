@@ -54,9 +54,7 @@ pub enum Location {
 impl Location {
     pub fn get_address(self) -> String {
         match self {
-            Location::Kube { address, .. } | Location::Vm { address, .. } | Location::Slurm { address, .. } => {
-                address.clone()
-            }
+            Location::Kube { address, .. } | Location::Vm { address, .. } | Location::Slurm { address, .. } => address,
             Location::Local { .. } => String::from("127.0.0.1"),
         }
     }

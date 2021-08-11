@@ -15,12 +15,12 @@ use kube::{Client as KubeClient, Config as KubeConfig};
 use rand::distributions::Alphanumeric;
 use rand::{self, Rng};
 use serde_json::{json, Value as JValue};
-use xenon::storage::{FileSystem, FileSystemPath};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::iter;
 use xenon::compute::{JobDescription, Scheduler};
 use xenon::credentials::{CertificateCredential, Credential};
+use xenon::storage::{FileSystem, FileSystemPath};
 
 // Names of environment variables.
 const BRANE_APPLICATION_ID: &str = "BRANE_APPLICATION_ID";
@@ -239,7 +239,7 @@ async fn handle_k8s(
         bail!("Cannot create KubeClient from non-config credentials.");
     };
 
-    let job_description = create_k8s_job_description(&job_id, &command, environment)?;
+    let job_description = create_k8s_job_description(job_id, &command, environment)?;
 
     let jobs: Api<Job> = Api::namespaced(client.clone(), &namespace);
     let result = jobs.create(&PostParams::default(), &job_description).await;
@@ -490,8 +490,8 @@ async fn handle_xenon(
     mut scheduler: Scheduler,
 ) -> Result<()> {
     let job_description = match runtime.to_lowercase().as_str() {
-        "singularity" => create_singularity_job_description(&command, &job_id, environment)?,
-        "docker" => create_docker_job_description(&command, &job_id, environment, None)?,
+        "singularity" => create_singularity_job_description(&command, job_id, environment)?,
+        "docker" => create_docker_job_description(&command, job_id, environment, None)?,
         _ => unreachable!(),
     };
 
@@ -530,12 +530,17 @@ where
         location
     };
 
-    let credential = if let Credential::Certificate(CertificateCredential { username, certificate, passphrase }) = credential {
+    let credential = if let Credential::Certificate(CertificateCredential {
+        username,
+        certificate,
+        passphrase,
+    }) = credential
+    {
         let certificate = base64::decode(certificate.replace("\n", ""))?;
 
         let mut local = FileSystem::create_local(xenon_endpoint.clone()).await?;
         let certificate_file = format!("/keys/{}", get_random_identifier());
-        
+
         let path = FileSystemPath::new(&certificate_file);
         local.write_to_file(certificate, &path).await?;
 

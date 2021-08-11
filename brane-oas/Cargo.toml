@@ -8,12 +8,13 @@ edition = "2018"
 anyhow = "1"
 backoff = { version = "0.3", features = ["tokio"] }
 cookie = "0.15"
-cookie_store = { version = "0.13", features = ["reqwest_impl"] }
+cookie_store = "0.15"
 log = "0.4"
 maplit = "1"
-openapiv3 = "0.4"
+openapiv3 = "0.5"
 rand = "0.8"
 reqwest = { version = "0.11", features = ["json", "cookies", "blocking"] }
+reqwest_cookie_store = "0.2"
 serde = "1"
 serde_json = "1"
 serde_yaml = "0.8"

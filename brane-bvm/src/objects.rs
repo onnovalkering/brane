@@ -113,7 +113,7 @@ impl Class {
             .collect();
 
         ClassMut {
-            name: self.name.clone(),
+            name: self.name,
             properties: Default::default(),
             methods,
         }

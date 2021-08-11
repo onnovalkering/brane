@@ -1,18 +1,18 @@
+use crate::docker;
 use anyhow::Result;
-use bollard::Docker;
 use bollard::errors::Error;
 use bollard::image::ImportImageOptions;
 use bollard::image::TagImageOptions;
 use bollard::models::BuildInfo;
+use bollard::Docker;
 use chrono::Utc;
 use console::{pad_str, Alignment};
-use crate::docker;
 use dialoguer::Confirm;
 use futures_util::stream::TryStreamExt;
 use hyper::Body;
 use indicatif::HumanDuration;
-use prettytable::Table;
 use prettytable::format::FormatBuilder;
+use prettytable::Table;
 use semver::Version;
 use serde_json::json;
 use specifications::package::PackageIndex;
@@ -55,7 +55,7 @@ pub fn get_package_dir(
 
         versions[0].to_string()
     } else {
-        Version::parse(&version)
+        Version::parse(version)
             .expect("Not a valid semantic version.")
             .to_string()
     };
@@ -81,7 +81,7 @@ pub fn get_package_index() -> Result<PackageIndex> {
         return Ok(PackageIndex::empty());
     }
 
-    let mut packages = vec!();
+    let mut packages = vec![];
     for package in fs::read_dir(packages_dir)? {
         let package_path = package?.path();
         if !package_path.is_dir() {
@@ -223,8 +223,14 @@ pub async fn load(
 
     let body = Body::wrap_stream(byte_stream);
     let result = docker.import_image(options, body, None).try_collect::<Vec<_>>().await?;
-    if let Some(BuildInfo { stream: Some(stream), .. }) = result.first() {
-        let (_, image_hash) = stream.trim().split_once("sha256:").expect("Expected image hash in load output.");
+    if let Some(BuildInfo {
+        stream: Some(stream), ..
+    }) = result.first()
+    {
+        let (_, image_hash) = stream
+            .trim()
+            .split_once("sha256:")
+            .expect("Expected image hash in load output.");
         debug!("Imported image: {}", image_hash);
 
         let options = TagImageOptions {

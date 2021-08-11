@@ -1,11 +1,11 @@
 use anyhow::{bail, Context, Result};
 use brane_cfg::{Infrastructure, Secrets};
-use brane_shr::utilities;
 use brane_job::{
     clb_heartbeat, clb_lifecycle,
     interface::{Callback, CallbackKind, Command, CommandKind},
 };
 use brane_job::{cmd_create, interface::Event};
+use brane_shr::utilities;
 use bytes::BytesMut;
 use clap::Clap;
 use dotenv::dotenv;
@@ -265,9 +265,7 @@ async fn start_worker(
                         event.encode(&mut payload).unwrap();
 
                         // Send event on output topic
-                        let message = FutureRecord::to(&output_topic)
-                            .key(&evt_key)
-                            .payload(payload.to_bytes());
+                        let message = FutureRecord::to(output_topic).key(&evt_key).payload(payload.to_bytes());
 
                         if let Err(error) = owned_producer.send(message, Timeout::Never).await {
                             error!("Failed to send event (key: {}): {:?}", evt_key, error);

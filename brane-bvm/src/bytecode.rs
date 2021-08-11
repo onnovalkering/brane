@@ -208,7 +208,7 @@ impl Chunk {
             write!(result, "{:04} ", offset)?;
             match *instruction {
                 OP_CONSTANT => {
-                    constant_instruction("OP_CONSTANT", &self, offset, &mut result);
+                    constant_instruction("OP_CONSTANT", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_ADD => {
@@ -248,7 +248,7 @@ impl Chunk {
                     writeln!(result, "OP_POP")?;
                 }
                 OP_POP_N => {
-                    byte_instruction("OP_POP_N", &self, offset, &mut result);
+                    byte_instruction("OP_POP_N", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_RETURN => {
@@ -276,23 +276,23 @@ impl Chunk {
                     writeln!(result, "OP_LOC_POP")?;
                 }
                 OP_DOT => {
-                    constant_instruction("OP_DOT", &self, offset, &mut result);
+                    constant_instruction("OP_DOT", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_ARRAY => {
-                    byte_instruction("OP_ARRAY", &self, offset, &mut result);
+                    byte_instruction("OP_ARRAY", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_PARALLEL => {
-                    byte_instruction("OP_PARALLEL", &self, offset, &mut result);
+                    byte_instruction("OP_PARALLEL", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_NEW => {
-                    byte_instruction("OP_NEW", &self, offset, &mut result);
+                    byte_instruction("OP_NEW", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_CALL => {
-                    byte_instruction("OP_CALL", &self, offset, &mut result);
+                    byte_instruction("OP_CALL", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_JUMP_IF_FALSE => {
@@ -308,39 +308,39 @@ impl Chunk {
                     skip = 2;
                 }
                 OP_DEFINE_GLOBAL => {
-                    constant_instruction("OP_DEFINE_GLOBAL", &self, offset, &mut result);
+                    constant_instruction("OP_DEFINE_GLOBAL", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_GET_GLOBAL => {
-                    constant_instruction("OP_GET_GLOBAL", &self, offset, &mut result);
+                    constant_instruction("OP_GET_GLOBAL", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_GET_LOCAL => {
-                    byte_instruction("OP_GET_LOCAL", &self, offset, &mut result);
+                    byte_instruction("OP_GET_LOCAL", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_GET_METHOD => {
-                    constant_instruction("OP_GET_METHOD", &self, offset, &mut result);
+                    constant_instruction("OP_GET_METHOD", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_GET_PROPERTY => {
-                    constant_instruction("OP_GET_PROPERTY", &self, offset, &mut result);
+                    constant_instruction("OP_GET_PROPERTY", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_SET_GLOBAL => {
-                    byte_instruction("OP_SET_GLOBAL", &self, offset, &mut result);
+                    byte_instruction("OP_SET_GLOBAL", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_SET_LOCAL => {
-                    byte_instruction("OP_SET_LOCAL", &self, offset, &mut result);
+                    byte_instruction("OP_SET_LOCAL", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_CLASS => {
-                    constant_instruction("OP_CLASS", &self, offset, &mut result);
+                    constant_instruction("OP_CLASS", self, offset, &mut result);
                     skip = 1;
                 }
                 OP_IMPORT => {
-                    constant_instruction("OP_IMPORT", &self, offset, &mut result);
+                    constant_instruction("OP_IMPORT", self, offset, &mut result);
                     skip = 1;
                 }
                 0x00 | 0x28..=u8::MAX => {
@@ -475,10 +475,7 @@ impl ChunkMut {
                         methods.insert(name, Slot::Object(handle));
                     }
 
-                    let class = Class {
-                        name: c.name.clone(),
-                        methods,
-                    };
+                    let class = Class { name: c.name, methods };
 
                     let class = Object::Class(class);
                     let handle = heap.insert(class).into_handle();

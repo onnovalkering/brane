@@ -86,7 +86,7 @@ fn create_package_info(oas_document: &OpenAPI) -> Result<PackageInfo> {
     let version = oas_document.info.version.clone();
     let description = oas_document.info.description.clone().unwrap_or_default();
 
-    let (functions, types) = build::build_oas_functions(&oas_document)?;
+    let (functions, types) = build::build_oas_functions(oas_document)?;
 
     let package_info = PackageInfo::new(
         name,
@@ -94,7 +94,7 @@ fn create_package_info(oas_document: &OpenAPI) -> Result<PackageInfo> {
         description,
         false,
         String::from("oas"),
-        vec!(),
+        vec![],
         Some(functions),
         Some(types),
     );

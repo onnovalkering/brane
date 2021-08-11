@@ -162,7 +162,7 @@ pub async fn emit_event(
     event.encode(&mut payload).unwrap();
 
     // Send event on output topic
-    let message = FutureRecord::to(&event_topic)
+    let message = FutureRecord::to(event_topic)
         .key(&event_key)
         .payload(payload.to_bytes());
 

@@ -142,7 +142,9 @@ pub async fn download(
         warp::reject::reject()
     })?;
 
-    let file = TokioFile::open(&image_tar).await.expect("Failed to open/read temporary file.");
+    let file = TokioFile::open(&image_tar)
+        .await
+        .expect("Failed to open/read temporary file.");
     let file = FramedRead::new(file, BytesCodec::new());
 
     let mut response = Response::new(Body::wrap_stream(file));
@@ -169,10 +171,12 @@ pub async fn upload(
 ) -> Result<impl Reply, Rejection> {
     let temp_file = tempfile::NamedTempFile::new().expect("Failed to create temporary file.");
 
-    tokio::fs::write(&temp_file.path(), package_archive).await.map_err(|e| {
-        error!("An error occured while writing to a temporary file: {}", e);
-        warp::reject::reject()
-    })?;
+    tokio::fs::write(&temp_file.path(), package_archive)
+        .await
+        .map_err(|e| {
+            error!("An error occured while writing to a temporary file: {}", e);
+            warp::reject::reject()
+        })?;
 
     // Unpack package archive to temporary working directory.
     let temp_dir = tempfile::tempdir().map_err(|e| {

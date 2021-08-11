@@ -263,7 +263,7 @@ fn capture_output(
 ) -> Result<Map<Value>> {
     debug!("Capture output using mode: {:?}", mode);
 
-    let stdout = preprocess_stdout(stdout, &mode)?;
+    let stdout = preprocess_stdout(stdout, mode)?;
     let docs = YamlLoader::load_from_str(&stdout)?;
 
     let c_types = c_types.clone().unwrap_or_default();
@@ -294,14 +294,14 @@ fn unwrap_yaml_hash(
 
                 let mut entries = vec![];
                 for element in elements.iter() {
-                    let variable = unwrap_yaml_value(&element, &value_type)?;
+                    let variable = unwrap_yaml_value(element, &value_type)?;
                     entries.push(variable);
                 }
 
                 let data_type = p.data_type.to_string();
                 Value::Array { data_type, entries }
             }
-            Yaml::Hash(_) => unwrap_yaml_struct(&value, &p.data_type, types)?,
+            Yaml::Hash(_) => unwrap_yaml_struct(value, &p.data_type, types)?,
             _ => unwrap_yaml_value(&map[&key], &p.data_type)?,
         };
 
@@ -352,7 +352,7 @@ fn unwrap_yaml_value(
             if let Yaml::Array(elements) = value {
                 let mut entries = vec![];
                 for element in elements.iter() {
-                    let variable = unwrap_yaml_value(&element, "File")?;
+                    let variable = unwrap_yaml_value(element, "File")?;
                     entries.push(variable);
                 }
 

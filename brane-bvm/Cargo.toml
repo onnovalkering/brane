@@ -9,18 +9,18 @@ anyhow = "1"
 async-trait = "0.1"
 broom = "0.3"
 bytes = "1"
+fnv = "1.0"
 futures = "0.3"
 itertools = "0.10"
 log = "0.4"
 rayon = "1.5"
 smallvec = "1.6"
-fnv = "1.0"
 specifications = { path = "../specifications" }
 tokio = { version = "1", features = ["full"] }
 
 [dev-dependencies]
-criterion = { version = "0.3", features = ["async", "async_futures"] }
 brane-dsl = { path = "../brane-dsl" }
+criterion = { version = "0.3", features = ["async", "async_futures"] }
 
 [[bench]]
 name = "fibonacci"

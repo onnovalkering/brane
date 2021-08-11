@@ -15,11 +15,7 @@ use prettytable::Table;
 use reqwest::{self, Body, Client};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-use specifications::common::Function;
-use specifications::common::Type;
 use specifications::package::PackageInfo;
-use tar::Archive;
-use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -55,9 +51,7 @@ impl RegistryConfig {
     }
 }
 
-///
-///
-///
+/// Get the GraphQL endpoint of the Brane API.
 pub fn get_graphql_endpoint() -> Result<String> {
     let config_file = utils::get_config_dir().join("registry.yml");
     let config = RegistryConfig::from_path(&config_file)
@@ -66,9 +60,7 @@ pub fn get_graphql_endpoint() -> Result<String> {
     Ok(format!("{}/graphql", config.url))
 }
 
-///
-///
-///
+/// Get the package endpoint of the Brane API.
 pub fn get_packages_endpoint() -> Result<String> {
     let config_file = utils::get_config_dir().join("registry.yml");
     let config = RegistryConfig::from_path(&config_file)
@@ -157,7 +149,7 @@ pub async fn pull(
 
     while let Some(chunk) = package_archive.chunk().await? {
         progress.inc(chunk.len() as u64);
-        temp_file.write(&chunk)?;
+        temp_file.write_all(&chunk)?;
     }
 
     progress.finish();
@@ -171,7 +163,10 @@ pub async fn pull(
     let graphql_endpoint = get_graphql_endpoint()?;
 
     // Prepare GraphQL query.
-    let variables = get_package::Variables { name: name.clone(), version: version.clone() };
+    let variables = get_package::Variables {
+        name: name.clone(),
+        version: version.clone(),
+    };
     let graphql_query = GetPackage::build_query(variables);
 
     // Request/response for GraphQL query.
@@ -179,9 +174,13 @@ pub async fn pull(
     let graphql_response: Response<get_package::ResponseData> = graphql_response.json().await?;
 
     if let Some(data) = graphql_response.data {
-        let package = data.packages.first().expect("No package information available").clone();
-        let functions = package.functions_as_json.clone().map(|f| serde_json::from_str(&f).unwrap());
-        let types = package.types_as_json.clone().map(|t| serde_json::from_str(&t).unwrap());
+        let package = data.packages.first().expect("No package information available");
+        let functions = package
+            .functions_as_json
+            .as_ref()
+            .map(|f| serde_json::from_str(f).unwrap());
+
+        let types = package.types_as_json.as_ref().map(|t| serde_json::from_str(t).unwrap());
 
         let package_info = PackageInfo {
             created: package.created,
@@ -198,7 +197,7 @@ pub async fn pull(
 
         // Write package.yml to package directory
         let mut buffer = File::create(package_dir.join("package.yml"))?;
-        write!(buffer, "{}", serde_yaml::to_string(&package_info)?)?;      
+        write!(buffer, "{}", serde_yaml::to_string(&package_info)?)?;
     } else {
         bail!("Failed to get package information from API.");
     }
@@ -209,7 +208,7 @@ pub async fn pull(
         style(&name).bold().cyan(),
     );
 
-    Ok(())    
+    Ok(())
 }
 
 ///
@@ -354,7 +353,7 @@ pub async fn unpublish(
             return Ok(());
         }
 
-        println!("");
+        println!();
     }
 
     // Prepare GraphQL query.

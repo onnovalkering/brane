@@ -17,20 +17,19 @@ dotenv = "0.15"
 env_logger = "0.9"
 futures = "0.3"
 futures-util = "0.3"
-k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_20"] }
-kube = "0.52"
+k8s-openapi = { version = "0.13", default-features = false, features = ["v1_20"] }
+kube = "0.59"
 log = "0.4"
-maplit = "1"
+maplit = "1.0"
 prost = "0.8"
-protobuf = "2.22"
 rand = "0.8"
 rdkafka = { version = "0.26", features = ["cmake-build"] }
 serde = "1"
 serde_json = "1"
 serde_yaml = "0.8"
-time = "0.2"
+time = "0.3"
 tokio = { version = "1", features = ["full"] }
-xenon-rs = { git = "https://github.com/onnovalkering/xenon-rs" }
+xenon-rs = "0.4"
 
 [dev-dependencies]
 dashmap = "4.0"

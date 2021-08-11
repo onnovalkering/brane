@@ -151,7 +151,7 @@ impl Slot {
                 Object::Class(c) => {
                     let class = c.clone().unfreeze(heap);
                     let class: SpecClass = class.into();
-                    Value::Class(class.into())
+                    Value::Class(class)
                 }
                 Object::Function(_) => panic!("Cannot convert function to value."),
                 Object::FunctionExt(f) => Value::FunctionExt(f.clone()),
@@ -162,7 +162,7 @@ impl Slot {
                     let mut properties = HashMap::new();
 
                     for (name, slot) in &i.properties {
-                        properties.insert(name.clone(), slot.clone().into_value(heap));
+                        properties.insert(name.clone(), (*slot).into_value(heap));
                     }
 
                     Value::Struct { data_type, properties }

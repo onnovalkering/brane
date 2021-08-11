@@ -146,6 +146,7 @@ impl Event {
     ///
     ///
     ///
+    #[allow(clippy::too_many_arguments)]
     pub fn new<S: Into<String> + Clone>(
         kind: EventKind,
         identifier: S,

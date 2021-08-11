@@ -283,5 +283,5 @@ project-specific topics.
 
 
 [documentation]: #
-[Stack Overflow]: http://stackoverflow.com/
+[Stack Overflow]: https://stackoverflow.com/
 [semantic linewrapping]: https://scott.mn/2014/02/21/semantic_linewrapping/

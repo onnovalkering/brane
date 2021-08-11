@@ -224,7 +224,7 @@ fn build_oas_function_input(
     }
 
     // Determine input from security schemes.
-    if let Some(security_scheme) = &operation.security.get(0) {
+    if let Some(Some(security_scheme)) = &operation.security.as_ref().map(|s| s.first().cloned()) {
         if let Some(security_scheme) = security_scheme.keys().next() {
             let item = ReferenceOr::Reference::<SecurityScheme> {
                 reference: format!("#/components/schemas/{}", security_scheme),
@@ -243,7 +243,7 @@ fn build_oas_function_input(
 
     // Convert input properties to parameters.
     let input_parameters = if input_properties.len() > 4 {
-        let type_name = uppercase_first_letter(&operation_id);
+        let type_name = uppercase_first_letter(operation_id);
         let input_data_type = format!("{}Input", type_name);
 
         debug!("Grouping input into a single object: {}", input_data_type);
@@ -321,7 +321,7 @@ fn build_oas_function_output(
 
     // Else, we use an object or unit if there is no output.
     let return_type = if !output_properties.is_empty() {
-        let type_name = uppercase_first_letter(&operation_id);
+        let type_name = uppercase_first_letter(operation_id);
         let output_data_type = format!("{}Output", type_name);
 
         let output_type = Type {

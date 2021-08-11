@@ -192,11 +192,11 @@ fn prompt_for_value(
         match data_type {
             "boolean" => {
                 let default = p.clone().default.map(|d| d.as_bool().unwrap());
-                Value::Boolean(prompt(&p, default)?)
+                Value::Boolean(prompt(p, default)?)
             }
             "Directory" | "File" => {
                 let default = p.clone().default.map(|d| d.as_string().unwrap());
-                let url = Value::Unicode(format!("file:///{}", prompt(&p, default)?));
+                let url = Value::Unicode(format!("file:///{}", prompt(p, default)?));
 
                 let mut properties = Map::<Value>::default();
                 properties.insert(String::from("url"), url);
@@ -208,18 +208,18 @@ fn prompt_for_value(
             }
             "integer" => {
                 let default = p.clone().default.map(|d| d.as_i64().unwrap());
-                Value::Integer(prompt(&p, default)?)
+                Value::Integer(prompt(p, default)?)
             }
             "real" => {
                 let default = p.clone().default.map(|d| d.as_f64().unwrap());
-                Value::Real(prompt(&p, default)?)
+                Value::Real(prompt(p, default)?)
             }
             "string" => {
                 let default = p.clone().default.map(|d| d.as_string().unwrap());
                 let value = if p.name.to_lowercase().contains("password") {
-                    prompt_password(&p, default)?
+                    prompt_password(p, default)?
                 } else {
-                    prompt(&p, default)?
+                    prompt(p, default)?
                 };
 
                 Value::Unicode(value)

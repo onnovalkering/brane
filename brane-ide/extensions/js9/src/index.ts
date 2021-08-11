@@ -99,8 +99,8 @@ async function loadJs9(el: HTMLElement): Promise<void> {
     console.log("JS9 all-in-one script and stylesheet inserted.");
 
     el.insertAdjacentHTML('beforeend', `
-      <link type="text/css" rel="stylesheet" href="http://js9.si.edu/js9/js9-allinone.css" />
-      <script type="text/javascript" src="http://js9.si.edu/js9/js9-allinone.js"></script>
+      <link type="text/css" rel="stylesheet" href="https://js9.si.edu/js9/js9-allinone.css" />
+      <script type="text/javascript" src="https://js9.si.edu/js9/js9-allinone.js"></script>
     `);
 
     evalInnerHTMLScriptTags(el);

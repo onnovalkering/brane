@@ -186,7 +186,7 @@ where
     pub fn capture_state(&self) -> VmState {
         let mut globals = FnvHashMap::default();
         for (name, slot) in &self.globals {
-            let value = slot.clone().into_value(&self.heap);
+            let value = (*slot).into_value(&self.heap);
             globals.insert(name.clone(), value);
         }
 
@@ -386,10 +386,9 @@ where
                         let object = object.into_handle();
 
                         self.stack.push_object(object);
-                    },
-                    _ => unreachable!()
+                    }
+                    _ => unreachable!(),
                 }
-
             }
             _ => unreachable!(),
         };

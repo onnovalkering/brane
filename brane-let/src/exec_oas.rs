@@ -152,7 +152,7 @@ fn as_type(
         Value::Array { entries, .. } => {
             let element_type = c_type.strip_suffix("[]").unwrap();
 
-            let entries = entries.iter().map(|e| as_type(e, element_type, &c_types)).collect();
+            let entries = entries.iter().map(|e| as_type(e, element_type, c_types)).collect();
             Value::Array {
                 entries,
                 data_type: c_type.to_string(),

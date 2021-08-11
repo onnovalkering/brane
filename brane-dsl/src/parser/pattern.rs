@@ -8,6 +8,7 @@ use specifications::{
     common::{CallPattern, Function, Parameter},
     package::{PackageIndex, PackageInfo},
 };
+use std::iter;
 
 type Map<T> = std::collections::HashMap<String, T>;
 
@@ -142,7 +143,7 @@ fn build_pattern(
         .collect();
 
     if let Some(infix) = notation.infix {
-        let infix: Vec<String> = infix.iter().map(|i| regex::escape(&i)).collect();
+        let infix: Vec<String> = infix.iter().map(|i| regex::escape(i)).collect();
         arguments = interleave(arguments, infix).collect();
     }
 
@@ -185,16 +186,17 @@ fn build_terms_pattern(terms: &[Expr]) -> Result<String> {
 ///
 ///
 fn create_temp_var(literal: bool) -> String {
-    let random_name = rand::thread_rng()
-        .sample_iter(&Alphanumeric)
+    let mut rng = rand::thread_rng();
+    let identifier: String = iter::repeat(())
+        .map(|()| rng.sample(Alphanumeric))
+        .map(char::from)
         .take(5)
-        .collect::<String>()
-        .to_lowercase();
+        .collect();
 
     if literal {
-        random_name
+        identifier
     } else {
-        format!("_{}", random_name)
+        format!("_{}", identifier)
     }
 }
 

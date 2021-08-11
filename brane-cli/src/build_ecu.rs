@@ -113,7 +113,7 @@ fn generate_package_info(container_info: &ContainerInfo) -> Result<PackageInfo> 
         container_info.description.clone().unwrap_or_default(),
         container_info.entrypoint.kind == *"service",
         String::from("ecu"),
-        vec!(),
+        vec![],
         Some(functions),
         container_info.types.clone(),
     );

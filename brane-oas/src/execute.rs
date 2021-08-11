@@ -2,10 +2,11 @@ use crate::{build, resolver};
 use anyhow::Result;
 use backoff::{retry, Error, ExponentialBackoff};
 use cookie::Cookie as RawCookie;
-use cookie_store::{Cookie, CookieStore, CookieStoreRwLock};
+use cookie_store::{Cookie, CookieStore};
 use openapiv3::{OpenAPI, Operation, Parameter as OParameter, ReferenceOr, SecurityScheme};
+use reqwest::blocking::RequestBuilder;
 use reqwest::Url;
-use reqwest::blocking::{RequestBuilder};
+use reqwest_cookie_store::CookieStoreRwLock;
 use specifications::common::Value;
 use std::{collections::HashMap, sync::Arc};
 
@@ -32,11 +33,11 @@ pub async fn execute(
     }
 
     let components = oas_document.components.clone();
-    let (path, method, operation) = get_operation(operation_id, &oas_document)?;
+    let (path, method, operation) = get_operation(operation_id, oas_document)?;
 
     // Prioritize server:
     // 1. argument
-    // 2. operation 
+    // 2. operation
     // 3. path
     // 4. global (document)
     let base_url: Url = arguments
@@ -91,7 +92,7 @@ pub async fn execute(
     }
 
     // Determine input from security schemes.
-    if let Some(security_scheme) = &operation.security.first() {
+    if let Some(Some(security_scheme)) = &operation.security.map(|s| s.first().cloned()) {
         if let Some(security_scheme) = security_scheme.keys().next() {
             let item = ReferenceOr::Reference::<SecurityScheme> {
                 reference: format!("#/components/schemas/{}", security_scheme),

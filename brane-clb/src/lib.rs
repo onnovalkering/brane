@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate log;
 
-#[cfg(feature = "default")]
 pub mod callback;
 pub mod interface;
 

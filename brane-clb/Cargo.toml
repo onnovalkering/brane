@@ -13,13 +13,10 @@ env_logger = "0.9"
 futures = "0.3"
 log = "0.4"
 prost = "0.8"
-rdkafka = { version = "0.26", features = ["cmake-build"], optional = true }
-time = "0.2"
+rdkafka = { version = "0.26", features = ["cmake-build"] }
+time = "0.3"
 tokio = { version = "1", features = ["full"] }
 tonic = "0.5"
-
-[features]
-default = ["rdkafka"]
 
 [build-dependencies]
 tonic-build = "0.5"
