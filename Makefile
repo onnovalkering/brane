@@ -17,31 +17,27 @@ build-services: \
 	build-api-image \
 	build-clb-image \
 	build-drv-image \
-	build-ide-image \
 	build-job-image \
 	build-log-image \
 	build-plr-image
 
 build-api-image:
-	docker build -t brane_brane-api -f Dockerfile.api .
+	docker build --load -t brane_brane-api -f Dockerfile.api .
 
 build-clb-image:
-	docker build -t brane_brane-clb -f Dockerfile.clb .
+	docker build --load -t brane_brane-clb -f Dockerfile.clb .
 
 build-drv-image:
-	docker build -t brane_brane-drv -f Dockerfile.drv .
-
-build-ide-image:
-	docker build -t brane_brane-ide -f Dockerfile.ide .
+	docker build --load -t brane_brane-drv -f Dockerfile.drv .
 
 build-job-image:
-	docker build -t brane_brane-job -f Dockerfile.job .
+	docker build --load -t brane_brane-job -f Dockerfile.job .
 
 build-log-image:
-	docker build -t brane_brane-log -f Dockerfile.log .
+	docker build --load -t brane_brane-log -f Dockerfile.log .
 
 build-plr-image:
-	docker build -t brane_brane-plr -f Dockerfile.plr .
+	docker build --load -t brane_brane-plr -f Dockerfile.plr .
 
 # Development setup
 start-instance: \

@@ -1,5 +1,6 @@
-FROM rust:1.52 as build
+FROM rust:1 as build
 
+# Can be removed if `xenon-rs` disables formatting for `tonic_build`.
 RUN rustup component add rustfmt
 
 RUN apt-get update && apt-get install -y \

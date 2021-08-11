@@ -1,24 +1,16 @@
-FROM rust:1.52 as build
+FROM rust:1 as build
 
 RUN apt-get update && apt-get install -y \
     cmake \
  && rm -rf /var/lib/apt/lists/*
 
-RUN USER=root cargo new --bin brane-api
+# Copy over relevant crates
+COPY ./brane-api ./brane-api
+COPY ./specifications ./specifications
+
+# Build an optimized binary
 WORKDIR /brane-api
-
-# Copy over project manifests
-COPY ./brane-api/Cargo.toml ./Cargo.toml
-COPY ./specifications /specifications
-
-# This will prepare dependencies
 RUN cargo build --release
-RUN rm src/*.rs
-
-# Copy over project source code
-COPY ./brane-api/migrations ./migrations
-COPY ./brane-api/src ./src
-COPY ./brane-api/diesel.toml ./diesel.toml
 
 # This will build a release binary
 RUN rm ./target/release/deps/brane_api*
@@ -29,10 +21,7 @@ FROM ubuntu:20.04
 
 RUN apt-get update && apt-get install -y \
     gnupg2 \
-    libpq-dev \
-    libssl-dev \
-    openssh-client \
-    sshpass \
+    libssl1.1 \
     wget \
  && rm -rf /var/lib/apt/lists/*
 
@@ -43,7 +32,7 @@ RUN . /etc/os-release \
  && apt-get install -y skopeo \
  && rm -rf /var/lib/apt/lists/*
 
-# Copy the release binary from the build stage
+# Copy `brane-api` from build stage
 COPY --from=build /brane-api/target/release/brane-api .
 
-CMD ["./brane-api"]
+ENTRYPOINT [ "./brane-api" ]
