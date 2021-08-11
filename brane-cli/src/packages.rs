@@ -10,7 +10,7 @@ use console::{pad_str, Alignment};
 use dialoguer::Confirm;
 use futures_util::stream::TryStreamExt;
 use hyper::Body;
-use indicatif::HumanDuration;
+use indicatif::{DecimalBytes, HumanDuration};
 use prettytable::format::FormatBuilder;
 use prettytable::Table;
 use semver::Version;
@@ -18,6 +18,7 @@ use serde_json::json;
 use specifications::package::PackageIndex;
 use specifications::package::PackageInfo;
 use std::fs;
+use fs_extra::dir;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::fs::File as TFile;
@@ -145,7 +146,7 @@ pub fn list() -> Result<()> {
 
     let mut table = Table::new();
     table.set_format(format);
-    table.add_row(row!["ID", "NAME", "VERSION", "KIND", "CREATED"]);
+    table.add_row(row!["ID", "NAME", "VERSION", "KIND", "CREATED", "SIZE"]);
 
     // Add a row to the table for each version of each group.
     let packages = fs::read_dir(packages_dir)?;
@@ -176,8 +177,9 @@ pub fn list() -> Result<()> {
                 let elapsed = Duration::from_secs((now - package_info.created.timestamp()) as u64);
                 let created = format!("{} ago", HumanDuration(elapsed));
                 let created = pad_str(&created, 15, Alignment::Left, None);
+                let size = DecimalBytes(dir::get_size(path)?);
 
-                table.add_row(row![id, name, version, kind, created]);
+                table.add_row(row![id, name, version, kind, created, size]);
             }
         }
     }
