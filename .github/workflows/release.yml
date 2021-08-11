@@ -70,7 +70,7 @@ jobs:
       - name: Get Github tag
         id: meta
         run: |
-          echo "::set-output name=tag::${GITHUB_REF#"refs/tags/v"}
+          echo "::set-output name=tag::${GITHUB_REF#'refs/tags/v'}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
