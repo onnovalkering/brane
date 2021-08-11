@@ -2,6 +2,29 @@
 
 All notable changes to the Brane framework will be documented in this file.
 
+## [0.4.0] - 2021-08-11
+### Added
+- BraneScript, an alternative to Bakery with more a C-like syntax.
+- GraphQL endpoint for querying application event logs, including subscriptions.
+- Initial support for proxies and bridge functions: `brane-net`.
+- Allow checkout folder name to be different than 'brane' (by [romnn](https://github.com/romnn)).
+- Automated (daily) audits and multi-platform builds using GitHub actions.
+- Optional flag to keep temporary package build files.
+- Automatically add `token` and `server` arguments for OAS functions. 
+
+## Changed
+- Use seperate service for scheduling functions: `brane-job`.
+- Use seperate library for OpenAPI support: `brane-oas`.
+- REPL is now based on the `rustyline` library.
+- Use gRPC for drivers (REPL and Jupyter kernel).
+- Switched from Cassandra to ScyllaDB, and removed PostgreSQL dependency.
+- DSL implementation is based on parser combinatorics, with `nom`.
+- Switched from `actix` to `warp` as the framework for `brane-api`.
+
+## Fixed
+- Minor fixes for the word count quickstart.
+- Correctly convert between DSL values and specification values.
+
 ## [0.3.0] - 2021-03-03
 ### Added
 - Generate convenience function for CWL workflows with a single required parameter.
