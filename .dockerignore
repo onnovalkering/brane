@@ -1,12 +1,8 @@
 .github/
-brane-api/packages
-brane-api/temporary
 brane-ide/extensions/js9/node_modules
 brane-ide/extensions/registry/node_modules
 brane-ide/extensions/renderer/node_modules
 brane-ide/extensions/vault/node_modules
 brane-let/
-brane-log/target
 examples/
 target/
-contrib/datastax/cpp-driver/build/
