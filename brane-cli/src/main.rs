@@ -34,6 +34,8 @@ enum SubCommand {
         kind: Option<String>,
         #[structopt(short, long, help = "Path to the init binary to use (override Brane's binary)")]
         init: Option<PathBuf>,
+        #[structopt(long, help = "Don't delete build files")]
+        keep_files: bool,
     },
 
     #[structopt(name = "import", about = "Import a package")]
@@ -204,6 +206,7 @@ async fn run(options: Cli) -> Result<()> {
             file,
             kind,
             init,
+            keep_files,
         } => {
             let kind = if let Some(kind) = kind {
                 kind.to_lowercase()
@@ -212,8 +215,8 @@ async fn run(options: Cli) -> Result<()> {
             };
 
             match kind.as_str() {
-                "ecu" => build_ecu::handle(context, file, init).await?,
-                "oas" => build_oas::handle(context, file, init).await?,
+                "ecu" => build_ecu::handle(context, file, init, keep_files).await?,
+                "oas" => build_oas::handle(context, file, init, keep_files).await?,
                 _ => println!("Unsupported package kind: {}", kind),
             }
         }
@@ -246,8 +249,8 @@ async fn run(options: Cli) -> Result<()> {
             };
 
             match kind.as_str() {
-                "ecu" => build_ecu::handle(context, file, init).await?,
-                "oas" => build_oas::handle(context, file, init).await?,
+                "ecu" => build_ecu::handle(context, file, init, false).await?,
+                "oas" => build_oas::handle(context, file, init, false).await?,
                 _ => println!("Unsupported package kind: {}", kind),
             }
         }

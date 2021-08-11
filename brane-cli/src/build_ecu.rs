@@ -29,6 +29,7 @@ pub async fn handle(
     context: PathBuf,
     file: PathBuf,
     branelet_path: Option<PathBuf>,
+    keep_files: bool,
 ) -> Result<()> {
     let context = fs::canonicalize(context)?;
     debug!("Using {:?} as build context", context);
@@ -71,7 +72,8 @@ pub async fn handle(
         let image_name = format!("localhost:5000/library/{}", image_name);
         docker::remove_image(&image_name).await?;
 
-        fs::remove_file(package_dir.join(".lock")).context("Failed to delete '.lock' file in package directory.")?;
+        // Remove all non-essential files.
+        clean_directory(&package_dir, keep_files)?;
     } else {
         println!(
             "Failed to built version {} of container (ECU) package {}. See error output above.",
@@ -289,6 +291,28 @@ fn prepare_directory(
 
     if !output.status.success() {
         warn!("Failed to cleanup working directory.");
+    }
+
+    Ok(())
+}
+
+///
+///
+///
+fn clean_directory(package_dir: &Path, keep_files: bool) -> Result<()> {
+    fs::remove_file(&package_dir.join(".lock")).context("Failed to delete '.lock' file inside package directory")?;
+    if keep_files {
+        return Ok(());
+    }
+
+    let files = ["container.yml", "Dockerfile", "wd.tar.gz"];
+    for file in files {
+        let file = package_dir.join(file);
+        if file.exists() {
+            if let Err(e) = fs::remove_file(&file) {
+                warn!("Failed to delete file '{:?}' as part of cleanup: {:?}", file, e);
+            }
+        }
     }
 
     Ok(())
