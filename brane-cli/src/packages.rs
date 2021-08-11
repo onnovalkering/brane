@@ -227,18 +227,24 @@ pub async fn load(
         stream: Some(stream), ..
     }) = result.first()
     {
+        debug!("{}", stream);
+
         let (_, image_hash) = stream
             .trim()
             .split_once("sha256:")
-            .expect("Expected image hash in load output.");
-        debug!("Imported image: {}", image_hash);
+            .unwrap_or_default();
 
-        let options = TagImageOptions {
-            repo: &package_info.name,
-            tag: &package_info.version,
-        };
+        // Manually add tag to image, if not specified.
+        if !image_hash.is_empty() {
+            debug!("Imported image: {}", image_hash);
 
-        docker.tag_image(image_hash, Some(options)).await?;
+            let options = TagImageOptions {
+                repo: &package_info.name,
+                tag: &package_info.version,
+            };
+    
+            docker.tag_image(image_hash, Some(options)).await?;
+        }
     }
 
     Ok(())
