@@ -299,7 +299,10 @@ fn prepare_directory(
 ///
 ///
 ///
-fn clean_directory(package_dir: &Path, keep_files: bool) -> Result<()> {
+fn clean_directory(
+    package_dir: &Path,
+    keep_files: bool,
+) -> Result<()> {
     fs::remove_file(&package_dir.join(".lock")).context("Failed to delete '.lock' file inside package directory")?;
     if keep_files {
         return Ok(());

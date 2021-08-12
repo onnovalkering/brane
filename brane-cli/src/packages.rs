@@ -8,6 +8,7 @@ use bollard::Docker;
 use chrono::Utc;
 use console::{pad_str, Alignment};
 use dialoguer::Confirm;
+use fs_extra::dir;
 use futures_util::stream::TryStreamExt;
 use hyper::Body;
 use indicatif::{DecimalBytes, HumanDuration};
@@ -18,7 +19,6 @@ use serde_json::json;
 use specifications::package::PackageIndex;
 use specifications::package::PackageInfo;
 use std::fs;
-use fs_extra::dir;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::fs::File as TFile;
@@ -231,10 +231,7 @@ pub async fn load(
     {
         debug!("{}", stream);
 
-        let (_, image_hash) = stream
-            .trim()
-            .split_once("sha256:")
-            .unwrap_or_default();
+        let (_, image_hash) = stream.trim().split_once("sha256:").unwrap_or_default();
 
         // Manually add tag to image, if not specified.
         if !image_hash.is_empty() {
@@ -244,7 +241,7 @@ pub async fn load(
                 repo: &package_info.name,
                 tag: &package_info.version,
             };
-    
+
             docker.tag_image(image_hash, Some(options)).await?;
         }
     }

@@ -210,12 +210,15 @@ fn prepare_directory(
 ///
 ///
 ///
-fn clean_directory(package_dir: &Path, keep_files: bool) -> Result<()> {
+fn clean_directory(
+    package_dir: &Path,
+    keep_files: bool,
+) -> Result<()> {
     fs::remove_file(&package_dir.join(".lock")).expect("Failed to delete '.lock' file inside package directory");
     if keep_files {
         return Ok(());
     }
-    
+
     let files = ["Dockerfile", "wd.tar.gz"];
     for file in files {
         let file = package_dir.join(file);
