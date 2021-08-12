@@ -27,13 +27,8 @@ use tonic::transport::Server;
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
-    #[clap(
-        short,
-        long,
-        default_value = "http://brane-api:8080/packages",
-        env = "PACKAGE_INDEX_URL"
-    )]
-    package_index_url: String,
+    #[clap(short, long, default_value = "http://brane-api:8080/graphql", env = "GRAPHQL_URL")]
+    graphql_url: String,
     #[clap(short, long, default_value = "127.0.0.1:50053", env = "ADDRESS")]
     /// Service address
     address: String,
@@ -99,11 +94,11 @@ async fn main() -> Result<()> {
         locations.clone(),
     ));
 
-    let package_index_url = opts.package_index_url.clone();
+    let graphql_url = opts.graphql_url.clone();
     let sessions: Arc<DashMap<String, VmState>> = Arc::new(DashMap::new());
     let handler = DriverHandler {
         command_topic,
-        package_index_url,
+        graphql_url,
         producer,
         results,
         sessions,

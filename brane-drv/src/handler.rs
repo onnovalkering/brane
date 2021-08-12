@@ -1,4 +1,4 @@
-use crate::grpc;
+use crate::{grpc, packages};
 use anyhow::Result;
 use async_trait::async_trait;
 use brane_bvm::vm::{VmOptions, VmState};
@@ -17,7 +17,6 @@ use rdkafka::{
     util::Timeout,
 };
 use specifications::common::{FunctionExt, Value};
-use specifications::package::PackageIndex;
 use std::sync::Arc;
 use std::{collections::HashMap, time::Duration};
 use tokio::sync::mpsc;
@@ -28,7 +27,7 @@ use uuid::Uuid;
 #[derive(Clone)]
 pub struct DriverHandler {
     pub command_topic: String,
-    pub package_index_url: String,
+    pub graphql_url: String,
     pub producer: FutureProducer,
     pub results: Arc<DashMap<String, Value>>,
     pub sessions: Arc<DashMap<String, VmState>>,
@@ -62,7 +61,7 @@ impl grpc::DriverService for DriverHandler {
         request: Request<grpc::ExecuteRequest>,
     ) -> Result<Response<Self::ExecuteStream>, Status> {
         let request = request.into_inner();
-        let package_index = PackageIndex::from_url(&self.package_index_url).await.unwrap();
+        let package_index = packages::get_package_index(&self.graphql_url).await.unwrap();
         let sessions = self.sessions.clone();
 
         let executor = JobExecutor {

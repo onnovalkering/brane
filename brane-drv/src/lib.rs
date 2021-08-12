@@ -2,6 +2,7 @@
 extern crate anyhow;
 
 pub mod handler;
+pub mod packages;
 
 pub mod grpc {
     tonic::include_proto!("driver");

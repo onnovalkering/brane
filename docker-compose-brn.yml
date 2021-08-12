@@ -9,12 +9,10 @@ services:
       - "127.0.0.1:8080:8080"
     restart: always
     environment:
-        HOST: "0.0.0.0"
-        BROKERS: "kafka:29092"
         ADDRESS: "0.0.0.0:8080"
-        SCYLLA: "scylla:9042"
-        CALLBACK_TOPIC: "clb"
+        BROKERS: "kafka:29092"
         DEBUG: "true"
+        SCYLLA: "scylla:9042"
 
   brane-clb:
     build:
@@ -42,9 +40,8 @@ services:
         ADDRESS: "0.0.0.0:50053"
         BROKERS: "kafka:29092"
         COMMAND_TOPIC: drv-cmd
-        EVENT_TOPIC: job-evt
         DEBUG: "true"
-        PACKAGE_INDEX_URL: http://brane-api:8080/packages
+        EVENT_TOPIC: job-evt
 
   brane-job:
     build:
@@ -59,8 +56,8 @@ services:
         BROKERS: "kafka:29092"
         CALLBACK_TOPIC: clb
         COMMAND_TOPIC: plr-cmd
-        EVENT_TOPIC: job-evt
         DEBUG: "true"
+        EVENT_TOPIC: job-evt
         XENON: "xenon:50051"
 
   brane-log:
@@ -72,8 +69,9 @@ services:
     restart: always
     environment:
         BROKERS: "kafka:29092"
+        DEBUG: "true"
         EVENT_TOPIC: job-evt
-        SCYLLA: scylla
+        SCYLLA: "scylla:9042"
 
   brane-plr:
     build:

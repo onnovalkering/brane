@@ -147,7 +147,13 @@ impl PackageIndex {
     ///
     pub fn from_value(v: JValue) -> Result<Self> {
         let known_packages: Vec<PackageInfo> = serde_json::from_value(v)?;
+        PackageIndex::from_packages(known_packages)
+    }
 
+    ///
+    ///
+    ///
+    pub fn from_packages(known_packages: Vec<PackageInfo>) -> Result<Self> {
         let mut packages = Map::<PackageInfo>::new();
         let mut versions = Map::<Vec<Version>>::new();
         for package in known_packages {
