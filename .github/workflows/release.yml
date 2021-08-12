@@ -150,6 +150,6 @@ jobs:
         with:
           args: |
             artifacts/darwin/brane-darwin
-            artifacts/linux/brane-linux
-            artifacts/linux/branelet
+            artifacts/linux/release/brane-linux
+            artifacts/linux/x86_64-unknown-linux-musl/release/branelet
 
