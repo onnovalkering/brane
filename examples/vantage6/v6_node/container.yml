@@ -34,6 +34,9 @@ actions:
       - name: api_key
         type: string
 
+      - name: data_path
+        type: string
+
       - name: server_host
         type: string
 

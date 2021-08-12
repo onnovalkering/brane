@@ -2,17 +2,23 @@ import v6_client;
 import v6_node;
 import v6_server;
 
+// Start a Vantage6 server.
 let server := start_server(5000);
 server.waitUntilStarted();
 
 let server_url := "http://" + server.address + ":5000";
 
-let session := login("admin", "password", server_url);
+// Authenticate with the server.
+let session := login("root", "root", server_url);
 let token := session.access_token;
 
-let collaboration := create_collaboration("collab", "1", server_url, token);
-let node_info := create_node(collaboration.id, server_url, token);
+// Retreive information about the nodes.
+let nodes := get_nodes(server_url, token);
 
-let node := start_node(node_info.api_key, server.address, 5000);
-node.waitUntilStarted();
+// Start the first Vantage6 node.
+let node1 := start_node(nodes[0].api_key, "/data/data.csv", server.address, 5000);
+node1.waitUntilStarted();
 
+// Start the second Vantage6 node.
+let node2 := start_node(nodes[1].api_key, "/data/data.csv", server.address, 5000);
+node2.waitUntilStarted();

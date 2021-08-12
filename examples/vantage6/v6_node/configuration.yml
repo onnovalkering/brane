@@ -2,7 +2,7 @@ application:
   api_key: PLC_API_KEY
   api_path: /api
   databases:
-    default: ''
+    default: PLC_DATA_PATH
   encryption:
     enabled: false
     private_key: ''

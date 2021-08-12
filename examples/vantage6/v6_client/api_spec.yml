@@ -71,15 +71,74 @@ paths:
                 - collaboration_id
               properties:
                 collaboration_id:
-                  type: integer   
+                  type: integer
       responses:
         "200":
           description: OK, created node
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/Node"               
-                      
+                "$ref": "#/components/schemas/Node"
+
+  "/api/user":
+    get:
+      operationId: get_users
+      responses:
+        "200":
+          description: OK, array of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/UserList"
+      security:
+        - bearerAuth: []
+    post:
+      operationId: create_user
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - firstname
+                - lastname
+                - organization
+                - password
+                - rules
+                - username
+              properties:
+                email:
+                  type: string
+                firstname:
+                  type: string
+                lastname:
+                  type: string
+                organization:
+                  type: array
+                  items:
+                    "$ref": "#/components/schemas/UserOrgRef"
+                password:
+                  type: string
+                rules:
+                  type: array
+                  items:
+                    type: integer
+                username:
+                  type: string
+      responses:
+        "201":
+          description: OK, created user
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/UserList"
+
+
   "/api/token/user":
     post:
       operationId: login
@@ -109,9 +168,91 @@ paths:
                     type: string
                   user_url:
                     type: string
+                    
+  "/api/task":
+    get:
+      operationId: getTasks
+      responses:
+        "200":
+          description: OK, array of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/Task"
+      security:
+        - bearerAuth: []
+    post:
+      operationId: createTask
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - description
+                - collaboration_id
+                - image
+                - name
+                - organizations
+              properties:
+                description:
+                  type: string
+                collaboration_id:
+                  type: integer
+                image:
+                  type: string
+                name:
+                  type: string
+                organizations:
+                  type: array
+                  items:
+                    "$ref": "#/components/schemas/TaskOrganizations"
+      responses:
+        "200":
+          description: OK, task created
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CreateTaskOutput"
+                
 
+  "/api/task/{id}/result":
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: task id
+        schema:
+          type: integer
+      operationId: getTaskResult
+      responses:
+        "200":
+          description: OK, array of result
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/Result"
+      security:
+        - bearerAuth: []
+    
 components:
   schemas:
+    TaskOrganizations:
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        input:
+          type: string
+          
     Collaboration:
       properties:
         id:
@@ -121,10 +262,76 @@ components:
         encrypted:
           type: boolean
 
+    User:
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    Task:
+      properties:
+        name:
+          type: string
+        id:
+          type: integer
+        description:
+          type: string
+        image: 
+          type: string
+        complete:
+          type: string
+    
+    Result:
+      properties:
+        id: 
+          type: integer
+        input:
+          type: string
+        result:
+          type: string
+        log:
+          type: string
+        organization:
+          type: string
+        task:
+          type: string
+    
+    CollaborationRef:
+      properties:
+        id:
+          type: integer
+    
+    ResultRef:
+      properties:
+        id:
+          type: integer
+          
+    CreateTaskOutput:
+      properties:
+        collaboration:
+          "$ref": "#/components/schemas/CollaborationRef"
+        id:
+          type: integer
+        complete:
+          type: boolean
+        description:
+          type: string
+        image:
+          type: string
+        name:
+          type: string
+        run_id:
+          type: integer
+        results:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ResultRef"
+        
     Node:
       properties:
         api_key:
-          type: string      
+          type: string
         id:
           type: integer
         ip:
@@ -133,14 +340,20 @@ components:
           type: string
         type:
           type: string
-        
-    User:
-      properties:
-        username:
-          type: string
-        password:
-          type: string
 
+    UserList:
+      properties:
+        firstname:
+          type: string
+        id:
+          type: integer
+
+
+    UserOrgRef:
+      properties:
+        id:
+          type: integer
+      
   securitySchemes:
     bearerAuth:
       type: http
