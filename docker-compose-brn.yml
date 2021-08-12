@@ -11,6 +11,8 @@ services:
     environment:
         HOST: "0.0.0.0"
         BROKERS: "kafka:29092"
+        ADDRESS: "0.0.0.0:8080"
+        SCYLLA: "scylla:9042"
         CALLBACK_TOPIC: "clb"
         DEBUG: "true"
 
