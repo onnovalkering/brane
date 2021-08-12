@@ -134,6 +134,9 @@ jobs:
       - build-linux-binaries
       - build-services
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        
       - name: Download artifacts
         uses: actions/download-artifact@v2
         with:
