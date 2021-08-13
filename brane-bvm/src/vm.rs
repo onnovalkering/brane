@@ -208,7 +208,7 @@ where
         let handle = self.heap.insert(function).into_handle();
 
         self.stack.push_object(handle);
-        self.call(0);
+        self.call(0).await;
         self.run().await;
 
         // For REPLs
@@ -235,7 +235,7 @@ where
         let handle = self.heap.insert(function).into_handle();
 
         self.stack.push_object(handle);
-        self.call(0);
+        self.call(0).await;
         self.run().await;
 
         if self.stack.len() == 1 {
@@ -248,7 +248,7 @@ where
     ///
     ///
     ///
-    fn call(
+    async fn call(
         &mut self,
         arity: u8,
     ) {
@@ -257,7 +257,10 @@ where
 
         let function = self.stack.get(frame_first).as_object().expect("");
         if let Some(Object::Function(_f)) = self.heap.get(function) {
-            println!("{}", _f.chunk.disassemble().unwrap());
+            self.executor
+                .debug(_f.chunk.disassemble().unwrap().to_string())
+                .await
+                .unwrap();
 
             let frame = CallFrame::new(function, frame_first);
             self.frames.push(frame);
@@ -325,7 +328,7 @@ where
                 }
             }
 
-            // println!("{}", self.stack);
+            self.executor.debug(format!("{}", self.stack)).await.unwrap();
         }
 
         None
@@ -445,7 +448,7 @@ where
             Slot::Object(handle) => match self.heap.get(handle).expect("") {
                 Object::Function(_) => {
                     // Execution is handled through call frames.
-                    self.call(arity);
+                    self.call(arity).await;
                     return;
                 }
                 Object::FunctionExt(f) => {

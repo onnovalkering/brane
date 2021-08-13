@@ -19,7 +19,7 @@ use rdkafka::{
 use specifications::common::{FunctionExt, Value};
 use std::sync::Arc;
 use std::{collections::HashMap, time::Duration};
-use tokio::sync::mpsc;
+use tokio::sync::mpsc::{self, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
@@ -64,7 +64,11 @@ impl grpc::DriverService for DriverHandler {
         let package_index = packages::get_package_index(&self.graphql_url).await.unwrap();
         let sessions = self.sessions.clone();
 
+        // Prepare gRPC stream between client and (this) driver.
+        let (tx, rx) = mpsc::channel::<Result<grpc::ExecuteReply, Status>>(10);
+
         let executor = JobExecutor {
+            client_tx: tx.clone(),
             command_topic: self.command_topic.clone(),
             producer: self.producer.clone(),
             session_uuid: request.uuid.clone(),
@@ -77,23 +81,13 @@ impl grpc::DriverService for DriverHandler {
         let vm_state = sessions.get(&request.uuid).as_deref().cloned();
         dbg!(&vm_state);
 
-        let (tx, rx) = mpsc::channel::<Result<grpc::ExecuteReply, Status>>(10);
         tokio::spawn(async move {
             let options = CompilerOptions::new(Lang::BraneScript);
             let mut compiler = Compiler::new(options, package_index.clone());
 
             // Compile input and send update to client.
             let function = match compiler.compile(request.input) {
-                Ok(function) => {
-                    let reply = grpc::ExecuteReply {
-                        output: String::new(),
-                        bytecode: String::from("TODO"),
-                        close: false,
-                    };
-
-                    tx.send(Ok(reply)).await.unwrap();
-                    function
-                }
+                Ok(function) => function,
                 Err(error) => {
                     let status = Status::invalid_argument(error.to_string());
                     tx.send(Err(status)).await.unwrap();
@@ -124,6 +118,7 @@ impl grpc::DriverService for DriverHandler {
 
 #[derive(Clone)]
 struct JobExecutor {
+    pub client_tx: Sender<Result<grpc::ExecuteReply, Status>>,
     pub command_topic: String,
     pub producer: FutureProducer,
     pub session_uuid: String,
@@ -152,6 +147,9 @@ impl JobExecutor {
 
 #[async_trait]
 impl VmExecutor for JobExecutor {
+    ///
+    ///
+    ///
     async fn call(
         &self,
         function: FunctionExt,
@@ -230,6 +228,66 @@ impl VmExecutor for JobExecutor {
 
             Ok(call.await)
         }
+    }
+
+    ///
+    ///
+    ///
+    async fn debug(
+        &self,
+        text: String,
+    ) -> Result<()> {
+        let reply = grpc::ExecuteReply {
+            close: false,
+            debug: Some(text),
+            stderr: None,
+            stdout: None,
+        };
+
+        self.client_tx.send(Ok(reply)).await.map(|_| ()).map_err(|e| {
+            error!("{:?}", e);
+            anyhow!("Failed to send gRPC (print) message to client.")
+        })
+    }
+
+    ///
+    ///
+    ///
+    async fn stderr(
+        &self,
+        text: String,
+    ) -> Result<()> {
+        let reply = grpc::ExecuteReply {
+            close: false,
+            debug: None,
+            stderr: Some(text),
+            stdout: None,
+        };
+
+        self.client_tx.send(Ok(reply)).await.map(|_| ()).map_err(|e| {
+            error!("{:?}", e);
+            anyhow!("Failed to send gRPC (print) message to client.")
+        })
+    }
+
+    ///
+    ///
+    ///
+    async fn stdout(
+        &self,
+        text: String,
+    ) -> Result<()> {
+        let reply = grpc::ExecuteReply {
+            close: false,
+            debug: None,
+            stderr: None,
+            stdout: Some(text),
+        };
+
+        self.client_tx.send(Ok(reply)).await.map(|_| ()).map_err(|e| {
+            error!("{:?}", e);
+            anyhow!("Failed to send gRPC (print) message to client.")
+        })
     }
 
     ///

@@ -125,6 +125,39 @@ impl VmExecutor for DockerExecutor {
     ///
     ///
     ///
+    async fn debug(
+        &self,
+        text: String,
+    ) -> Result<()> {
+        debug!("{}", text);
+        Ok(())
+    }
+
+    ///
+    ///
+    ///
+    async fn stderr(
+        &self,
+        text: String,
+    ) -> Result<()> {
+        eprintln!("{}", text);
+        Ok(())
+    }
+
+    ///
+    ///
+    ///
+    async fn stdout(
+        &self,
+        text: String,
+    ) -> Result<()> {
+        println!("{}", text);
+        Ok(())
+    }
+
+    ///
+    ///
+    ///
     async fn wait_until(
         &self,
         name: String,

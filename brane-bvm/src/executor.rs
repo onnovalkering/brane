@@ -13,6 +13,9 @@ pub enum ServiceState {
 
 #[async_trait]
 pub trait VmExecutor {
+    ///
+    ///
+    ///
     async fn call(
         &self,
         call: FunctionExt,
@@ -20,6 +23,33 @@ pub trait VmExecutor {
         location: Option<String>,
     ) -> Result<Value>;
 
+    ///
+    ///
+    ///
+    async fn debug(
+        &self,
+        text: String,
+    ) -> Result<()>;
+
+    ///
+    ///
+    ///
+    async fn stderr(
+        &self,
+        text: String,
+    ) -> Result<()>;
+
+    ///
+    ///
+    ///
+    async fn stdout(
+        &self,
+        text: String,
+    ) -> Result<()>;
+
+    ///
+    ///
+    ///
     async fn wait_until(
         &self,
         service: String,
@@ -38,6 +68,9 @@ impl Default for NoExtExecutor {
 
 #[async_trait]
 impl VmExecutor for NoExtExecutor {
+    ///
+    ///
+    ///
     async fn call(
         &self,
         _: FunctionExt,
@@ -47,6 +80,45 @@ impl VmExecutor for NoExtExecutor {
         bail!("External function calls not supported.");
     }
 
+    ///
+    ///
+    ///
+    async fn debug(
+        &self,
+        text: String,
+    ) -> Result<()> {
+        debug!("{}", text);
+
+        Ok(())
+    }
+
+    ///
+    ///
+    ///
+    async fn stderr(
+        &self,
+        text: String,
+    ) -> Result<()> {
+        eprintln!("{}", text);
+
+        Ok(())
+    }
+
+    ///
+    ///
+    ///
+    async fn stdout(
+        &self,
+        text: String,
+    ) -> Result<()> {
+        println!("{}", text);
+
+        Ok(())
+    }
+
+    ///
+    ///
+    ///
     async fn wait_until(
         &self,
         _: String,

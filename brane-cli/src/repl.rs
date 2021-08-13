@@ -226,11 +226,16 @@ async fn remote_repl(
                 while let message = stream.message().await {
                     match message {
                         Ok(Some(reply)) => {
-                            if !reply.bytecode.is_empty() {
-                                debug!("\n{}", reply.bytecode);
+                            if let Some(debug) = reply.debug {
+                                debug!("{}", debug);
                             }
-                            if !reply.output.is_empty() {
-                                println!("{}", reply.output);
+
+                            if let Some(stdout) = reply.stdout {
+                                println!("{}", stdout);
+                            }
+
+                            if let Some(stderr) = reply.stderr {
+                                eprintln!("{}", stderr);
                             }
 
                             if reply.close {

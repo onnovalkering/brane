@@ -27,7 +27,7 @@ use tonic::transport::Server;
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
-    #[clap(short, long, default_value = "http://brane-api:8080/graphql", env = "GRAPHQL_URL")]
+    #[clap(long, default_value = "http://brane-api:8080/graphql", env = "GRAPHQL_URL")]
     graphql_url: String,
     #[clap(short, long, default_value = "127.0.0.1:50053", env = "ADDRESS")]
     /// Service address

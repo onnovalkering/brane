@@ -10,7 +10,7 @@ type DateTimeUtc = DateTime<Utc>;
 ///
 ///
 ///
-pub async fn get_package_index(graphql_endpoint: &String) -> Result<PackageIndex> {
+pub async fn get_package_index(graphql_endpoint: &str) -> Result<PackageIndex> {
     #[derive(GraphQLQuery)]
     #[graphql(
         schema_path = "src/graphql/api_schema.json",

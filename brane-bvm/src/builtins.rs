@@ -55,7 +55,10 @@ where
     match builtin {
         BUILTIN_PRINT_CODE => {
             let value = arguments.first().unwrap();
-            println!("{}", value);
+            let text = value.to_string();
+
+            // Delegate printing to executor.
+            executor.stdout(text).await.unwrap();
 
             Value::Unit
         }

@@ -19,6 +19,7 @@ message ExecuteRequest {
 
 message ExecuteReply {
     bool close = 1;
-    string output = 2;
-    string bytecode = 3;
+    optional string debug = 2;
+    optional string stderr = 3;
+    optional string stdout = 4;
 }
