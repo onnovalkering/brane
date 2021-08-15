@@ -26,15 +26,15 @@ struct Opts {
     #[clap(short, long, default_value = "127.0.0.1:8080", env = "ADDRESS")]
     /// Service address
     address: String,
-    /// Scylla endpoint
-    #[clap(short, long, default_value = "127.0.0.1:9042", env = "SCYLLA")]
-    scylla: String,
     /// Print debug info
     #[clap(short, long, env = "DEBUG", takes_value = false)]
     debug: bool,
     /// Print debug info
-    #[clap(short, long, default_value = "registry:5000", env = "REGISTRY")]
+    #[clap(short, long, default_value = "127.0.0.1:5000", env = "REGISTRY")]
     registry: String,
+    /// Scylla endpoint
+    #[clap(short, long, default_value = "127.0.0.1:9042", env = "SCYLLA")]
+    scylla: String,
 }
 
 #[derive(Clone)]

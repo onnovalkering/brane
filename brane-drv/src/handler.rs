@@ -1,25 +1,15 @@
+use crate::executor::JobExecutor;
 use crate::{grpc, packages};
 use anyhow::Result;
-use async_trait::async_trait;
-use brane_bvm::vm::{VmOptions, VmState};
-use brane_bvm::{executor::VmExecutor, vm::Vm};
+use brane_bvm::vm::{Vm, VmOptions, VmState};
 use brane_cfg::Infrastructure;
 use brane_dsl::{Compiler, CompilerOptions, Lang};
-use brane_job::interface::{Command, CommandKind};
-use bytes::BytesMut;
+use brane_shr::jobs::JobStatus;
 use dashmap::DashMap;
-use prost::Message as _;
-use rand::distributions::Alphanumeric;
-use rand::{self, Rng};
-use rdkafka::message::ToBytes;
-use rdkafka::{
-    producer::{FutureProducer, FutureRecord},
-    util::Timeout,
-};
-use specifications::common::{FunctionExt, Value};
+use rdkafka::producer::FutureProducer;
+use specifications::common::Value;
 use std::sync::Arc;
-use std::{collections::HashMap, time::Duration};
-use tokio::sync::mpsc::{self, Sender};
+use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
@@ -31,7 +21,7 @@ pub struct DriverHandler {
     pub producer: FutureProducer,
     pub results: Arc<DashMap<String, Value>>,
     pub sessions: Arc<DashMap<String, VmState>>,
-    pub states: Arc<DashMap<String, String>>,
+    pub states: Arc<DashMap<String, JobStatus>>,
     pub locations: Arc<DashMap<String, String>>,
     pub infra: Infrastructure,
 }
@@ -79,8 +69,6 @@ impl grpc::DriverService for DriverHandler {
         };
 
         let vm_state = sessions.get(&request.uuid).as_deref().cloned();
-        dbg!(&vm_state);
-
         tokio::spawn(async move {
             let options = CompilerOptions::new(Lang::BraneScript);
             let mut compiler = Compiler::new(options, package_index.clone());
@@ -97,8 +85,10 @@ impl grpc::DriverService for DriverHandler {
 
             // Restore VM state corresponding to the session, if any.
             let mut vm = if let Some(vm_state) = vm_state {
+                debug!("Restore VM with state:\n{:?}", vm_state);
                 Vm::new_with_state(executor, Some(package_index), vm_state)
             } else {
+                debug!("No VM state to restore, creating new VM.");
                 let options = VmOptions {
                     clear_after_main: true,
                     ..Default::default()
@@ -113,256 +103,5 @@ impl grpc::DriverService for DriverHandler {
         });
 
         Ok(Response::new(ReceiverStream::new(rx)))
-    }
-}
-
-#[derive(Clone)]
-struct JobExecutor {
-    pub client_tx: Sender<Result<grpc::ExecuteReply, Status>>,
-    pub command_topic: String,
-    pub producer: FutureProducer,
-    pub session_uuid: String,
-    pub states: Arc<DashMap<String, String>>,
-    pub results: Arc<DashMap<String, Value>>,
-    pub locations: Arc<DashMap<String, String>>,
-    pub infra: Infrastructure,
-}
-
-impl JobExecutor {
-    ///
-    ///
-    ///
-    fn get_random_identifier(&self) -> String {
-        let mut rng = rand::thread_rng();
-
-        let identifier: String = std::iter::repeat(())
-            .map(|()| rng.sample(Alphanumeric))
-            .map(char::from)
-            .take(6)
-            .collect();
-
-        identifier.to_lowercase()
-    }
-}
-
-#[async_trait]
-impl VmExecutor for JobExecutor {
-    ///
-    ///
-    ///
-    async fn call(
-        &self,
-        function: FunctionExt,
-        arguments: HashMap<String, Value>,
-        location: Option<String>,
-    ) -> Result<Value> {
-        let image = format!("{}:{}", function.package, function.version);
-        let command = vec![
-            function.kind.to_string(),
-            function.name.to_string(),
-            base64::encode(serde_json::to_string(&arguments)?),
-        ];
-
-        let session_uuid = Uuid::parse_str(&self.session_uuid)?;
-        let session_uuid_simple = session_uuid.to_simple().to_string();
-
-        let random_id = self.get_random_identifier();
-        let correlation_id = format!("A{}R{}", &session_uuid_simple[..8], random_id);
-
-        let command = Command::new(
-            CommandKind::Create,
-            Some(correlation_id.clone()),
-            Some(self.session_uuid.clone()),
-            location,
-            Some(image),
-            command,
-            None,
-        );
-
-        let mut payload = BytesMut::with_capacity(64);
-        command.encode(&mut payload)?;
-
-        let message = FutureRecord::to(&self.command_topic)
-            .key(&correlation_id)
-            .payload(payload.to_bytes());
-
-        dbg!(&message);
-
-        let timeout = Timeout::After(Duration::from_secs(5));
-        if self.producer.send(message, timeout).await.is_err() {
-            bail!("Failed to send command to '{}' topic.", self.command_topic);
-        }
-
-        if function.detached {
-            // Wait until "created" (address known ?)
-            let created = WaitUntil {
-                state: String::from("created"),
-                correlation_id: correlation_id.clone(),
-                states: self.states.clone(),
-            };
-
-            created.await;
-
-            let location = self
-                .locations
-                .get(&correlation_id)
-                .map(|s| s.clone())
-                .unwrap_or_default();
-            let location = self.infra.get_location_metadata(location)?;
-
-            let mut properties = HashMap::default();
-            properties.insert(String::from("identifier"), Value::Unicode(correlation_id));
-            properties.insert(String::from("address"), Value::Unicode(location.get_address()));
-
-            Ok(Value::Struct {
-                data_type: String::from("Service"),
-                properties,
-            })
-        } else {
-            // TODO: await value to be in states & results (perf).
-            let call = Call {
-                correlation_id,
-                states: self.states.clone(),
-                results: self.results.clone(),
-            };
-
-            Ok(call.await)
-        }
-    }
-
-    ///
-    ///
-    ///
-    async fn debug(
-        &self,
-        text: String,
-    ) -> Result<()> {
-        let reply = grpc::ExecuteReply {
-            close: false,
-            debug: Some(text),
-            stderr: None,
-            stdout: None,
-        };
-
-        self.client_tx.send(Ok(reply)).await.map(|_| ()).map_err(|e| {
-            error!("{:?}", e);
-            anyhow!("Failed to send gRPC (print) message to client.")
-        })
-    }
-
-    ///
-    ///
-    ///
-    async fn stderr(
-        &self,
-        text: String,
-    ) -> Result<()> {
-        let reply = grpc::ExecuteReply {
-            close: false,
-            debug: None,
-            stderr: Some(text),
-            stdout: None,
-        };
-
-        self.client_tx.send(Ok(reply)).await.map(|_| ()).map_err(|e| {
-            error!("{:?}", e);
-            anyhow!("Failed to send gRPC (print) message to client.")
-        })
-    }
-
-    ///
-    ///
-    ///
-    async fn stdout(
-        &self,
-        text: String,
-    ) -> Result<()> {
-        let reply = grpc::ExecuteReply {
-            close: false,
-            debug: None,
-            stderr: None,
-            stdout: Some(text),
-        };
-
-        self.client_tx.send(Ok(reply)).await.map(|_| ()).map_err(|e| {
-            error!("{:?}", e);
-            anyhow!("Failed to send gRPC (print) message to client.")
-        })
-    }
-
-    ///
-    ///
-    ///
-    async fn wait_until(
-        &self,
-        _service: String,
-        _state: brane_bvm::executor::ServiceState,
-    ) -> Result<()> {
-        Ok(())
-    }
-}
-
-struct Call {
-    correlation_id: String,
-    states: Arc<DashMap<String, String>>,
-    results: Arc<DashMap<String, Value>>,
-}
-
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
-impl Future for Call {
-    type Output = Value;
-
-    fn poll(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
-        let state = self.states.get(&self.correlation_id);
-        if state.is_none() {
-            cx.waker().wake_by_ref();
-            return Poll::Pending;
-        }
-
-        let state = state.unwrap().clone();
-        if state == *"finished" {
-            let (_, value) = self.results.remove(&self.correlation_id).unwrap();
-
-            self.states.remove(&self.correlation_id);
-            return Poll::Ready(value);
-        }
-
-        cx.waker().wake_by_ref();
-        Poll::Pending
-    }
-}
-
-struct WaitUntil {
-    state: String,
-    correlation_id: String,
-    states: Arc<DashMap<String, String>>,
-}
-
-impl Future for WaitUntil {
-    type Output = ();
-
-    fn poll(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
-        let state = self.states.get(&self.correlation_id);
-        if state.is_none() {
-            cx.waker().wake_by_ref();
-            return Poll::Pending;
-        }
-
-        let state = state.unwrap().clone();
-        if state == self.state {
-            return Poll::Ready(());
-        }
-
-        cx.waker().wake_by_ref();
-        Poll::Pending
     }
 }

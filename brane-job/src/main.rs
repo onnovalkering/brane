@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{bail, Context, Result};
 use brane_cfg::{Infrastructure, Secrets};
 use brane_job::{
@@ -8,6 +10,7 @@ use brane_job::{cmd_create, interface::Event};
 use brane_shr::utilities;
 use bytes::BytesMut;
 use clap::Clap;
+use dashmap::{lock::RwLock, DashMap};
 use dotenv::dotenv;
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
@@ -25,6 +28,7 @@ use rdkafka::{
     Message as KafkaMesage, Offset, TopicPartitionList,
 };
 use tokio::task::JoinHandle;
+use xenon::compute::Scheduler;
 
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
@@ -36,7 +40,7 @@ struct Opts {
     #[clap(short = 'o', long = "cmd-topic", default_value = "plr-cmd", env = "COMMAND_TOPIC")]
     command_topic: String,
     /// Kafka brokers
-    #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
+    #[clap(short, long, default_value = "127.0.0.1:9092", env = "BROKERS")]
     brokers: String,
     /// Print debug info
     #[clap(short, long, env = "DEBUG", takes_value = false)]
@@ -57,7 +61,7 @@ struct Opts {
     #[clap(short, long, default_value = "./secrets.yml", env = "SECRETS")]
     secrets: String,
     /// Xenon gRPC endpoint
-    #[clap(short, long, default_value = "http://localhost:50051", env = "XENON")]
+    #[clap(short, long, default_value = "http://127.0.0.1:50051", env = "XENON")]
     xenon: String,
 }
 
@@ -89,6 +93,7 @@ async fn main() -> Result<()> {
     let secrets = Secrets::new(opts.secrets.clone())?;
     secrets.validate()?;
 
+    let xenon_schedulers = Arc::new(DashMap::<String, Arc<RwLock<Scheduler>>>::new());
     let xenon_endpoint = utilities::ensure_http_schema(&opts.xenon, !opts.debug)?;
 
     // Spawn workers, using Tokio tasks and thread pool.
@@ -103,6 +108,7 @@ async fn main() -> Result<()> {
                 infra.clone(),
                 secrets.clone(),
                 xenon_endpoint.clone(),
+                xenon_schedulers.clone(),
             ));
 
             info!("Spawned asynchronous worker #{}.", i + 1);
@@ -173,6 +179,7 @@ async fn start_worker(
     infra: Infrastructure,
     secrets: Secrets,
     xenon_endpoint: String,
+    xenon_schedulers: Arc<DashMap<String, Arc<RwLock<Scheduler>>>>,
 ) -> Result<()> {
     let output_topic = evt_topic.as_ref();
 
@@ -227,6 +234,7 @@ async fn start_worker(
         let owned_infra = infra.clone();
         let owned_secrets = secrets.clone();
         let owned_xenon_endpoint = xenon_endpoint.clone();
+        let owned_xenon_schedulers = xenon_schedulers.clone();
         let clb_topic = clb_topic.clone();
         let cmd_topic = cmd_topic.clone();
 
@@ -252,7 +260,15 @@ async fn start_worker(
             let events = if topic == clb_topic {
                 handle_clb_message(msg_key, msg_payload)
             } else if topic == cmd_topic {
-                handle_cmd_message(msg_key, msg_payload, owned_infra, owned_secrets, owned_xenon_endpoint).await
+                handle_cmd_message(
+                    msg_key,
+                    msg_payload,
+                    owned_infra,
+                    owned_secrets,
+                    owned_xenon_endpoint,
+                    owned_xenon_schedulers,
+                )
+                .await
             } else {
                 unreachable!()
             };
@@ -319,6 +335,7 @@ async fn handle_cmd_message(
     infra: Infrastructure,
     secrets: Secrets,
     xenon_endpoint: String,
+    xenon_schedulers: Arc<DashMap<String, Arc<RwLock<Scheduler>>>>,
 ) -> Result<Vec<(String, Event)>> {
     // Decode payload into a command message.
     let command = Command::decode(payload).unwrap();
@@ -335,7 +352,9 @@ async fn handle_cmd_message(
 
     // Dispatch command message to appropriate handlers.
     match kind {
-        CommandKind::Create => cmd_create::handle(&key, command, infra, secrets, xenon_endpoint).await,
+        CommandKind::Create => {
+            cmd_create::handle(&key, command, infra, secrets, xenon_endpoint, xenon_schedulers).await
+        }
         CommandKind::Stop => unimplemented!(),
         CommandKind::Unknown => unreachable!(),
     }

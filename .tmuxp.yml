@@ -1,0 +1,24 @@
+session_name: brane
+windows:
+  - window_name: services
+    layout: tiled
+    panes:
+      - shell_command:
+          - cd ./brane-api
+          - cargo run -- --debug
+      - shell_command:
+          - cd ./brane-clb
+          - cargo run -- --debug
+      - shell_command:
+          - cd ./brane-drv
+          - cargo run -- --debug
+      - shell_command:
+          - cd ./brane-plr
+          - cargo run -- --debug
+      - shell_command:
+          - cd ./brane-job
+          - cargo run -- --debug
+
+  - window_name: CLI
+    panes:
+      - cd ./brane-cli

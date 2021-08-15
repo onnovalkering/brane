@@ -29,31 +29,32 @@ services:
   minio:
     image: minio/minio
     ports:
-      - "127.0.0.1:9000:9000"
+      - "9000:9000"
     command: server /data
     restart: always
     environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio123
+      MINIO_ROOT_USER: JntYwuVjKY5v5F2bPZr3aZtD
+      MINIO_ROOT_PASSWORD: qBKuJxbCNa5bSCPQb3kEyB4s
     volumes:
       - data:/data
 
   redis:
     image: redis:6-alpine
     ports:
-      - "127.0.0.1:6379:6379"
+      - "6379:6379"
     restart: always
 
   registry:
     image: registry:2
     ports:
-      - "127.0.0.1:5000:5000"
+      - "5000:5000"
     restart: always
 
   xenon:
     image: onnovalkering/xenon-grpc
     ports:
       - "127.0.0.1:50051:50051"
+    command: -vvvvv
     restart: always
 
   zookeeper:

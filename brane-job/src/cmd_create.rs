@@ -6,6 +6,8 @@ use bollard::models::HostConfig;
 use bollard::Docker;
 use brane_cfg::infrastructure::{Location, LocationCredentials};
 use brane_cfg::{Infrastructure, Secrets};
+use dashmap::lock::RwLock;
+use dashmap::DashMap;
 use futures_util::stream::TryStreamExt;
 use k8s_openapi::api::batch::v1::Job;
 use k8s_openapi::api::core::v1::Namespace;
@@ -18,6 +20,7 @@ use serde_json::{json, Value as JValue};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::iter;
+use std::sync::Arc;
 use xenon::compute::{JobDescription, Scheduler};
 use xenon::credentials::{CertificateCredential, Credential};
 use xenon::storage::{FileSystem, FileSystemPath};
@@ -39,6 +42,7 @@ pub async fn handle(
     infra: Infrastructure,
     secrets: Secrets,
     xenon_endpoint: String,
+    xenon_schedulers: Arc<DashMap<String, Arc<RwLock<Scheduler>>>>,
 ) -> Result<Vec<(String, Event)>> {
     let context = || format!("CREATE command failed or is invalid (key: {}).", key);
 
@@ -121,6 +125,7 @@ pub async fn handle(
                 runtime,
                 credentials,
                 xenon_endpoint,
+                xenon_schedulers,
             )
             .await?
         }
@@ -151,6 +156,7 @@ pub async fn handle(
                 runtime,
                 credentials,
                 xenon_endpoint,
+                xenon_schedulers,
             )
             .await?
         }
@@ -430,6 +436,7 @@ async fn ensure_image(
 ///
 ///
 ///
+#[allow(clippy::too_many_arguments)]
 async fn handle_slurm(
     command: Command,
     job_id: &str,
@@ -438,6 +445,7 @@ async fn handle_slurm(
     runtime: String,
     credentials: LocationCredentials,
     xenon_endpoint: String,
+    xenon_schedulers: Arc<DashMap<String, Arc<RwLock<Scheduler>>>>,
 ) -> Result<()> {
     let credentials = match credentials {
         LocationCredentials::SshCertificate {
@@ -449,13 +457,25 @@ async fn handle_slurm(
         LocationCredentials::Config { .. } => unreachable!(),
     };
 
-    let scheduler = create_xenon_scheduler("slurm", address, credentials, xenon_endpoint).await?;
+    let location_id = environment
+        .get(BRANE_LOCATION_ID)
+        .expect("Expected 'location_id' as environment variable.");
+    let scheduler = create_xenon_scheduler(
+        location_id,
+        "slurm",
+        address,
+        credentials,
+        xenon_endpoint,
+        xenon_schedulers,
+    )
+    .await?;
     handle_xenon(command, job_id, environment, runtime, scheduler).await
 }
 
 ///
 ///
 ///
+#[allow(clippy::too_many_arguments)]
 async fn handle_vm(
     command: Command,
     job_id: &str,
@@ -464,6 +484,7 @@ async fn handle_vm(
     runtime: String,
     credentials: LocationCredentials,
     xenon_endpoint: String,
+    xenon_schedulers: Arc<DashMap<String, Arc<RwLock<Scheduler>>>>,
 ) -> Result<()> {
     let credentials = match credentials {
         LocationCredentials::SshCertificate {
@@ -475,7 +496,18 @@ async fn handle_vm(
         LocationCredentials::Config { .. } => unreachable!(),
     };
 
-    let scheduler = create_xenon_scheduler("ssh", address, credentials, xenon_endpoint).await?;
+    let location_id = environment
+        .get(BRANE_LOCATION_ID)
+        .expect("Expected 'location_id' as environment variable.");
+    let scheduler = create_xenon_scheduler(
+        location_id,
+        "ssh",
+        address,
+        credentials,
+        xenon_endpoint,
+        xenon_schedulers,
+    )
+    .await?;
     handle_xenon(command, job_id, environment, runtime, scheduler).await
 }
 
@@ -487,7 +519,7 @@ async fn handle_xenon(
     job_id: &str,
     environment: HashMap<String, String>,
     runtime: String,
-    mut scheduler: Scheduler,
+    scheduler: Arc<RwLock<Scheduler>>,
 ) -> Result<()> {
     let job_description = match runtime.to_lowercase().as_str() {
         "singularity" => create_singularity_job_description(&command, job_id, environment)?,
@@ -495,8 +527,7 @@ async fn handle_xenon(
         _ => unreachable!(),
     };
 
-    let job = scheduler.submit_batch_job(job_description).await?;
-    dbg!(&job);
+    let _job = scheduler.write().submit_batch_job(job_description).await?;
 
     Ok(())
 }
@@ -505,16 +536,29 @@ async fn handle_xenon(
 ///
 ///
 async fn create_xenon_scheduler<S1, S2, S3>(
+    location_id: &str,
     adaptor: S2,
     location: S1,
     credential: Credential,
     xenon_endpoint: S3,
-) -> Result<Scheduler>
+    xenon_schedulers: Arc<DashMap<String, Arc<RwLock<Scheduler>>>>,
+) -> Result<Arc<RwLock<Scheduler>>>
 where
     S1: Into<String>,
     S2: Into<String>,
     S3: Into<String>,
 {
+    if xenon_schedulers.contains_key(location_id) {
+        let scheduler = xenon_schedulers.get(location_id).unwrap();
+        let scheduler = scheduler.value();
+
+        if scheduler.write().is_open().await? {
+            return Ok(scheduler.clone());
+        } else {
+            xenon_schedulers.remove(location_id);
+        }
+    }
+
     let adaptor = adaptor.into();
     let location = location.into();
     let xenon_endpoint = xenon_endpoint.into();
@@ -550,6 +594,10 @@ where
     };
 
     let scheduler = Scheduler::create(adaptor, location, credential, xenon_endpoint, Some(properties)).await?;
+    xenon_schedulers.insert(location_id.to_string(), Arc::new(RwLock::new(scheduler)));
+
+    let scheduler = xenon_schedulers.get(location_id).unwrap();
+    let scheduler = scheduler.value().clone();
 
     Ok(scheduler)
 }
@@ -572,24 +620,24 @@ fn create_docker_job_description(
         String::from("--rm"),
         String::from("--name"),
         job_id.to_string(),
-        String::from("--cap-drop"),
-        String::from("ALL"),
-        String::from("--cap-add"),
-        String::from("NET_ADMIN"),
-        String::from("--cap-add"),
-        String::from("NET_BIND_SERVICE"),
-        String::from("--cap-add"),
-        String::from("NET_RAW"),
+        String::from("--privileged"),
+        // String::from("ALL"),
+        // String::from("--cap-add"),
+        // String::from("NET_ADMIN"),
+        // String::from("--cap-add"),
+        // String::from("NET_BIND_SERVICE"),
+        // String::from("--cap-add"),
+        // String::from("NET_RAW"),
     ];
 
-    if environment.contains_key(BRANE_MOUNT_DFS) {
-        arguments.push(String::from("--cap-add"));
-        arguments.push(String::from("SYS_ADMIN"));
-        arguments.push(String::from("--device"));
-        arguments.push(String::from("/dev/fuse"));
-        arguments.push(String::from("--security-opt"));
-        arguments.push(String::from("apparmor:unconfined"));
-    }
+    // if environment.contains_key(BRANE_MOUNT_DFS) {
+    //     arguments.push(String::from("--cap-add"));
+    //     arguments.push(String::from("SYS_ADMIN"));
+    //     arguments.push(String::from("--device"));
+    //     arguments.push(String::from("/dev/fuse"));
+    //     arguments.push(String::from("--security-opt"));
+    //     arguments.push(String::from("apparmor:unconfined"));
+    // }
 
     arguments.push(String::from("--network"));
     if let Some(network) = network {
@@ -616,9 +664,14 @@ fn create_docker_job_description(
     arguments.push(command.image.expect("unreachable!"));
 
     // Add command
+    arguments.push(String::from("--debug"));
     arguments.extend(command.command);
 
+    debug!("[job {}] arguments: {}", job_id, arguments.join(" "));
+    debug!("[job {}] executable: {}", job_id, executable);
+
     let job_description = JobDescription {
+        queue: Some(String::from("unlimited")),
         arguments: Some(arguments),
         executable: Some(executable),
         stdout: Some(format!("stdout-{}.txt", job_id)),
@@ -671,8 +724,6 @@ fn create_singularity_job_description(
 
     // Add command
     arguments.extend(command.command);
-
-    dbg!(&arguments.join(" "));
 
     let job_description = JobDescription {
         arguments: Some(arguments),

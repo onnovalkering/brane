@@ -14,14 +14,14 @@ use tonic::transport::Server;
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
-    #[clap(short, long, default_value = "127.0.0.1:50052", env = "ADDRESS")]
+    #[clap(short, long, default_value = "0.0.0.0:50052", env = "ADDRESS")]
     /// Service address
     address: String,
     /// Kafka brokers
-    #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
+    #[clap(short, long, default_value = "127.0.0.1:9092", env = "BROKERS")]
     brokers: String,
     /// Topic to send callbacks to
-    #[clap(short, long = "clb-topic", env = "CALLBACK_TOPIC")]
+    #[clap(short, long = "clb-topic", default_value = "clb", env = "CALLBACK_TOPIC")]
     callback_topic: String,
     /// Print debug info
     #[clap(short, long, env = "DEBUG", takes_value = false)]

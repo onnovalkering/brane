@@ -53,9 +53,23 @@ impl VmState {
         heap: &mut Heap<Object>,
     ) -> FnvHashMap<String, Slot> {
         let mut globals = FnvHashMap::default();
+
+        // First process all the the classes.
         for (name, value) in &self.globals {
-            let slot = Slot::from_value(value.clone(), &globals, heap);
-            globals.insert(name.clone(), slot);
+            if let Value::Class(_) = value {
+                let slot = Slot::from_value(value.clone(), &globals, heap);
+                globals.insert(name.clone(), slot);
+            }
+        }
+
+        // Then the rest of the globals.
+        for (name, value) in &self.globals {
+            if let Value::Class(_) = value {
+                continue;
+            } else {
+                let slot = Slot::from_value(value.clone(), &globals, heap);
+                globals.insert(name.clone(), slot);
+            }
         }
 
         globals
@@ -124,7 +138,12 @@ where
         options: VmOptions,
         stack: Stack,
     ) -> Self {
-        let mut vm = Self {
+        let mut globals = globals;
+        let mut heap = heap;
+
+        builtins::register(&mut globals, &mut heap);
+
+        Self {
             executor,
             frames,
             globals,
@@ -133,11 +152,7 @@ where
             package_index,
             options,
             stack,
-        };
-
-        builtins::register(&mut vm.globals, &mut vm.heap);
-
-        vm
+        }
     }
 
     ///
@@ -276,6 +291,8 @@ where
     ///
     async fn run(&mut self) -> Option<Slot> {
         while let Some(instruction) = self.next() {
+            debug!("{:?}", instruction);
+
             match *instruction {
                 OP_ADD => self.op_add(),
                 OP_AND => self.op_and(),
@@ -328,8 +345,12 @@ where
                 }
             }
 
-            self.executor.debug(format!("{}", self.stack)).await.unwrap();
+            // debug!("Sending stack to client.");
+            // self.executor.debug(format!("{}", self.stack)).await.unwrap();
+            // debug!("Sent stack to client.");
         }
+
+        debug!("No more instructions to process within this call frame.");
 
         None
     }
@@ -459,8 +480,12 @@ where
                         .map(|(p, a)| (p.name.clone(), a))
                         .collect();
 
+                    let function_name = function.name.clone();
                     match self.executor.call(function, arguments, location).await {
-                        Ok(value) => value,
+                        Ok(value) => {
+                            debug!("Value from function '{}' (external): \n{:#?}", function_name, value);
+                            value
+                        }
                         Err(e) => {
                             error!("{:?}", e);
                             panic!("External function failed");
@@ -482,6 +507,8 @@ where
         // Store return value on the stack.
         let slot = Slot::from_value(value, &self.globals, &mut self.heap);
         self.stack.push(slot);
+
+        debug!("Completed call to op_call.");
     }
 
     ///

@@ -179,8 +179,6 @@ pub async fn execute(
 }
 
 async fn perform_request(client: RequestBuilder) -> Result<String, Error<reqwest::Error>> {
-    dbg!(&client);
-
     let op = || {
         let client = client.try_clone().unwrap();
         let response = client.send()?.text()?;

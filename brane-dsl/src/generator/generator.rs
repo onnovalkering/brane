@@ -386,8 +386,6 @@ pub fn expr_to_opcodes(
             expr_to_opcodes(*lhs_operand, chunk, locals, scope);
             let rhs_operand = *rhs_operand;
 
-            dbg!(&rhs_operand);
-
             if let BinOp::Dot = operator {
                 match &rhs_operand {
                     Expr::Ident(Ident(ident)) => {

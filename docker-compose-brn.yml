@@ -10,8 +10,8 @@ services:
     restart: always
     environment:
         ADDRESS: "0.0.0.0:8080"
-        BROKERS: "kafka:29092"
         DEBUG: "true"
+        REGISTRY: "registry:5000"
         SCYLLA: "scylla:9042"
 
   brane-clb:
@@ -19,12 +19,11 @@ services:
       context: .
       dockerfile: Dockerfile.clb
     ports:
-      - "127.0.0.1:50052:50052"
+      - "50052:50052"
     restart: always
     environment:
         ADDRESS: "0.0.0.0:50052"
         BROKERS: "kafka:29092"
-        CALLBACK_TOPIC: "clb"
         DEBUG: "true"
 
   brane-drv:

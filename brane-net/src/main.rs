@@ -24,7 +24,7 @@ struct Opts {
     /// Service address
     address: String,
     /// Kafka brokers
-    #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
+    #[clap(short, long, default_value = "127.0.0.1:9092", env = "BROKERS")]
     brokers: String,
     /// Topic to send callbacks to
     #[clap(short, long = "evt-topic", env = "EVENT_TOPIC")]
@@ -86,7 +86,6 @@ pub async fn handle_connection(
 ) -> Result<()> {
     match socks6::read_request(&mut source).await {
         Ok(request) => {
-            dbg!(&request);
             socks6::write_no_authentication(&mut source).await?;
 
             if let Ok(mut destination) = TcpStream::connect(request.destination.to_string()).await {
@@ -154,8 +153,6 @@ pub async fn emit_event(
     let event_key = format!("{}#{}", job_id, order);
     let category = String::from("net");
     let event = Event::new(kind, job_id, application, location, category, order, payload, None);
-
-    dbg!(&event);
 
     // Encode event as bytes.
     let mut payload = BytesMut::with_capacity(64);

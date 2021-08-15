@@ -4,6 +4,7 @@ use brane_cfg::Infrastructure;
 use brane_drv::grpc::DriverServiceServer;
 use brane_drv::handler::DriverHandler;
 use brane_job::interface::{Event, EventKind};
+use brane_shr::jobs::JobStatus;
 use clap::Clap;
 use dashmap::DashMap;
 use dotenv::dotenv;
@@ -27,7 +28,7 @@ use tonic::transport::Server;
 #[derive(Clap)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
-    #[clap(long, default_value = "http://brane-api:8080/graphql", env = "GRAPHQL_URL")]
+    #[clap(long, default_value = "http://127.0.0.1:8080/graphql", env = "GRAPHQL_URL")]
     graphql_url: String,
     #[clap(short, long, default_value = "127.0.0.1:50053", env = "ADDRESS")]
     /// Service address
@@ -36,10 +37,10 @@ struct Opts {
     #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
     brokers: String,
     /// Topic to send commands to
-    #[clap(short, long = "cmd-topic", env = "COMMAND_TOPIC")]
+    #[clap(short, long = "cmd-topic", default_value = "drv-cmd", env = "COMMAND_TOPIC")]
     command_topic: String,
     /// Topic to recieve events from
-    #[clap(short, long = "evt-topic", env = "EVENT_TOPIC")]
+    #[clap(short, long = "evt-topic", default_value = "job-evt", env = "EVENT_TOPIC")]
     event_topic: String,
     /// Print debug info
     #[clap(short, long, env = "DEBUG", takes_value = false)]
@@ -81,7 +82,7 @@ async fn main() -> Result<()> {
         .context("Failed to create Kafka producer.")?;
 
     // Start event monitor in the background.
-    let states: Arc<DashMap<String, String>> = Arc::new(DashMap::new());
+    let states: Arc<DashMap<String, JobStatus>> = Arc::new(DashMap::new());
     let results: Arc<DashMap<String, Value>> = Arc::new(DashMap::new());
     let locations: Arc<DashMap<String, String>> = Arc::new(DashMap::new());
 
@@ -159,7 +160,7 @@ async fn start_event_monitor(
     brokers: String,
     group_id: String,
     topic: String,
-    states: Arc<DashMap<String, String>>,
+    states: Arc<DashMap<String, JobStatus>>,
     results: Arc<DashMap<String, Value>>,
     locations: Arc<DashMap<String, String>>,
 ) -> Result<()> {
@@ -204,27 +205,22 @@ async fn start_event_monitor(
                     let event = Event::decode(payload).unwrap();
                     let kind = EventKind::from_i32(event.kind).unwrap();
 
-                    dbg!(&event);
-
                     let event_id: Vec<_> = event.identifier.split('-').collect();
                     let correlation_id = event_id.first().unwrap().to_string();
 
                     match kind {
-                        EventKind::Unknown => {
-                            owned_states.insert(correlation_id, String::from("unkown"));
-                        }
                         EventKind::Created => {
-                            owned_states.insert(correlation_id.clone(), String::from("created"));
+                            owned_states.insert(correlation_id.clone(), JobStatus::Created);
                             owned_locations.insert(correlation_id, event.location.clone());
                         }
                         EventKind::Ready => {
-                            owned_states.insert(correlation_id, String::from("created"));
+                            owned_states.insert(correlation_id, JobStatus::Ready);
                         }
                         EventKind::Initialized => {
-                            owned_states.insert(correlation_id, String::from("initialized"));
+                            owned_states.insert(correlation_id, JobStatus::Initialized);
                         }
                         EventKind::Started => {
-                            owned_states.insert(correlation_id, String::from("started"));
+                            owned_states.insert(correlation_id, JobStatus::Started);
                         }
                         EventKind::Finished => {
                             let payload = String::from_utf8_lossy(&event.payload).to_string();
@@ -233,21 +229,18 @@ async fn start_event_monitor(
                             // Using these two hashmaps is not ideal, they lock and we're dependend on polling (from call future).
                             // NOTE: for now we have to make sure the results are inserted before the state becomes "finished" to prevent race conditions.
                             owned_results.insert(correlation_id.clone(), value);
-                            owned_states.insert(correlation_id, String::from("finished"));
-                            dbg!(&owned_results);
+                            owned_states.insert(correlation_id, JobStatus::Finished);
                         }
                         EventKind::Stopped => {
-                            owned_states.insert(correlation_id, String::from("stopped"));
+                            owned_states.insert(correlation_id, JobStatus::Stopped);
                         }
                         EventKind::Failed => {
-                            owned_states.insert(correlation_id, String::from("failed"));
+                            owned_states.insert(correlation_id, JobStatus::Failed);
                         }
                         _ => {
                             unreachable!();
                         }
                     }
-
-                    dbg!(&owned_states);
                 }
 
                 Ok(())

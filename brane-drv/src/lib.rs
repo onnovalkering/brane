@@ -3,6 +3,7 @@ extern crate anyhow;
 #[macro_use]
 extern crate log;
 
+pub mod executor;
 pub mod handler;
 pub mod packages;
 

@@ -137,8 +137,6 @@ async fn process_message(
     let kind = EventKind::from_i32(event.kind).unwrap();
     let payload = event.payload.clone();
 
-    dbg!(&event);
-
     // Additional information, based on kind of event.
     let mut information = vec![];
     match kind {

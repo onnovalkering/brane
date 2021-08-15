@@ -13,6 +13,7 @@ brane-bvm = { path = "../brane-bvm" }
 brane-cfg = { path = "../brane-cfg" }
 brane-dsl = { path = "../brane-dsl" }
 brane-job = { path = "../brane-job" }
+brane-shr = { path = "../brane-shr" }
 bytes = "1"
 chrono = "0.4"
 clap = "3.0.0-beta.2"

@@ -13,6 +13,7 @@ brane-cfg = { path = "../brane-cfg" }
 brane-shr = { path = "../brane-shr" }
 bytes = "1"
 clap = "3.0.0-beta.2"
+dashmap = "4.0"
 dotenv = "0.15"
 env_logger = "0.9"
 futures = "0.3"

@@ -27,7 +27,7 @@ struct Opts {
     #[clap(short, long, default_value = "127.0.0.1", env = "SCYLLA")]
     scylla: String,
     /// Kafka brokers
-    #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
+    #[clap(short, long, default_value = "127.0.0.1:9092", env = "BROKERS")]
     brokers: String,
     /// Print debug info
     #[clap(short, long, env = "DEBUG", takes_value = false)]

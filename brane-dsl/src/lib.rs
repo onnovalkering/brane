@@ -90,14 +90,11 @@ impl Compiler {
         match scanner::scan_tokens(input) {
             Ok((_, tokens)) => {
                 let tokens = Tokens::new(&tokens);
-                dbg!(&tokens);
 
                 let program = match self.options.lang {
                     Lang::Bakery => bakery::parse_ast(tokens, self.package_index.clone()),
                     Lang::BraneScript => bscript::parse_ast(tokens),
                 };
-
-                dbg!(&program);
 
                 match program {
                     Ok((_, program)) => generator::compile(program),

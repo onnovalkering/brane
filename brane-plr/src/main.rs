@@ -26,16 +26,21 @@ use tokio::task::JoinHandle;
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
     /// Topic to receive commands from
-    #[clap(short = 'o', long = "cmd-from-topic", env = "COMMAND_FROM_TOPIC")]
+    #[clap(
+        short = 'o',
+        long = "cmd-from-topic",
+        default_value = "drv-cmd",
+        env = "COMMAND_FROM_TOPIC"
+    )]
     command_from_topic: String,
     /// Kafka brokers
-    #[clap(short, long, default_value = "localhost:9092", env = "BROKERS")]
+    #[clap(short, long, default_value = "127.0.0.1:9092", env = "BROKERS")]
     brokers: String,
     /// Print debug info
     #[clap(short, long, env = "DEBUG", takes_value = false)]
     debug: bool,
     /// Topic to send commands to
-    #[clap(short, long = "cmd-to-topic", env = "COMMAND_TO_TOPIC")]
+    #[clap(short, long = "cmd-to-topic", default_value = "plr-cmd", env = "COMMAND_TO_TOPIC")]
     command_to_topic: String,
     /// Consumer group id
     #[clap(short, long, default_value = "brane-job", env = "GROUP_ID")]

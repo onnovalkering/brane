@@ -166,8 +166,6 @@ async fn start_event_monitor(
                     let event = Event::decode(payload).unwrap();
                     let kind = EventKind::from_i32(event.kind).unwrap();
 
-                    dbg!(&event);
-
                     let event_id: Vec<_> = event.identifier.split('-').collect();
                     let command_id = event_id.first().unwrap().to_string();
 
@@ -200,8 +198,6 @@ async fn start_event_monitor(
                             unreachable!();
                         }
                     }
-
-                    dbg!(&owned_states);
                 }
 
                 Ok(())
@@ -236,8 +232,6 @@ async fn execute_run_action(
     let message = FutureRecord::to(&command_topic)
         .key(&action.identifier)
         .payload(payload.to_bytes());
-
-    dbg!(&message);
 
     if let Err(_) = producer.send(message, Timeout::After(Duration::from_secs(5))).await {
         bail!("Failed to send command to '{}' topic.", command_topic);

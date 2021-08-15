@@ -25,6 +25,7 @@ pub enum Location {
         mount_dfs: Option<String>,
     },
     Local {
+        address: Option<String>,
         callback_to: String,
         network: String,
         registry: String,
@@ -55,7 +56,7 @@ impl Location {
     pub fn get_address(self) -> String {
         match self {
             Location::Kube { address, .. } | Location::Vm { address, .. } | Location::Slurm { address, .. } => address,
-            Location::Local { .. } => String::from("127.0.0.1"),
+            Location::Local { address, .. } => address.unwrap_or_else(|| String::from("127.0.0.1")),
         }
     }
 }

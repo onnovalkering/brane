@@ -39,13 +39,15 @@ build-log-image:
 build-plr-image:
 	docker build --load -t brane_brane-plr -f Dockerfile.plr .
 
-# Development setup
-start-instance: \
+prepare-instance: \
 	ensure-configuration \
 	create-kind-network \
 	start-services \
-	format-dfs \
-	start-brane
+	format-dfs 
+
+start-instance-dev: prepare-instance start-brane-dev
+
+start-instance: prepare-instance start-brane
 
 stop-instance: \
 	stop-ide \
@@ -62,6 +64,9 @@ restart-services: stop-services start-services
 
 start-brane:
 	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-brn.yml up -d
+
+start-brane-dev:
+	tmuxp load .
 
 stop-brane:
 	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-brn.yml down
@@ -83,8 +88,8 @@ ensure-configuration:
 format-dfs:
 	docker run --network kind onnovalkering/juicefs \
 		format \
-		--access-key minio \
-		--secret-key minio123 \
+		--access-key JntYwuVjKY5v5F2bPZr3aZtD \
+		--secret-key qBKuJxbCNa5bSCPQb3kEyB4s \
 		--storage minio \
 		--bucket http://minio:9000/data \
 		redis \
