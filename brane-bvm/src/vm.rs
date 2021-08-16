@@ -1,3 +1,5 @@
+use std::cmp::max;
+
 use crate::frames::CallFrame;
 use crate::objects::Class;
 use crate::stack::{Slot, Stack};
@@ -277,7 +279,8 @@ where
                 .await
                 .unwrap();
 
-            let frame = CallFrame::new(function, frame_first);
+            // Position 0 is the main function, never allow it as root for a nested call frame.
+            let frame = CallFrame::new(function, max(frame_first, 1));
             self.frames.push(frame);
 
             return;
