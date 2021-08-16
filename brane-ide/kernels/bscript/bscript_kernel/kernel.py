@@ -21,7 +21,7 @@ class BraneScriptKernel(Kernel):
     implementation_version = '1.0.0'
     banner = 'bscript'
     language = 'no-op'
-    language_version = '0.4.0'
+    language_version = '0.4.1'
     language_info = {
         'name': 'BraneScript',
         'mimetype': 'text/plain',

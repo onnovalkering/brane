@@ -21,7 +21,7 @@ class BakeryKernel(Kernel):
     implementation_version = '1.0.0'
     banner = 'bakery'
     language = 'no-op'
-    language_version = '0.4.0'
+    language_version = '0.4.1'
     language_info = {
         'name': 'Bakery',
         'mimetype': 'text/plain',

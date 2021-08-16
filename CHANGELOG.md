@@ -2,6 +2,15 @@
 
 All notable changes to the Brane framework will be documented in this file.
 
+## [0.4.1] - 2021-08-16
+### Fixed
+- Disable debug logging from within WaitUntil future.
+- Always use offset of at least 1 for nested call frames.
+- Uniformly handle local and remote jobs.
+- Propagate debug, stdout, and stderr output from driver to client.
+- Construct package index from graphql endpoint.
+- Missing scylla address in docker-compose-brn.yml
+
 ## [0.4.0] - 2021-08-11
 ### Added
 - BraneScript, an alternative to Bakery with more a C-like syntax.
