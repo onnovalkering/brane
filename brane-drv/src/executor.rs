@@ -288,10 +288,10 @@ impl Future for WaitUntil {
     ) -> Poll<Self::Output> {
         let state = self.states.get(&self.correlation_id);
         if let Some(state) = state {
-            if *state.value() >= self.at_least {
+            let state = state.value();
+            
+            if state >= &self.at_least {
                 return Poll::Ready(());
-            } else {
-                debug!("{:?}", state.value());
             }
         }
 
