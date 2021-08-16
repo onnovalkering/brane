@@ -2,23 +2,30 @@ import v6_client;
 import v6_node;
 import v6_server;
 
-// Start a Vantage6 server.
-let server := start_server(5000);
-server.waitUntilStarted();
+on "local" {
+    // Start the Vantage6 server.
+    let server := start_server(5005);
+    server.waitUntilStarted();
 
-let server_url := "http://" + server.address + ":5000";
+    let server_url := "http://" + server.address + ":5005";
 
-// Authenticate with the server.
-let session := login("root", "root", server_url);
-let token := session.access_token;
+    // Authenticate with the server.
+    let session := login("root", "root", server_url);
+    let token := session.access_token;
 
-// Retreive information about the nodes.
-let nodes := get_nodes(server_url, token);
+    // Retreive information about the nodes.
+    let nodes := get_nodes(server_url, token);
 
-// Start the first Vantage6 node.
-let node1 := start_node(nodes[0].api_key, "/data/data.csv", server.address, 5000);
-node1.waitUntilStarted();
-
-// Start the second Vantage6 node.
-let node2 := start_node(nodes[1].api_key, "/data/data.csv", server.address, 5000);
-node2.waitUntilStarted();
+    parallel [
+        on "vm-01" {
+            // Start the first Vantage6 node.
+            let node1 := start_node(nodes[0].api_key, "/data/data.csv", server.address, 5005);
+            node1.waitUntilStarted();
+        },
+        on "vm-02" {
+            // Start the second Vantage6 node.
+            let node2 := start_node(nodes[1].api_key, "/data/data.csv", server.address, 5005);
+            node2.waitUntilStarted();
+        }
+    ];
+}
