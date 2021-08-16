@@ -38,7 +38,7 @@ const BRANE_MOUNT_DFS: &str = "BRANE_MOUNT_DFS";
 ///
 pub async fn handle(
     key: &str,
-    command: Command,
+    mut command: Command,
     infra: Infrastructure,
     secrets: Secrets,
     xenon_endpoint: String,
@@ -54,6 +54,8 @@ pub async fn handle(
     // Retreive location metadata and credentials.
     let location_id = command.location.clone().unwrap();
     let location = infra.get_location_metadata(&location_id).with_context(context)?;
+
+    command.image = Some(format!("{}/library/{}", location.get_registry(), &image));
 
     // Generate job identifier.
     let job_id = format!("{}-{}", correlation_id, get_random_identifier());

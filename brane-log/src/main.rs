@@ -33,7 +33,7 @@ struct Opts {
     #[clap(short, long, env = "DEBUG", takes_value = false)]
     debug: bool,
     /// Topic to receive events from
-    #[clap(short, long = "evt-topics", env = "EVENT_TOPIC", multiple = true)]
+    #[clap(short, long = "evt-topics", env = "EVENT_TOPIC", multiple_values = true)]
     event_topics: Vec<String>,
     /// Consumer group id
     #[clap(short, long, default_value = "brane-log", env = "GROUP_ID")]

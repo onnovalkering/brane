@@ -304,7 +304,7 @@ pub fn stmt_to_opcodes(
         // TODO: merge with block statement?
         Stmt::On { location, block } => {
             // Create a new scope (shadow).
-            let scope = scope + 1;
+            // let scope = scope + 1;
 
             expr_to_opcodes(location, chunk, locals, scope);
             chunk.write(OP_LOC_PUSH);

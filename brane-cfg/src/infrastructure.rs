@@ -53,10 +53,21 @@ pub enum Location {
 }
 
 impl Location {
-    pub fn get_address(self) -> String {
+    pub fn get_address(&self) -> String {
         match self {
-            Location::Kube { address, .. } | Location::Vm { address, .. } | Location::Slurm { address, .. } => address,
-            Location::Local { address, .. } => address.unwrap_or_else(|| String::from("127.0.0.1")),
+            Location::Kube { address, .. } | Location::Vm { address, .. } | Location::Slurm { address, .. } => {
+                address.clone()
+            }
+            Location::Local { address, .. } => address.clone().unwrap_or_else(|| String::from("127.0.0.1")),
+        }
+    }
+
+    pub fn get_registry(&self) -> String {
+        match self {
+            Location::Kube { registry, .. }
+            | Location::Vm { registry, .. }
+            | Location::Slurm { registry, .. }
+            | Location::Local { registry, .. } => registry.clone(),
         }
     }
 }

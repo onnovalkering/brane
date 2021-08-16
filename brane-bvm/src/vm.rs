@@ -294,8 +294,6 @@ where
     ///
     async fn run(&mut self) -> Option<Slot> {
         while let Some(instruction) = self.next() {
-            debug!("{:?}", instruction);
-
             match *instruction {
                 OP_ADD => self.op_add(),
                 OP_AND => self.op_and(),
@@ -348,6 +346,7 @@ where
                 }
             }
 
+            // INVESTIGATE: this appears to cause a deadlock (?).
             // debug!("Sending stack to client.");
             // self.executor.debug(format!("{}", self.stack)).await.unwrap();
             // debug!("Sent stack to client.");
