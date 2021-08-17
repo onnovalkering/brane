@@ -67,10 +67,14 @@ pub async fn handle(
 
         // Check if previous build is still loaded in Docker
         let image_name = format!("{}:{}", package_info.name, package_info.version);
-        docker::remove_image(&image_name).await?;
+        if let Err(e) = docker::remove_image(&image_name).await {
+            error!("Failed to remove previous image from docker:\n{:?}", e);
+        }
 
         let image_name = format!("localhost:5000/library/{}", image_name);
-        docker::remove_image(&image_name).await?;
+        if let Err(e) = docker::remove_image(&image_name).await {
+            error!("Failed to remove previous image from docker:\n{:?}", e);
+        }
 
         // Remove all non-essential files.
         clean_directory(&package_dir, keep_files)?;
