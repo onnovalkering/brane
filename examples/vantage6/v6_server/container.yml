@@ -18,8 +18,18 @@ environment:
   LANG: C.UTF-8
 
 install:
-  - pip3 install pipenv PyJWT==1.7.1 vantage6-server==2.1.1
+  - pip3 install pipenv
   - pipenv install vantage6-server==1.2.3
+  - |-
+    pip3 install \
+      Flask-SocketIO==4.2.1 \
+      Flask==1.1.1  \
+      PyJWT==1.7.1 \
+      python-engineio==3.10.0 \
+      python-socketio==4.4.0 \
+      socketIO-client==0.7.2 \
+      vantage6-server==2.1.1 \
+      websocket-client==0.57.0 
 
 files:
   - configuration.yml

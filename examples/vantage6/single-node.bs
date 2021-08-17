@@ -1,0 +1,20 @@
+import v6_client;
+import v6_node;
+import v6_server;
+
+// Start the Vantage6 server.
+let server := start_server(5005);
+server.waitUntilStarted();
+
+let server_url := "http://" + server.address + ":5005";
+
+// Authenticate with the server.
+let session := login("root", "root", server_url);
+let token := session.access_token;
+
+// Retreive information about the nodes.
+let nodes := get_nodes(server_url, token);
+
+// Start a Vantage6 node.
+let node1 := start_node(nodes[0].api_key, "/data/data.csv", server.address, 5005);
+node1.waitUntilStarted();

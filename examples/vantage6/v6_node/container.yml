@@ -18,7 +18,16 @@ dependencies:
   - python3-pip
 
 install:
-  - pip3 install Flask==1.1.1 vantage6-node==2.1.0
+  - |-
+    pip3 install \
+      Flask-SocketIO==4.2.1 \
+      Flask==1.1.1  \
+      PyJWT==1.7.1 \
+      python-engineio==3.10.0 \
+      python-socketio==4.4.0 \
+      socketIO-client==0.7.2 \
+      vantage6-node==2.1.0 \
+      websocket-client==0.57.0 
 
 files:
   - entrypoint.sh
