@@ -71,12 +71,6 @@ start-brane-dev:
 stop-brane:
 	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-brn.yml down
 
-start-ide:
-	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-ide.yml up -d
-
-stop-ide:
-	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-ide.yml down
-
 # Configuration
 
 ensure-configuration:
@@ -126,12 +120,3 @@ start-slurm: create-kind-network
 		--name slurm \
 		-p 127.0.0.1:10022:22 \
 		onnovalkering/slurm
-
-# JupyterLab IDE
-
-jupyterlab-token:
-	@docker logs brane_brane-ide_1 2>&1 \
-	| grep "token=" \
-	| tail -1 \
-	| sed "s#.*token=##"
-
