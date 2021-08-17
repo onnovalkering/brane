@@ -1,8 +1,10 @@
 <p align="center">
   <img src="https://raw.githubusercontent.com/onnovalkering/brane/master/contrib/assets/logo.png" alt="logo" width="250"/>
+  <h3 align="center">Programmable Orchestration of Applications and Networking</h3>
 </p>
 
-#
+----
+
 <span align="center">
 
   [![Audit status](https://github.com/onnovalkering/brane/workflows/Audit/badge.svg)](https://github.com/onnovalkering/brane/actions)
