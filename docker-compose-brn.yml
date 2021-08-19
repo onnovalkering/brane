@@ -1,10 +1,8 @@
-version: '3.5'
+version: '3'
 
 services:
   brane-api:
-    build:
-      context: .
-      dockerfile: Dockerfile.api
+    image: ghcr.io/onnovalkering/brane/brane-api:${BRANE_VERSION:-latest}
     ports:
       - "127.0.0.1:8080:8080"
     restart: always
@@ -15,11 +13,9 @@ services:
         SCYLLA: "scylla:9042"
 
   brane-clb:
-    build:
-      context: .
-      dockerfile: Dockerfile.clb
+    image: ghcr.io/onnovalkering/brane/brane-clb:${BRANE_VERSION:-latest}
     ports:
-      - "50052:50052"
+      - "127.0.0.1:50052:50052"
     restart: always
     environment:
         ADDRESS: "0.0.0.0:50052"
@@ -27,9 +23,7 @@ services:
         DEBUG: "true"
 
   brane-drv:
-    build:
-      context: .
-      dockerfile: Dockerfile.drv
+    image: ghcr.io/onnovalkering/brane/brane-drv:${BRANE_VERSION:-latest}
     ports:
       - "127.0.0.1:50053:50053"
     volumes:
@@ -43,9 +37,7 @@ services:
         EVENT_TOPIC: job-evt
 
   brane-job:
-    build:
-      context: .
-      dockerfile: Dockerfile.job
+    image: ghcr.io/onnovalkering/brane/brane-job:${BRANE_VERSION:-latest}
     restart: always
     volumes:
       - ./infra.yml:/infra.yml
@@ -60,9 +52,7 @@ services:
         XENON: "xenon:50051"
 
   brane-log:
-    build:
-      context: .
-      dockerfile: Dockerfile.log
+    image: ghcr.io/onnovalkering/brane/brane-log:${BRANE_VERSION:-latest}
     ports:
       - "127.0.0.1:8081:8081"
     restart: always
@@ -73,9 +63,7 @@ services:
         SCYLLA: "scylla:9042"
 
   brane-plr:
-    build:
-      context: .
-      dockerfile: Dockerfile.plr
+    image: ghcr.io/onnovalkering/brane/brane-plr:${BRANE_VERSION:-latest}
     restart: always
     volumes:
       - ./infra.yml:/infra.yml
@@ -89,4 +77,4 @@ services:
 networks:
   default:
     external:
-      name: kind
+      name: brane

@@ -1,4 +1,4 @@
-version: '3.5'
+version: '3'
 
 services:
   scylla:
@@ -26,10 +26,35 @@ services:
       KAFKA_NUM_PARTITIONS: 1
       CONFLUENT_SUPPORT_METRICS_ENABLE: 0
 
+  registry:
+    image: registry:2
+    ports:
+      - "127.0.0.1:5000:5000"
+    restart: always
+
+  xenon:
+    build:
+      context: ./contrib/images
+      dockerfile: Dockerfile.xenon
+    ports:
+      - "127.0.0.1:50051:50051"
+    command: -v
+    restart: always
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:5.5.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: "2181"
+    restart: always
+
+  #############
+  ## JuiceFS ##
+  #############
+
   minio:
     image: minio/minio
     ports:
-      - "9000:9000"
+      - "127.0.0.1:9000:9000"
     command: server /data
     restart: always
     environment:
@@ -41,32 +66,22 @@ services:
   redis:
     image: redis:6-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     restart: always
 
-  registry:
-    image: registry:2
-    ports:
-      - "5000:5000"
-    restart: always
-
-  xenon:
-    image: onnovalkering/xenon-grpc
-    ports:
-      - "127.0.0.1:50051:50051"
-    command: -vvvvv
-    restart: always
-
-  zookeeper:
-    image: confluentinc/cp-zookeeper:5.5.1
-    environment:
-      ZOOKEEPER_CLIENT_PORT: "2181"
-    restart: always
+  format:
+    build:
+      context: ./contrib/images
+      dockerfile: Dockerfile.juicefs
+    depends_on: 
+      - minio
+      - redis
+    command: format --access-key JntYwuVjKY5v5F2bPZr3aZtD --secret-key qBKuJxbCNa5bSCPQb3kEyB4s --storage minio --bucket http://minio:9000/data redis brane
 
 networks:
   default:
     external:
-      name: kind
+      name: brane
 
 volumes:
   data:

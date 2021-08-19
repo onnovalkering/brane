@@ -1,0 +1,11 @@
+FROM ubuntu:20.04
+
+ENV VERSION="0.12.1"
+ENV RELEASE="juicefs-$VERSION-linux-amd64"
+
+ADD "https://github.com/juicedata/juicefs/releases/download/v$VERSION/$RELEASE.tar.gz" .
+
+RUN tar -xf "$RELEASE.tar.gz" \
+ && rm "$RELEASE.tar.gz"
+
+ENTRYPOINT ["/juicefs"]

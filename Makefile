@@ -1,6 +1,9 @@
 build: build-binaries build-services
 
-# Build release versions of the binaries.
+##############
+## BINARIES ##
+##############
+
 build-binaries: \
 	build-cli \
 	build-let
@@ -12,7 +15,10 @@ build-let:
 	rustup target add x86_64-unknown-linux-musl
 	cargo build --release --package brane-let --target x86_64-unknown-linux-musl
 
-# build release versions of the serivces.
+##############
+## SERVICES ##
+##############
+
 build-services: \
 	build-api-image \
 	build-clb-image \
@@ -22,101 +28,61 @@ build-services: \
 	build-plr-image
 
 build-api-image:
-	docker build --load -t brane_brane-api -f Dockerfile.api .
+	docker build --load -t ghcr.io/onnovalkering/brane/brane-api -f Dockerfile.api .
 
 build-clb-image:
-	docker build --load -t brane_brane-clb -f Dockerfile.clb .
+	docker build --load -t ghcr.io/onnovalkering/brane/brane-clb -f Dockerfile.clb .
 
 build-drv-image:
-	docker build --load -t brane_brane-drv -f Dockerfile.drv .
+	docker build --load -t ghcr.io/onnovalkering/brane/brane-drv -f Dockerfile.drv .
 
 build-job-image:
-	docker build --load -t brane_brane-job -f Dockerfile.job .
+	docker build --load -t ghcr.io/onnovalkering/brane/brane-job -f Dockerfile.job .
 
 build-log-image:
-	docker build --load -t brane_brane-log -f Dockerfile.log .
+	docker build --load -t ghcr.io/onnovalkering/brane/brane-log -f Dockerfile.log .
 
 build-plr-image:
-	docker build --load -t brane_brane-plr -f Dockerfile.plr .
+	docker build --load -t ghcr.io/onnovalkering/brane/brane-plr -f Dockerfile.plr .
 
-prepare-instance: \
+##############
+## INSTANCE ##
+##############
+
+start-instance: \
+	ensure-docker-images \
+	ensure-docker-network \
 	ensure-configuration \
-	create-kind-network \
-	start-services \
-	format-dfs 
-
-start-instance-dev: prepare-instance start-brane-dev
-
-start-instance: prepare-instance start-brane
+	start-svc \
+	start-brn
 
 stop-instance: \
-	stop-ide \
-	stop-brane \
-	stop-services
+	stop-brn \
+	stop-svc
 
-start-services:
-	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-svc.yml up -d
+ensure-docker-images:
+	if [ -z "${BRANE_VERSION}" ]; then \
+		make build-services; \
+	fi;
 
-stop-services:
-	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-svc.yml down
-
-restart-services: stop-services start-services
-
-start-brane:
-	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-brn.yml up -d
-
-start-brane-dev:
-	tmuxp load .
-
-stop-brane:
-	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-brn.yml down
-
-# Configuration
+ensure-docker-network:
+	if [ ! -n "$(shell docker network ls -f name=brane | grep brane)" ]; then \
+		docker network create brane; \
+	fi;
 
 ensure-configuration:
 	touch infra.yml && \
-	touch secrets.yml
+	touch secrets.yml	
 
-# JuiceFS
+start-svc:
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-svc.yml up -d
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-svc.yml rm -f
 
-format-dfs:
-	docker run --network kind onnovalkering/juicefs \
-		format \
-		--access-key JntYwuVjKY5v5F2bPZr3aZtD \
-		--secret-key qBKuJxbCNa5bSCPQb3kEyB4s \
-		--storage minio \
-		--bucket http://minio:9000/data \
-		redis \
-		brane
+stop-svc:
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-svc.yml down
 
-# TODO: move below to contrib / seperate repository
+start-brn:
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-brn.yml up -d
 
-# Kubernetes in Docker (kind)
-
-install-kind:
-	./contrib/kind/install-kubectl.sh && \
-	./contrib/kind/install-kind.sh
-
-create-kind-network:
-	if [ ! -n "$(shell docker network ls -f name=kind | grep kind)" ]; then \
-		docker network create kind; \
-	fi;
-
-create-kind-cluster:
-	kind create cluster --config=contrib/kind/config.yml --wait 5m
-
-delete-kind-cluster:
-	kind delete cluster --name brane
-
-kind-cluster-config:
-	@kind get kubeconfig --internal --name brane | base64
-
-# Slurm
-
-start-slurm: create-kind-network
-	docker run --rm -dt \
-		--privileged \
-		--network kind \
-		--name slurm \
-		-p 127.0.0.1:10022:22 \
-		onnovalkering/slurm
+stop-brn:
+	COMPOSE_IGNORE_ORPHANS=1 docker-compose -p brane -f docker-compose-brn.yml down
