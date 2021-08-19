@@ -1,4 +1,6 @@
 application:
+  directories:
+    data: /
   api_key: PLC_API_KEY
   api_path: /api
   databases:

@@ -8,6 +8,7 @@ sed -i "s/PLC_SERVER_PORT/$SERVER_PORT/g" configuration.yml
 
 # Generate random port number for the proxy.
 export PROXY_SERVER_PORT=$(shuf -i 2000-65000 -n 1)
+export DATA_VOLUME_NAME=brane_data
 
 vnode-local start --config "./configuration.yml"
 
