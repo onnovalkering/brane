@@ -9,7 +9,7 @@ use brane_job::{
 use brane_job::{cmd_create, interface::Event};
 use brane_shr::utilities;
 use bytes::BytesMut;
-use clap::Clap;
+use clap::Parser;
 use dashmap::{lock::RwLock, DashMap};
 use dotenv::dotenv;
 use futures::stream::FuturesUnordered;
@@ -30,7 +30,7 @@ use rdkafka::{
 use tokio::task::JoinHandle;
 use xenon::compute::Scheduler;
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
     /// Topic to receive callbacks from

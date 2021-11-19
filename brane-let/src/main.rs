@@ -3,7 +3,7 @@ use brane_let::callback::Callback;
 use brane_let::exec_code;
 use brane_let::exec_oas;
 use brane_let::redirector;
-use clap::Clap;
+use clap::Parser;
 use dotenv::dotenv;
 use log::LevelFilter;
 use serde::de::DeserializeOwned;
@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::{future::Future, process};
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
     #[clap(short, long, env = "BRANE_APPLICATION_ID")]
@@ -36,7 +36,7 @@ struct Opts {
     sub_command: SubCommand,
 }
 
-#[derive(Clap, Clone)]
+#[derive(Parser, Clone)]
 enum SubCommand {
     /// Execute arbitrary source code and return output
     #[clap(name = "code")]

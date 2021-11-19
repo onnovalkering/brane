@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use brane_clb::{callback::CallbackHandler, grpc::CallbackServiceServer};
-use clap::Clap;
+use clap::Parser;
 use dotenv::dotenv;
 use log::LevelFilter;
 use rdkafka::{
@@ -11,7 +11,7 @@ use rdkafka::{
 };
 use tonic::transport::Server;
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
     #[clap(short, long, default_value = "0.0.0.0:50052", env = "ADDRESS")]

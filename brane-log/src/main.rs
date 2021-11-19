@@ -2,7 +2,7 @@ use anyhow::Result;
 use brane_log::ingestion;
 use brane_log::schema::{Event, Query, Subscription};
 use brane_log::{Context, Schema};
-use clap::Clap;
+use clap::Parser;
 use dotenv::dotenv;
 use futures::FutureExt;
 use juniper::{self, EmptyMutation};
@@ -17,7 +17,7 @@ use tokio::sync::watch;
 use warp::ws::Ws;
 use warp::Filter;
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
     #[clap(short, long, default_value = "127.0.0.1:8081", env = "ADDRESS")]

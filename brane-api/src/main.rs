@@ -9,7 +9,7 @@ mod packages;
 mod schema;
 
 use anyhow::{Context as _, Result};
-use clap::Clap;
+use clap::Parser;
 use dotenv::dotenv;
 use juniper::EmptySubscription;
 use log::LevelFilter;
@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use warp::Filter;
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
     #[clap(short, long, default_value = "127.0.0.1:8080", env = "ADDRESS")]

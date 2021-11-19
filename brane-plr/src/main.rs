@@ -3,7 +3,7 @@ use brane_cfg::infrastructure::Location;
 use brane_cfg::Infrastructure;
 use brane_job::interface::{Command, CommandKind};
 use bytes::{Bytes, BytesMut};
-use clap::Clap;
+use clap::Parser;
 use dotenv::dotenv;
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
@@ -22,7 +22,7 @@ use rdkafka::{
 };
 use tokio::task::JoinHandle;
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
     /// Topic to receive commands from

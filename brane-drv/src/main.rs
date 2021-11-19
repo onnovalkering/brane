@@ -5,7 +5,7 @@ use brane_drv::grpc::DriverServiceServer;
 use brane_drv::handler::DriverHandler;
 use brane_job::interface::{Event, EventKind};
 use brane_shr::jobs::JobStatus;
-use clap::Clap;
+use clap::Parser;
 use dashmap::DashMap;
 use dotenv::dotenv;
 use futures::TryStreamExt;
@@ -25,7 +25,7 @@ use specifications::common::Value;
 use std::sync::Arc;
 use tonic::transport::Server;
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
     #[clap(long, default_value = "http://127.0.0.1:8080/graphql", env = "GRAPHQL_URL")]

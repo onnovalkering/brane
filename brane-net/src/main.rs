@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use brane_net::interface::{Event, EventKind};
-use clap::Clap;
+use clap::Parser;
 use dotenv::dotenv;
 use log::{warn, LevelFilter};
 use prost::{bytes::BytesMut, Message};
@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 struct Opts {
     #[clap(short, long, default_value = "0.0.0.0:5081", env = "ADDRESS")]
