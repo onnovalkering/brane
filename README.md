@@ -16,11 +16,19 @@
 
 </span>
 
+:warning: The development and maintanence has been handed over to the [EPI project](https://enablingpersonalizedinterventions.nl), please see [this](http://github.com/epi-project/brane) fork.
+
 ## Introduction
 
 Regardless of the context and rationale, running distributed applications on geographically dispersed IT resources often comes with various technical and organizational challenges. If not addressed appropriately, these challenges may impede development, and in turn, scientific and business innovation. We have designed and developed Brane to support implementers in addressing these challenges. Brane makes use of containerization to encapsulate functionalities as portable building blocks. Through programmability, application orchestration can be expressed using intuitive domain-specific languages. As a result, end-users with limited or no programming experience are empowered to compose applications by themselves, without having to deal with the underlying technical details.
 
-See the [documentation](https://onnovalkering.gitbook.io/brane) for more information.
+See the [documentation](docs/README.md) for more information, or check out our [conference paper](https://doi.org/10.1109/eScience51609.2021.00056) for the scientific context:
+
+```
+O. Valkering, R. Cushing and A. Belloum (2021)
+Brane: A Framework for Programmable Orchestration of Multi-Site Applications 
+IEEE 17th International Conference on eScience pp. 277-282
+```
 
 ## Contributing
 If you're interrested in contributing, please read the [code of conduct](.github/CODE_OF_CONDUCT.md) and [contributing](.github/CONTRIBUTING.md) guide.
